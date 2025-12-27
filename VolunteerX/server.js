@@ -9,6 +9,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+/* ================= DATABASE ================= */
 const pool = new Pool({
   user: process.env.DB_USER,
   host: process.env.DB_HOST,
@@ -17,9 +18,28 @@ const pool = new Pool({
   port: process.env.DB_PORT,
 });
 
-const JWT_SECRET = "volunteerx_secret_key"; // later move to .env
+/* ================= JWT ================= */
+const JWT_SECRET = process.env.JWT_SECRET || "volunteerx_secret_key";
 
-// TEST ROUTE
+/* ================= AUTH MIDDLEWARE ================= */
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({ error: "Token missing" });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: "Invalid token" });
+    }
+    req.user = user;
+    next();
+  });
+}
+
+/* ================= TEST ROUTE ================= */
 app.get("/", (req, res) => {
   res.json({ message: "VolunteerX Auth Ready" });
 });
@@ -34,7 +54,7 @@ app.post("/api/register", async (req, res) => {
     }
 
     const userExists = await pool.query(
-      "SELECT * FROM users WHERE email=$1",
+      "SELECT id FROM users WHERE email=$1",
       [email]
     );
 
@@ -104,6 +124,54 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
+/* ================= CREATE EVENT (ORGANIZER ONLY) ================= */
+app.post("/api/events", authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== "organizer") {
+      return res
+        .status(403)
+        .json({ error: "Only organizers can create events" });
+    }
+
+    const { title, description, location, event_date } = req.body;
+
+    if (!title || !event_date) {
+      return res.status(400).json({ error: "Title and date required" });
+    }
+
+    const newEvent = await pool.query(
+      "INSERT INTO events (organizer_id, title, description, location, event_date) VALUES ($1,$2,$3,$4,$5) RETURNING *",
+      [req.user.id, title, description, location, event_date]
+    );
+
+    res.json({
+      message: "Event created successfully",
+      event: newEvent.rows[0],
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Event creation failed" });
+  }
+});
+
+/* ================= GET EVENTS (PUBLIC) ================= */
+app.get("/api/events", async (req, res) => {
+  try {
+    const events = await pool.query(
+      `SELECT e.*, u.name AS organizer_name
+       FROM events e
+       JOIN users u ON e.organizer_id = u.id
+       ORDER BY e.event_date ASC`
+    );
+
+    res.json(events.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch events" });
+  }
+});
+
+/* ================= SERVER ================= */
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

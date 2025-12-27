@@ -120,199 +120,180 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-/* ================= CREATE EVENT ================= */
+/* ================= EVENTS ================= */
 app.post("/api/events", authenticateToken, async (req, res) => {
-  try {
-    if (req.user.role !== "organizer") {
-      return res.status(403).json({ error: "Only organizers can create events" });
-    }
+  if (req.user.role !== "organizer")
+    return res.status(403).json({ error: "Only organizers can create events" });
 
-    const { title, description, location, event_date } = req.body;
+  const { title, description, location, event_date } = req.body;
+  if (!title || !event_date)
+    return res.status(400).json({ error: "Title and date required" });
 
-    if (!title || !event_date) {
-      return res.status(400).json({ error: "Title and date required" });
-    }
+  const event = await pool.query(
+    "INSERT INTO events (organizer_id,title,description,location,event_date) VALUES ($1,$2,$3,$4,$5) RETURNING *",
+    [req.user.id, title, description, location, event_date]
+  );
 
-    const newEvent = await pool.query(
-      "INSERT INTO events (organizer_id, title, description, location, event_date) VALUES ($1,$2,$3,$4,$5) RETURNING *",
-      [req.user.id, title, description, location, event_date]
-    );
-
-    res.json({
-      message: "Event created successfully",
-      event: newEvent.rows[0],
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Event creation failed" });
-  }
+  res.json({ message: "Event created", event: event.rows[0] });
 });
 
-/* ================= GET EVENTS ================= */
 app.get("/api/events", async (req, res) => {
-  try {
-    const events = await pool.query(
-      `SELECT e.*, u.name AS organizer_name
-       FROM events e
-       JOIN users u ON e.organizer_id = u.id
-       ORDER BY e.event_date ASC`
-    );
-
-    res.json(events.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to fetch events" });
-  }
+  const events = await pool.query(
+    `SELECT e.*, u.name AS organizer_name
+     FROM events e JOIN users u ON e.organizer_id = u.id
+     ORDER BY e.event_date ASC`
+  );
+  res.json(events.rows);
 });
 
-/* ================= APPLY TO EVENT ================= */
+/* ================= APPLY ================= */
 app.post("/api/events/:id/apply", authenticateToken, async (req, res) => {
-  try {
-    if (req.user.role !== "volunteer") {
-      return res.status(403).json({ error: "Only volunteers can apply" });
-    }
+  if (req.user.role !== "volunteer")
+    return res.status(403).json({ error: "Only volunteers can apply" });
 
-    const eventId = req.params.id;
+  const eventId = req.params.id;
 
-    const event = await pool.query(
-      "SELECT * FROM events WHERE id=$1",
-      [eventId]
-    );
+  const exists = await pool.query(
+    "SELECT 1 FROM events WHERE id=$1",
+    [eventId]
+  );
+  if (exists.rows.length === 0)
+    return res.status(404).json({ error: "Event not found" });
 
-    if (event.rows.length === 0) {
-      return res.status(404).json({ error: "Event not found" });
-    }
+  const dup = await pool.query(
+    "SELECT 1 FROM applications WHERE event_id=$1 AND volunteer_id=$2",
+    [eventId, req.user.id]
+  );
+  if (dup.rows.length > 0)
+    return res.status(400).json({ error: "Already applied" });
 
-    const alreadyApplied = await pool.query(
-      "SELECT * FROM applications WHERE event_id=$1 AND volunteer_id=$2",
-      [eventId, req.user.id]
-    );
+  const appRow = await pool.query(
+    "INSERT INTO applications (event_id, volunteer_id) VALUES ($1,$2) RETURNING *",
+    [eventId, req.user.id]
+  );
 
-    if (alreadyApplied.rows.length > 0) {
-      return res.status(400).json({ error: "Already applied to this event" });
-    }
-
-    const application = await pool.query(
-      "INSERT INTO applications (event_id, volunteer_id) VALUES ($1,$2) RETURNING *",
-      [eventId, req.user.id]
-    );
-
-    res.json({
-      message: "Applied successfully",
-      application: application.rows[0],
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Application failed" });
-  }
+  res.json({ message: "Applied successfully", application: appRow.rows[0] });
 });
 
 /* ================= VIEW APPLICANTS ================= */
 app.get("/api/events/:id/applicants", authenticateToken, async (req, res) => {
-  try {
-    if (req.user.role !== "organizer") {
-      return res.status(403).json({ error: "Only organizers can view applicants" });
-    }
+  if (req.user.role !== "organizer")
+    return res.status(403).json({ error: "Only organizers allowed" });
 
-    const eventId = req.params.id;
+  const event = await pool.query(
+    "SELECT 1 FROM events WHERE id=$1 AND organizer_id=$2",
+    [req.params.id, req.user.id]
+  );
+  if (event.rows.length === 0)
+    return res.status(403).json({ error: "Not your event" });
 
-    const event = await pool.query(
-      "SELECT * FROM events WHERE id=$1 AND organizer_id=$2",
-      [eventId, req.user.id]
-    );
+  const applicants = await pool.query(
+    `SELECT a.id, a.status, u.id AS volunteer_id, u.name, u.email
+     FROM applications a JOIN users u ON a.volunteer_id = u.id
+     WHERE a.event_id=$1`,
+    [req.params.id]
+  );
 
-    if (event.rows.length === 0) {
-      return res.status(403).json({ error: "Not your event" });
-    }
-
-    const applicants = await pool.query(
-      `SELECT a.id, a.status, u.id AS volunteer_id, u.name, u.email
-       FROM applications a
-       JOIN users u ON a.volunteer_id = u.id
-       WHERE a.event_id = $1`,
-      [eventId]
-    );
-
-    res.json(applicants.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to fetch applicants" });
-  }
+  res.json(applicants.rows);
 });
 
-/* ================= APPROVE / REJECT ================= */
+/* ================= DECISION ================= */
 app.post("/api/applications/:id/decision", authenticateToken, async (req, res) => {
+  if (req.user.role !== "organizer")
+    return res.status(403).json({ error: "Only organizers allowed" });
+
+  const { decision } = req.body;
+  if (!["approve", "reject"].includes(decision))
+    return res.status(400).json({ error: "Invalid decision" });
+
+  const appRow = await pool.query(
+    `SELECT a.id, e.organizer_id
+     FROM applications a JOIN events e ON a.event_id = e.id
+     WHERE a.id=$1`,
+    [req.params.id]
+  );
+
+  if (appRow.rows.length === 0)
+    return res.status(404).json({ error: "Application not found" });
+
+  if (appRow.rows[0].organizer_id !== req.user.id)
+    return res.status(403).json({ error: "Not your event" });
+
+  const status = decision === "approve" ? "approved" : "rejected";
+  await pool.query(
+    "UPDATE applications SET status=$1 WHERE id=$2",
+    [status, req.params.id]
+  );
+
+  res.json({ message: `Application ${status}` });
+});
+
+/* ================= MY APPLICATIONS ================= */
+app.get("/api/my-applications", authenticateToken, async (req, res) => {
+  if (req.user.role !== "volunteer")
+    return res.status(403).json({ error: "Only volunteers allowed" });
+
+  const apps = await pool.query(
+    `SELECT a.id AS application_id, a.status,
+            e.title, e.location, e.event_date,
+            u.name AS organizer_name
+     FROM applications a
+     JOIN events e ON a.event_id = e.id
+     JOIN users u ON e.organizer_id = u.id
+     WHERE a.volunteer_id=$1
+     ORDER BY a.applied_at DESC`,
+    [req.user.id]
+  );
+
+  res.json(apps.rows);
+});
+
+/* ================= RATINGS (STEP 8) ================= */
+app.post("/api/ratings", authenticateToken, async (req, res) => {
   try {
-    if (req.user.role !== "organizer") {
-      return res.status(403).json({ error: "Only organizers can take decisions" });
-    }
+    const { event_id, ratee_id, score, comment } = req.body;
 
-    const applicationId = req.params.id;
-    const { decision } = req.body;
+    if (!event_id || !ratee_id || !score)
+      return res.status(400).json({ error: "Missing required fields" });
 
-    if (!["approve", "reject"].includes(decision)) {
-      return res.status(400).json({ error: "Invalid decision" });
-    }
+    if (score < 1 || score > 5)
+      return res.status(400).json({ error: "Score must be between 1 and 5" });
 
-    const application = await pool.query(
-      `SELECT a.*, e.organizer_id
+    const validRelation = await pool.query(
+      `SELECT 1
        FROM applications a
        JOIN events e ON a.event_id = e.id
-       WHERE a.id = $1`,
-      [applicationId]
+       WHERE a.event_id = $1
+         AND a.status = 'approved'
+         AND (
+           (a.volunteer_id = $2 AND e.organizer_id = $3)
+           OR
+           (a.volunteer_id = $3 AND e.organizer_id = $2)
+         )`,
+      [event_id, ratee_id, req.user.id]
     );
 
-    if (application.rows.length === 0) {
-      return res.status(404).json({ error: "Application not found" });
-    }
+    if (validRelation.rows.length === 0)
+      return res.status(403).json({ error: "Rating not allowed" });
 
-    if (application.rows[0].organizer_id !== req.user.id) {
-      return res.status(403).json({ error: "Not your event" });
-    }
+    const alreadyRated = await pool.query(
+      "SELECT 1 FROM ratings WHERE event_id=$1 AND rater_id=$2 AND ratee_id=$3",
+      [event_id, req.user.id, ratee_id]
+    );
 
-    const newStatus = decision === "approve" ? "approved" : "rejected";
+    if (alreadyRated.rows.length > 0)
+      return res.status(400).json({ error: "Already rated" });
 
     await pool.query(
-      "UPDATE applications SET status=$1 WHERE id=$2",
-      [newStatus, applicationId]
+      `INSERT INTO ratings (event_id, rater_id, ratee_id, score, comment)
+       VALUES ($1,$2,$3,$4,$5)`,
+      [event_id, req.user.id, ratee_id, score, comment || null]
     );
 
-    res.json({ message: `Application ${newStatus}` });
+    res.json({ message: "Rating submitted successfully" });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Decision failed" });
-  }
-});
-
-/* ================= VOLUNTEER: MY APPLICATIONS ================= */
-app.get("/api/my-applications", authenticateToken, async (req, res) => {
-  try {
-    if (req.user.role !== "volunteer") {
-      return res.status(403).json({ error: "Only volunteers can view applications" });
-    }
-
-    const applications = await pool.query(
-  `SELECT 
-     a.id AS application_id,
-     a.status,
-     e.id AS event_id,
-     e.title,
-     e.location,
-     e.event_date,
-     u.name AS organizer_name
-   FROM applications a
-   JOIN events e ON a.event_id = e.id
-   JOIN users u ON e.organizer_id = u.id
-   WHERE a.volunteer_id = $1
-   ORDER BY a.applied_at DESC`,
-  [req.user.id]
-);
-
-
-    res.json(applications.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to fetch applications" });
+    res.status(500).json({ error: "Rating failed" });
   }
 });
 

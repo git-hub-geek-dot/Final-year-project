@@ -52,8 +52,31 @@ const getApplications = async (req, res) => {
   }
 };
 
+const getStats = async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        (SELECT COUNT(*) FROM users) AS total_users,
+        (SELECT COUNT(*) FROM events) AS total_events,
+        (SELECT COUNT(*) FROM events WHERE status = 'active') AS active_events,
+        (SELECT COUNT(*) FROM applications) AS total_applications
+    `);
+
+    res.json({
+      totalUsers: parseInt(result.rows[0].total_users),
+      totalEvents: parseInt(result.rows[0].total_events),
+      activeEvents: parseInt(result.rows[0].active_events),
+      totalApplications: parseInt(result.rows[0].total_applications),
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Stats fetch failed" });
+  }
+};
+
+
 module.exports = {
   getUsers,
   getEvents,
   getApplications,
+  getStats,
 };

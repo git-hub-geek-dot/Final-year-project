@@ -9,6 +9,9 @@ class AdminEventsScreen extends StatefulWidget {
 }
 
 class _AdminEventsScreenState extends State<AdminEventsScreen> {
+  // ✅ ADDED (as requested)
+  String search = "";
+
   late Future<List<dynamic>> eventsFuture;
 
   @override
@@ -38,15 +41,23 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
 
         final events = snapshot.data!;
 
-        return ListView.builder(
-          itemCount: events.length,
+        // ✅ ADDED: filter events before ListView
+        final filtered = events
+            .where((e) =>
+                e["title"].toLowerCase().contains(search))
+            .toList();
+
+        // ✅ ADDED: extracted events list
+        final eventsList = ListView.builder(
+          itemCount: filtered.length,
           itemBuilder: (context, i) {
-            final e = events[i];
+            final e = filtered[i];
 
             return Card(
               child: ListTile(
                 title: Text(e["title"]),
-                subtitle: Text("Organiser: ${e["organizer_name"] ?? "N/A"}"),
+                subtitle:
+                    Text("Organiser: ${e["organizer_name"] ?? "N/A"}"),
                 trailing: IconButton(
                   icon: const Icon(Icons.delete, color: Colors.red),
                   onPressed: () async {
@@ -57,6 +68,24 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
               ),
             );
           },
+        );
+
+        // ✅ UPDATED: wrap list with Column
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: TextField(
+                decoration: const InputDecoration(
+                  hintText: "Search event title",
+                  prefixIcon: Icon(Icons.search),
+                ),
+                onChanged: (v) =>
+                    setState(() => search = v.toLowerCase()),
+              ),
+            ),
+            Expanded(child: eventsList),
+          ],
         );
       },
     );

@@ -9,6 +9,10 @@ class AdminUsersScreen extends StatefulWidget {
 }
 
 class _AdminUsersScreenState extends State<AdminUsersScreen> {
+  // ✅ ADDED (previous step)
+  String query = "all"; // all | active | blocked
+  String search = "";
+
   late Future<List<dynamic>> usersFuture;
 
   @override
@@ -38,10 +42,23 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
         final users = snapshot.data!;
 
-        return ListView.builder(
-          itemCount: users.length,
+        // ✅ ADDED: filter users before ListView
+        final filtered = users.where((u) {
+          final matchSearch =
+              u["name"].toLowerCase().contains(search) ||
+              u["email"].toLowerCase().contains(search);
+
+          final matchStatus =
+              query == "all" || u["status"] == query;
+
+          return matchSearch && matchStatus;
+        }).toList();
+
+        // ✅ ADDED: extracted users list
+        final usersList = ListView.builder(
+          itemCount: filtered.length,
           itemBuilder: (context, i) {
-            final u = users[i];
+            final u = filtered[i];
             final isBlocked = u["status"] == "blocked";
 
             return Card(
@@ -66,6 +83,33 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
               ),
             );
           },
+        );
+
+        // ✅ UPDATED: wrap list with Column
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: TextField(
+                decoration: const InputDecoration(
+                  hintText: "Search name or email",
+                  prefixIcon: Icon(Icons.search),
+                ),
+                onChanged: (v) =>
+                    setState(() => search = v.toLowerCase()),
+              ),
+            ),
+            DropdownButton<String>(
+              value: query,
+              items: const [
+                DropdownMenuItem(value: "all", child: Text("All")),
+                DropdownMenuItem(value: "active", child: Text("Active")),
+                DropdownMenuItem(value: "blocked", child: Text("Blocked")),
+              ],
+              onChanged: (v) => setState(() => query = v!),
+            ),
+            Expanded(child: usersList),
+          ],
         );
       },
     );

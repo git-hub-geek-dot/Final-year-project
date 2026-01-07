@@ -6,6 +6,8 @@ import '../auth/login_screen.dart';
 import 'admin_events_screen.dart';
 import 'admin_users_screen.dart';
 import 'admin_applications_screen.dart';
+import 'admin_stats_screen.dart';
+
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -22,7 +24,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -45,6 +47,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
+            Tab(text: "Stats"),
             Tab(text: "Events"),
             Tab(text: "Users"),
             Tab(text: "Applications"),
@@ -69,6 +72,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
         child: TabBarView(
           controller: _tabController,
           children: const [
+            AdminStatsScreen(),
             AdminEventsScreen(),
             AdminUsersScreen(),
             AdminApplicationsScreen(),

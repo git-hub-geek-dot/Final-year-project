@@ -111,5 +111,23 @@ static Future<void> cancelApplication(int appId) async {
   }
 }
 
+static Future<Map<String, dynamic>> getStats() async {
+  final token = await TokenService.getToken();
+
+  final res = await http.get(
+    Uri.parse("${ApiConfig.baseUrl}/admin/stats"),
+    headers: {
+      "Authorization": "Bearer $token",
+    },
+  );
+
+  if (res.statusCode != 200) {
+    throw Exception("Failed to load stats");
+  }
+
+  return jsonDecode(res.body);
+}
+
+
 
 }

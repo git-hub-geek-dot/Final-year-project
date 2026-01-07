@@ -10,6 +10,9 @@ class AdminApplicationsScreen extends StatefulWidget {
 }
 
 class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
+  // ✅ ADDED (as requested)
+  String status = "all";
+
   late Future<List<dynamic>> appsFuture;
 
   @override
@@ -39,14 +42,19 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
 
         final apps = snapshot.data!;
 
-        if (apps.isEmpty) {
+        // ✅ ADDED: filter applications by status
+        final filtered = apps.where((a) =>
+            status == "all" || a["status"] == status).toList();
+
+        if (filtered.isEmpty) {
           return const Center(child: Text("No applications found"));
         }
 
-        return ListView.builder(
-          itemCount: apps.length,
+        // ✅ ADDED: extracted applications list
+        final appsList = ListView.builder(
+          itemCount: filtered.length,
           itemBuilder: (context, i) {
-            final a = apps[i];
+            final a = filtered[i];
 
             return Card(
               child: ListTile(
@@ -64,6 +72,23 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
               ),
             );
           },
+        );
+
+        // ✅ UPDATED: wrap list with Column
+        return Column(
+          children: [
+            DropdownButton<String>(
+              value: status,
+              items: const [
+                DropdownMenuItem(value: "all", child: Text("All")),
+                DropdownMenuItem(value: "pending", child: Text("Pending")),
+                DropdownMenuItem(value: "approved", child: Text("Approved")),
+                DropdownMenuItem(value: "rejected", child: Text("Rejected")),
+              ],
+              onChanged: (v) => setState(() => status = v!),
+            ),
+            Expanded(child: appsList),
+          ],
         );
       },
     );

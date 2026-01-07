@@ -11,6 +11,9 @@ import 'screens/volunteer/volunteer_home_screen.dart';
 import 'screens/organiser/organiser_home_screen.dart';
 import 'screens/admin/admin_home_screen.dart';
 
+// ORGANISER
+import 'screens/organiser/organiser_profile_screen.dart'; // ✅ ADD THIS
+
 void main() {
   runApp(const MyApp());
 }
@@ -24,7 +27,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       initialRoute: '/',
       routes: {
-        // AUTH
+        // 🔐 AUTH
         '/': (context) => const LoginScreen(),
         '/register': (context) => const RoleSelectionScreen(),
         '/register-volunteer': (context) =>
@@ -32,13 +35,17 @@ class MyApp extends StatelessWidget {
         '/register-organiser': (context) =>
             const RegisterOrganiserScreen(),
 
-        // ROLE HOMES
+        // 🏠 ROLE HOMES
         '/volunteer-home': (context) =>
             const VolunteerHomeScreen(),
         '/organiser-home': (context) =>
             const OrganiserHomeScreen(),
         '/admin-home': (context) =>
             const AdminHomeScreen(),
+
+        // 👤 ORGANISER PROFILE
+        '/organiser-profile': (context) =>
+            const OrganiserProfileScreen(), // ✅ ADD THIS
       },
     );
   }

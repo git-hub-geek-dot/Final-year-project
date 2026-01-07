@@ -3,7 +3,8 @@ import 'package:http/http.dart' as http;
 import 'token_service.dart';
 
 class EventService {
-  static const String baseUrl = "http://localhost:4000/api";
+  static const String baseUrl = "http://10.0.2.2:4000/api";
+
 
   /// ================= CREATE EVENT =================
   static Future<bool> createEvent({

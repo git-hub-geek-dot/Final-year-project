@@ -41,15 +41,23 @@ class AdminService {
 
   // Fetch all users
 static Future<List<dynamic>> getAllUsers() async {
+  
   final token = await TokenService.getToken();
-
+  if (token == null) {
+    throw Exception("Admin token missing");
+    
+}
   final res = await http.get(
     Uri.parse("${ApiConfig.baseUrl}/admin/users"),
     headers: {
       "Content-Type": "application/json",
+      
       "Authorization": "Bearer $token",
     },
   );
+  
+
+
 
   if (res.statusCode != 200) {
     throw Exception("Failed to load users");

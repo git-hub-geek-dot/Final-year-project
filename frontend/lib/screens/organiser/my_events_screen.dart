@@ -27,13 +27,18 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
       });
     } catch (e) {
       setState(() => loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to load events")),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("My Events")),
+      appBar: AppBar(
+        title: const Text("My Events"),
+      ),
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : events.isEmpty
@@ -45,13 +50,38 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                   itemCount: events.length,
                   itemBuilder: (context, index) {
                     final event = events[index];
+
+                    final eventDate = event["event_date"] != null
+                        ? event["event_date"].toString().split("T")[0]
+                        : "-";
+
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       child: ListTile(
-                        title: Text(event["title"]),
-                        subtitle: Text(event["location"]),
+                        isThreeLine: true,
+                        title: Text(
+                          event["title"] ?? "Untitled Event",
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(event["location"] ?? ""),
+                            const SizedBox(height: 4),
+                            Text(
+                              "Status: ${event["status"] ?? "open"}",
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ],
+                        ),
                         trailing: Text(
-                          event["event_date"].toString().split("T")[0],
+                          eventDate,
+                          style: const TextStyle(fontSize: 12),
                         ),
                       ),
                     );

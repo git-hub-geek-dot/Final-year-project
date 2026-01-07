@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+
+import '../config/api_config.dart';
 import 'token_service.dart';
 
 class EventService {
-  static const String baseUrl = "http://localhost:4000/api";
 
   /// ================= CREATE EVENT =================
   static Future<bool> createEvent({
@@ -13,14 +14,13 @@ class EventService {
     required String eventDate,
   }) async {
     final token = await TokenService.getToken();
-    print("MY EVENTS TOKEN 👉 $token");
 
     if (token == null) {
       throw Exception("No token found");
     }
 
     final response = await http.post(
-      Uri.parse("$baseUrl/events"),
+      Uri.parse("${ApiConfig.baseUrl}/events"),
       headers: {
         "Content-Type": "application/json",
         "Authorization": "Bearer $token",
@@ -50,7 +50,7 @@ class EventService {
     }
 
     final response = await http.get(
-      Uri.parse("$baseUrl/events/my-events"),
+      Uri.parse("${ApiConfig.baseUrl}/events/my-events"),
       headers: {
         "Authorization": "Bearer $token",
         "Content-Type": "application/json",

@@ -1,3 +1,6 @@
+import 'login_screen.dart';
+ // adjust path if needed
+
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -75,7 +78,12 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
 
     if (response.statusCode == 201) {
       if (!mounted) return;
-      Navigator.pop(context);
+    Navigator.pushReplacement(
+  context,
+  MaterialPageRoute(builder: (_) => const LoginScreen()),
+);
+
+
     } else {
       showError(response.body);
     }

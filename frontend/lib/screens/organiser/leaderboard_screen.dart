@@ -5,16 +5,12 @@ class LeaderboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // TEMP: current organiser rank (later from backend)
-    const int currentOrganiserRank = 3;
-
     return Scaffold(
       body: Column(
         children: [
           // 🔷 HEADER
           Container(
-            height: 160,
-            padding: const EdgeInsets.fromLTRB(20, 50, 20, 20),
+            padding: const EdgeInsets.fromLTRB(20, 50, 20, 24),
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
@@ -27,105 +23,103 @@ class LeaderboardScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: const [
                 Text(
-                  "Organiser Leaderboard",
+                  "Volunteerx",
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                Icon(Icons.emoji_events, color: Colors.white),
+                Icon(Icons.notifications, color: Colors.white),
               ],
             ),
           ),
 
           const SizedBox(height: 16),
 
-          // ⭐ CURRENT ORGANISER RANK CARD
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
+          // 🏆 TITLE
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                "Organisers Leaderboard",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
                 ),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                children: const [
-                  CircleAvatar(
-                    radius: 26,
-                    backgroundColor: Colors.white,
-                    child: Icon(Icons.person, color: Colors.green),
-                  ),
-                  SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "You (Current Organiser)",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          "Rank #3 • 12 Events • 4.7 ⭐",
-                          style: TextStyle(color: Colors.white70, fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(Icons.star, color: Colors.amber),
-                ],
               ),
             ),
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
 
-          // 📋 ORGANISER RANKING LIST
+          // 📋 LEADERBOARD LIST
           Expanded(
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              children: [
-                organiserTile(
+              children: const [
+                LeaderboardTile(
                   rank: 1,
-                  name: "Rahul Events",
-                  events: 22,
-                  rating: "4.9",
-                  isTop: true,
+                  name: "Ankit Verma",
+                  city: "Bengaluru",
+                  score: "98 pts",
                 ),
-                organiserTile(
+                LeaderboardTile(
                   rank: 2,
-                  name: "Goa Social Group",
-                  events: 18,
-                  rating: "4.8",
+                  name: "Rahul Sharma",
+                  city: "Mumbai",
+                  score: "92 pts",
                 ),
-                organiserTile(
+                LeaderboardTile(
                   rank: 3,
-                  name: "You",
-                  events: 12,
-                  rating: "4.7",
-                  highlight: true,
+                  name: "Neha Gupta",
+                  city: "Delhi",
+                  score: "88 pts",
                 ),
-                organiserTile(
+                LeaderboardTile(
                   rank: 4,
-                  name: "Helping Hands",
-                  events: 9,
-                  rating: "4.5",
+                  name: "Amit Patel",
+                  city: "Ahmedabad",
+                  score: "81 pts",
                 ),
-                organiserTile(
+                LeaderboardTile(
                   rank: 5,
-                  name: "Youth Club",
-                  events: 7,
-                  rating: "4.2",
+                  name: "Sneha Iyer",
+                  city: "Chennai",
+                  score: "77 pts",
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+
+      // 🔻 BOTTOM NAVIGATION BAR
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: 1, // 👈 Leaderboard selected
+        selectedItemColor: const Color(0xFF22C55E),
+        unselectedItemColor: Colors.grey,
+        onTap: (index) {
+          if (index == 0) {
+            Navigator.pushReplacementNamed(context, '/organiser-home');
+          } else if (index == 2) {
+            Navigator.pushReplacementNamed(
+                context, '/organiser-profile');
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: "Home",
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.leaderboard),
+            label: "Leaderboard",
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: "Profile",
           ),
         ],
       ),
@@ -133,67 +127,74 @@ class LeaderboardScreen extends StatelessWidget {
   }
 }
 
-/// 🧩 ORGANISER TILE
-Widget organiserTile({
-  required int rank,
-  required String name,
-  required int events,
-  required String rating,
-  bool highlight = false,
-  bool isTop = false,
-}) {
-  return Container(
-    margin: const EdgeInsets.only(bottom: 12),
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
-      color: highlight ? Colors.green.withOpacity(0.1) : Colors.white,
-      border: Border.all(
-        color: highlight ? Colors.green : Colors.grey.shade300,
-        width: highlight ? 1.5 : 1,
+/// 🏅 LEADERBOARD TILE
+class LeaderboardTile extends StatelessWidget {
+  final int rank;
+  final String name;
+  final String city;
+  final String score;
+
+  const LeaderboardTile({
+    super.key,
+    required this.rank,
+    required this.name,
+    required this.city,
+    required this.score,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
+        ),
       ),
-      borderRadius: BorderRadius.circular(16),
-    ),
-    child: Row(
-      children: [
-        // Rank badge
-        CircleAvatar(
-          radius: 18,
-          backgroundColor: isTop ? Colors.amber : Colors.grey.shade200,
-          child: Text(
-            "#$rank",
-            style: const TextStyle(fontWeight: FontWeight.bold),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: Colors.white,
+            child: Text(
+              rank.toString(),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF22C55E),
+              ),
+            ),
           ),
-        ),
-
-        const SizedBox(width: 12),
-
-        const CircleAvatar(child: Icon(Icons.business)),
-
-        const SizedBox(width: 12),
-
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                name,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                "$events Events • $rating ⭐",
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-            ],
+                Text(
+                  city,
+                  style:
+                      const TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+              ],
+            ),
           ),
-        ),
-
-        if (isTop)
-          const Icon(Icons.emoji_events, color: Colors.amber),
-      ],
-    ),
-  );
+          Text(
+            score,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
-

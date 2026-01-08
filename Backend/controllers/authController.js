@@ -12,7 +12,7 @@ exports.register = async (req, res) => {
       role,
       contact_number,
       city,
-      government_id
+      government_id,
     } = req.body;
 
     // Basic validation
@@ -32,7 +32,7 @@ exports.register = async (req, res) => {
     // Organiser-specific validation
     if (finalRole === "organiser" && !contact_number) {
       return res.status(400).json({
-        error: "Contact number is required for organiser"
+        error: "Contact number is required for organiser",
       });
     }
 
@@ -63,12 +63,11 @@ exports.register = async (req, res) => {
         finalRole,
         contact_number ?? null,
         finalRole === "volunteer" ? city ?? null : null,
-        finalRole === "organiser" ? government_id ?? null : null
+        finalRole === "organiser" ? government_id ?? null : null,
       ]
     );
 
     res.status(201).json({ message: "User registered successfully" });
-
   } catch (err) {
     console.error("REGISTER ERROR:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -87,7 +86,7 @@ exports.login = async (req, res) => {
     }
 
     const result = await pool.query(
-      "SELECT id, password, role FROM users WHERE email = $1",
+      "SELECT id, name, email, password, role FROM users WHERE email = $1",
       [email]
     );
 
@@ -108,12 +107,16 @@ exports.login = async (req, res) => {
       { expiresIn: "1d" }
     );
 
-    res.json({
+    // ✅ FIXED RESPONSE STRUCTURE
+    res.status(200).json({
       token,
-      userId: user.id,
-      role: user.role
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
     });
-
   } catch (err) {
     console.error("LOGIN ERROR:", err);
     res.status(500).json({ error: "Internal server error" });

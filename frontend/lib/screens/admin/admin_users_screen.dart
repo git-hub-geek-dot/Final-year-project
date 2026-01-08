@@ -9,11 +9,11 @@ class AdminUsersScreen extends StatefulWidget {
 }
 
 class _AdminUsersScreenState extends State<AdminUsersScreen> {
-  // ✅ ADDED (previous step)
-  String query = "all"; // all | active | blocked
-  String search = "";
-
   late Future<List<dynamic>> usersFuture;
+
+  String search = "";
+  String statusFilter = "all"; // all | active | blocked
+  String roleFilter = "all";   // all | volunteer | organiser | admin
 
   @override
   void initState() {
@@ -42,52 +42,23 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
         final users = snapshot.data!;
 
-        // ✅ ADDED: filter users before ListView
         final filtered = users.where((u) {
           final matchSearch =
               u["name"].toLowerCase().contains(search) ||
               u["email"].toLowerCase().contains(search);
 
           final matchStatus =
-              query == "all" || u["status"] == query;
+              statusFilter == "all" || u["status"] == statusFilter;
 
-          return matchSearch && matchStatus;
+          final matchRole =
+              roleFilter == "all" || u["role"] == roleFilter;
+
+          return matchSearch && matchStatus && matchRole;
         }).toList();
 
-        // ✅ ADDED: extracted users list
-        final usersList = ListView.builder(
-          itemCount: filtered.length,
-          itemBuilder: (context, i) {
-            final u = filtered[i];
-            final isBlocked = u["status"] == "blocked";
-
-            return Card(
-              child: ListTile(
-                title: Text(u["name"]),
-                subtitle: Text("${u["email"]} • ${u["role"]}"),
-                trailing: TextButton(
-                  onPressed: () async {
-                    await AdminService.updateUserStatus(
-                      u["id"],
-                      isBlocked ? "active" : "blocked",
-                    );
-                    refresh();
-                  },
-                  child: Text(
-                    isBlocked ? "UNBLOCK" : "BLOCK",
-                    style: TextStyle(
-                      color: isBlocked ? Colors.green : Colors.red,
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-
-        // ✅ UPDATED: wrap list with Column
         return Column(
           children: [
+            // 🔍 Search
             Padding(
               padding: const EdgeInsets.all(8),
               child: TextField(
@@ -99,16 +70,88 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                     setState(() => search = v.toLowerCase()),
               ),
             ),
-            DropdownButton<String>(
-              value: query,
-              items: const [
-                DropdownMenuItem(value: "all", child: Text("All")),
-                DropdownMenuItem(value: "active", child: Text("Active")),
-                DropdownMenuItem(value: "blocked", child: Text("Blocked")),
-              ],
-              onChanged: (v) => setState(() => query = v!),
+
+            // 🔽 Filters
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                children: [
+                  DropdownButton<String>(
+                    value: statusFilter,
+                    items: const [
+                      DropdownMenuItem(
+                          value: "all", child: Text("All Status")),
+                      DropdownMenuItem(
+                          value: "active", child: Text("Active")),
+                      DropdownMenuItem(
+                          value: "blocked", child: Text("Blocked")),
+                    ],
+                    onChanged: (v) =>
+                        setState(() => statusFilter = v!),
+                  ),
+                  const SizedBox(width: 16),
+                  DropdownButton<String>(
+                    value: roleFilter,
+                    items: const [
+                      DropdownMenuItem(
+                          value: "all", child: Text("All Roles")),
+                      DropdownMenuItem(
+                          value: "volunteer", child: Text("Volunteer")),
+                      DropdownMenuItem(
+                          value: "organiser", child: Text("Organiser")),
+                      DropdownMenuItem(
+                          value: "admin", child: Text("Admin")),
+                    ],
+                    onChanged: (v) =>
+                        setState(() => roleFilter = v!),
+                  ),
+                ],
+              ),
             ),
-            Expanded(child: usersList),
+
+            const SizedBox(height: 8),
+
+            // 📋 User list
+            Expanded(
+              child: filtered.isEmpty
+                  ? const Center(child: Text("No users found"))
+                  : ListView.builder(
+                      itemCount: filtered.length,
+                      itemBuilder: (context, i) {
+                        final u = filtered[i];
+                        final isBlocked = u["status"] == "blocked";
+                        final isAdmin = u["role"] == "admin";
+
+                        return Card(
+                          child: ListTile(
+                            title: Text(u["name"]),
+                            subtitle: Text(
+                              "${u["email"]} • ${u["role"]} • ${u["status"]}",
+                            ),
+                            trailing: TextButton(
+                              onPressed: isAdmin
+                                  ? null
+                                  : () async {
+                                      await AdminService.updateUserStatus(
+                                        u["id"],
+                                        isBlocked ? "active" : "blocked",
+                                      );
+                                      refresh();
+                                    },
+                              child: Text(
+                                isBlocked ? "UNBLOCK" : "BLOCK",
+                                style: TextStyle(
+                                  color: isBlocked
+                                      ? Colors.green
+                                      : Colors.red,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
           ],
         );
       },

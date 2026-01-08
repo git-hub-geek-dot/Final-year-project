@@ -58,7 +58,7 @@ const getStats = async (req, res) => {
       SELECT
         (SELECT COUNT(*) FROM users) AS total_users,
         (SELECT COUNT(*) FROM events) AS total_events,
-        (SELECT COUNT(*) FROM events WHERE status = 'active') AS active_events,
+        (SELECT COUNT(*) FROM events WHERE status = 'open') AS active_events,
         (SELECT COUNT(*) FROM applications) AS total_applications
     `);
 
@@ -71,6 +71,75 @@ const getStats = async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: "Stats fetch failed" });
   }
+ };
+
+ const updateUserStatus = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { status } = req.body;
+
+    if (!["active", "blocked"].includes(status)) {
+      return res.status(400).json({ error: "Invalid status" });
+    }
+
+    const result = await pool.query(
+      "UPDATE users SET status = $1 WHERE id = $2 RETURNING id, status",
+      [status, userId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({
+      message: "User status updated",
+      user: result.rows[0],
+    });
+  } catch (err) {
+    console.error("UPDATE USER STATUS ERROR:", err);
+    res.status(500).json({ error: "Failed to update user status" });
+  }};
+
+
+  const cancelApplication = async (req, res) => {
+  try {
+    const appId = req.params.id;
+
+    const result = await pool.query(
+      "UPDATE applications SET status = 'cancelled' WHERE id = $1",
+      [appId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Application not found" });
+    }
+
+    res.json({ message: "Application cancelled" });
+  } catch (err) {
+    console.error("CANCEL APPLICATION ERROR:", err);
+    res.status(500).json({ error: "Failed to cancel application" });
+  }
+};
+
+const deleteEvent = async (req, res) => {
+  try {
+    const eventId = req.params.id;
+
+    const result = await pool.query(
+  "UPDATE events SET status = 'deleted' WHERE id = $1",
+  [eventId]
+);
+
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    res.json({ message: "Event deleted" });
+  } catch (err) {
+    console.error("DELETE EVENT ERROR:", err);
+    res.status(500).json({ error: "Failed to delete event" });
+  }
 };
 
 
@@ -79,4 +148,7 @@ module.exports = {
   getEvents,
   getApplications,
   getStats,
+  updateUserStatus,
+  cancelApplication,
+  deleteEvent,
 };

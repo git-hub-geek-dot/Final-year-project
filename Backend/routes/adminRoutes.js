@@ -5,11 +5,58 @@ const authenticateToken = require("../middleware/auth");
 const adminOnly = require("../middleware/admin");
 const adminController = require("../controllers/adminController");
 
+// USERS
+router.get(
+  "/users",
+  authenticateToken,
+  adminOnly,
+  adminController.getUsers
+);
 
-router.get("/users", adminController.getUsers);
-router.get("/events", adminController.getEvents);
-router.get("/applications", adminController.getApplications);
-router.get("/stats", authenticateToken, adminOnly, adminController.getStats);
+router.post(
+  "/users/:id/status",
+  authenticateToken,
+  adminOnly,
+  adminController.updateUserStatus
+);
+
+// EVENTS
+router.get(
+  "/events",
+  authenticateToken,
+  adminOnly,
+  adminController.getEvents
+);
+
+// APPLICATIONS
+router.get(
+  "/applications",
+  authenticateToken,
+  adminOnly,
+  adminController.getApplications
+);
+
+// STATS
+router.get(
+  "/stats",
+  authenticateToken,
+  adminOnly,
+  adminController.getStats
+);
+
+router.delete(
+  "/applications/:id",
+  authenticateToken,
+  adminOnly,
+  adminController.cancelApplication
+);
+
+router.delete(
+  "/events/:id",
+  authenticateToken,
+  adminOnly,
+  adminController.deleteEvent
+);
 
 
 module.exports = router;

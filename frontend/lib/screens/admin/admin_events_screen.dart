@@ -9,10 +9,8 @@ class AdminEventsScreen extends StatefulWidget {
 }
 
 class _AdminEventsScreenState extends State<AdminEventsScreen> {
-  // ✅ ADDED (as requested)
-  String search = "";
-
   late Future<List<dynamic>> eventsFuture;
+  String search = "";
 
   @override
   void initState() {
@@ -41,38 +39,16 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
 
         final events = snapshot.data!;
 
-        // ✅ ADDED: filter events before ListView
-        final filtered = events
-            .where((e) =>
-                e["title"].toLowerCase().contains(search))
-            .toList();
+        final filtered = events.where((e) {
+          return e["title"]
+              .toString()
+              .toLowerCase()
+              .contains(search.toLowerCase());
+        }).toList();
 
-        // ✅ ADDED: extracted events list
-        final eventsList = ListView.builder(
-          itemCount: filtered.length,
-          itemBuilder: (context, i) {
-            final e = filtered[i];
-
-            return Card(
-              child: ListTile(
-                title: Text(e["title"]),
-                subtitle:
-                    Text("Organiser: ${e["organizer_name"] ?? "N/A"}"),
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  onPressed: () async {
-                    await AdminService.deleteEvent(e["id"]);
-                    refresh();
-                  },
-                ),
-              ),
-            );
-          },
-        );
-
-        // ✅ UPDATED: wrap list with Column
         return Column(
           children: [
+            // 🔍 Search
             Padding(
               padding: const EdgeInsets.all(8),
               child: TextField(
@@ -80,11 +56,57 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
                   hintText: "Search event title",
                   prefixIcon: Icon(Icons.search),
                 ),
-                onChanged: (v) =>
-                    setState(() => search = v.toLowerCase()),
+                onChanged: (v) => setState(() => search = v),
               ),
             ),
-            Expanded(child: eventsList),
+
+            Expanded(
+              child: filtered.isEmpty
+                  ? const Center(child: Text("No events found"))
+                  : ListView.builder(
+                      itemCount: filtered.length,
+                      itemBuilder: (context, i) {
+                        final event = filtered[i];
+                        final isDeleted = event["status"] == "deleted";
+
+                        return Opacity(
+                          opacity: isDeleted ? 0.4 : 1.0,
+                          child: Card(
+                            child: ListTile(
+                              title: Text(
+                                isDeleted
+                                    ? "${event["title"]} (Deleted)"
+                                    : event["title"],
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  decoration: isDeleted
+                                      ? TextDecoration.lineThrough
+                                      : null,
+                                ),
+                              ),
+                              subtitle: Text(
+                                "Organiser: ${event["organiser_name"] ?? "N/A"}",
+                              ),
+                              trailing: IconButton(
+                                icon: const Icon(
+                                  Icons.delete,
+                                  color: Colors.red,
+                                ),
+                                onPressed: isDeleted
+                                    ? null
+                                    : () async {
+                                        await AdminService.deleteEvent(
+                                          event["id"],
+                                        );
+                                        refresh();
+                                      },
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
           ],
         );
       },

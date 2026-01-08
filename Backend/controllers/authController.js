@@ -5,43 +5,36 @@ const pool = require("../config/db");
 // ================= REGISTER =================
 exports.register = async (req, res) => {
   try {
-    let {
+    const {
       name,
       email,
       password,
       role,
-      username,
-      contact,
-      gov_id
+      contact_number,
+      city,
+      government_id
     } = req.body;
 
-    // Validate required fields
+    // Basic validation
     if (!name || !email || !password) {
       return res
         .status(400)
         .json({ error: "Name, email and password are required" });
     }
 
-    let finalRole = role ?? "volunteer";
+    const finalRole = role ?? "volunteer";
 
-// enforce allowed roles
-if (!["volunteer", "organiser", "admin"].includes(finalRole)) {
-  return res.status(400).json({ error: "Invalid role" });
-}
+    // Allowed roles
+    if (!["volunteer", "organiser"].includes(finalRole)) {
+      return res.status(400).json({ error: "Invalid role" });
+    }
 
-
-// organiser-specific validation
-if (finalRole === "organiser") {
-  if (!username || !contact) {
-    return res.status(400).json({
-      error: "Username and contact are required for organiser"
-    });
-  }
-}
-
-
-
-   
+    // Organiser-specific validation
+    if (finalRole === "organiser" && !contact_number) {
+      return res.status(400).json({
+        error: "Contact number is required for organiser"
+      });
+    }
 
     // Check existing user
     const existing = await pool.query(
@@ -58,24 +51,24 @@ if (finalRole === "organiser") {
 
     // Insert user
     await pool.query(
-  `
-  INSERT INTO users
-  (name, email, password, role, username, contact, gov_id)
-  VALUES ($1, $2, $3, $4, $5, $6, $7)
-  `,
-  [
-    name,
-    email,
-    hashedPassword,
-    finalRole,
-    finalRole === "organiser" ? username : null,
-    finalRole === "organiser" ? contact : null,
-    finalRole === "organiser" ? gov_id : null
-  ]
-);
-
+      `
+      INSERT INTO users
+      (name, email, password, role, contact_number, city, government_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `,
+      [
+        name,
+        email,
+        hashedPassword,
+        finalRole,
+        contact_number ?? null,
+        finalRole === "volunteer" ? city ?? null : null,
+        finalRole === "organiser" ? government_id ?? null : null
+      ]
+    );
 
     res.status(201).json({ message: "User registered successfully" });
+
   } catch (err) {
     console.error("REGISTER ERROR:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -116,12 +109,10 @@ exports.login = async (req, res) => {
     );
 
     res.json({
-  token,
-  user: {
-    id: user.id,
-    role: user.role
-  }
-});
+      token,
+      userId: user.id,
+      role: user.role
+    });
 
   } catch (err) {
     console.error("LOGIN ERROR:", err);

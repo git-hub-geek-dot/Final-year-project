@@ -54,23 +54,34 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
 
   // ================= LOGIC UNCHANGED =================
   Future<void> fetchEvents() async {
-    try {
-      final response =
-          await http.get(Uri.parse("http://10.0.2.2:4000/api/events"));
+  try {
+    final response =
+        await http.get(Uri.parse("http://10.0.2.2:4000/api/events"));
 
-      if (response.statusCode == 200) {
-        final decoded = jsonDecode(response.body);
-        setState(() {
-          events = decoded;
-          loading = false;
-        });
-      } else {
-        setState(() => loading = false);
-      }
-    } catch (_) {
+    debugPrint("==== EVENTS API CALL ====");
+    debugPrint("STATUS CODE: ${response.statusCode}");
+    debugPrint("RAW BODY: ${response.body}");
+
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body);
+
+      debugPrint("DECODED TYPE: ${decoded.runtimeType}");
+      debugPrint("DECODED LENGTH: ${decoded.length}");
+
+      setState(() {
+        events = decoded;
+        loading = false;
+      });
+    } else {
+      debugPrint("NON-200 RESPONSE");
       setState(() => loading = false);
     }
+  } catch (e) {
+    debugPrint("FETCH EVENTS ERROR: $e");
+    setState(() => loading = false);
   }
+}
+
 
   // ================= TAB BODY =================
   Widget getBody() {
@@ -85,150 +96,160 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
 
   // ================= HOME UI =================
   Widget buildHome() {
-    if (loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
+  if (loading) {
+    return const Center(child: CircularProgressIndicator());
+  }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // 🔍 Search + Filter (UNCHANGED)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  decoration: InputDecoration(
-                    hintText: "Search volunteer jobs",
-                    prefixIcon: const Icon(Icons.search),
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(30),
-                      borderSide: BorderSide.none,
-                    ),
+  // ✅ THIS IS THE FIX
+  final filteredEvents = selectedCategory == "All"
+      ? events
+      : events
+          .where((e) => e["category"] == selectedCategory)
+          .toList();
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      // 🔍 Search + Filter (UNCHANGED)
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                decoration: InputDecoration(
+                  hintText: "Search volunteer jobs",
+                  prefixIcon: const Icon(Icons.search),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide: BorderSide.none,
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              GestureDetector(
-                onTap: _openFilterSheet,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2ECC71),
-                    borderRadius: BorderRadius.circular(22),
+            ),
+            const SizedBox(width: 12),
+            GestureDetector(
+              onTap: _openFilterSheet,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2ECC71),
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.tune, color: Colors.white, size: 18),
+                    SizedBox(width: 6),
+                    Text(
+                      "Filter",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+
+      // 🟦 CATEGORY CHIPS (UNCHANGED)
+      SizedBox(
+        height: 46,
+        child: ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          scrollDirection: Axis.horizontal,
+          itemCount: eventCategories.length,
+          itemBuilder: (context, index) {
+            final category = eventCategories[index];
+            final selected = category == selectedCategory;
+
+            return GestureDetector(
+              onTap: () {
+                setState(() => selectedCategory = category);
+              },
+              child: Container(
+                margin: const EdgeInsets.only(right: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? const Color(0xFF2E6BE6)
+                      : Colors.white,
+                  borderRadius: BorderRadius.circular(22),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 6,
+                    ),
+                  ],
+                ),
+                child: Text(
+                  category,
+                  style: TextStyle(
+                    color: selected ? Colors.white : Colors.black87,
+                    fontWeight: FontWeight.w500,
                   ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.tune, color: Colors.white, size: 18),
-                      SizedBox(width: 6),
-                      Text(
-                        "Filter",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+
+      const SizedBox(height: 12),
+
+      const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16),
+        child: Text(
+          "Volunteer Jobs",
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+      ),
+
+      const SizedBox(height: 12),
+
+      // 📋 EVENTS LIST (✅ FIXED)
+      Expanded(
+        child: filteredEvents.isEmpty
+            ? const Center(child: Text("No events found"))
+            : ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: filteredEvents.length,
+                itemBuilder: (context, index) {
+                  final event = filteredEvents[index];
+
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ViewEventScreen(event: event),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        // 🟦 CATEGORY CHIPS (UNCHANGED)
-        SizedBox(
-          height: 46,
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            scrollDirection: Axis.horizontal,
-            itemCount: eventCategories.length,
-            itemBuilder: (context, index) {
-              final category = eventCategories[index];
-              final selected = category == selectedCategory;
-
-              return GestureDetector(
-                onTap: () {
-                  setState(() => selectedCategory = category);
-                },
-                child: Container(
-                  margin: const EdgeInsets.only(right: 10),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? const Color(0xFF2E6BE6)
-                        : Colors.white,
-                    borderRadius: BorderRadius.circular(22),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
-                        blurRadius: 6,
-                      ),
-                    ],
-                  ),
-                  child: Text(
-                    category,
-                    style: TextStyle(
-                      color: selected ? Colors.white : Colors.black87,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-
-        const SizedBox(height: 12),
-
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            "Volunteer Jobs",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-        ),
-
-        const SizedBox(height: 12),
-
-        // 📋 EVENTS LIST (CARD FULLY TAPPABLE)
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: events.length,
-            itemBuilder: (context, index) {
-              final event = events[index];
-
-              return GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ViewEventScreen(event: event),
+                      );
+                    },
+                    child: eventCard(
+                      title: event["title"] ?? "",
+                      location: event["location"] ?? "",
+                      date: event["event_date"]
+                              ?.toString()
+                              .split("T")[0] ??
+                          "",
+                      slotsLeft: event["slots_left"] ?? 0,
                     ),
                   );
                 },
-                child: eventCard(
-                  title: event["title"] ?? "",
-                  location: event["location"] ?? "",
-                  date: event["event_date"]
-                          ?.toString()
-                          .split("T")[0] ??
-                      "",
-                  slotsLeft: event["slots_left"] ?? 5, // UI-safe fallback
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
+              ),
+      ),
+    ],
+  );
+}
+
 
   // ================= FILTER BOTTOM SHEET (UNCHANGED) =================
   void _openFilterSheet() {

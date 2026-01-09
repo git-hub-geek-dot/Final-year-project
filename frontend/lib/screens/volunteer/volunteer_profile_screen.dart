@@ -3,6 +3,12 @@ import 'package:flutter/material.dart';
 import '../../services/token_service.dart';
 import '../auth/login_screen.dart';
 
+import 'my_applications_screen.dart';
+import 'my_badges_screen.dart';
+import 'payment_history_screen.dart';
+import 'invite_friends_screen.dart';
+import 'help_support_screen.dart';
+
 class VolunteerProfileScreen extends StatefulWidget {
   const VolunteerProfileScreen({super.key});
 
@@ -95,17 +101,15 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
                   ),
                   const SizedBox(height: 14),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 28, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 28, vertical: 10),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(30),
                     ),
                     child: const Text(
                       "Edit Profile",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
@@ -161,10 +165,8 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
                 children: [
                   const Text(
                     "Volunteer Activities",
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
 
@@ -173,9 +175,10 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
                     title: "My Applications",
                     badge: "3",
                     onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("Applications coming soon"),
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const MyApplicationsScreen(),
                         ),
                       );
                     },
@@ -185,21 +188,53 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
                     icon: Icons.star,
                     title: "My Badges",
                     badge: "5",
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const MyBadgesScreen(),
+                        ),
+                      );
+                    },
                   ),
 
                   _activityTile(
                     icon: Icons.payments,
                     title: "Payment History",
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const PaymentHistoryScreen(),
+                        ),
+                      );
+                    },
                   ),
 
                   _activityTile(
                     icon: Icons.group,
                     title: "Invite Friends",
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const InviteFriendsScreen(),
+                        ),
+                      );
+                    },
                   ),
 
                   _activityTile(
                     icon: Icons.help_outline,
                     title: "Help & Support",
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const HelpSupportScreen(),
+                        ),
+                      );
+                    },
                   ),
 
                   const SizedBox(height: 20),

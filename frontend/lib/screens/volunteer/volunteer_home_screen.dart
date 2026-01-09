@@ -11,12 +11,15 @@ class VolunteerHomeScreen extends StatefulWidget {
 
   @override
   State<VolunteerHomeScreen> createState() => _VolunteerHomeScreenState();
+  
 }
 
 class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
+  
   int selectedIndex = 0;
   List events = [];
   bool loading = true;
+  
 
   // 🔹 FILTER UI STATE (UNCHANGED)
   String selectedCategory = "All";

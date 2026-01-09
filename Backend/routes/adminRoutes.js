@@ -72,5 +72,24 @@ router.get(
   adminController.getOrganiserLeaderboard
 );
 
+router.post(
+  "/badges/evaluate",
+  authenticateToken,
+  adminOnly,
+  adminController.evaluateBadges
+);
+
+router.get("/badges", authenticateToken, adminOnly, adminController.getBadges);
+router.post("/badges", authenticateToken, adminOnly, adminController.createBadge);
+
+router.get(
+  "/badges/users",
+  authenticateToken,
+  adminOnly,
+  adminController.getUserBadges
+);
+
+
+
 
 module.exports = router;

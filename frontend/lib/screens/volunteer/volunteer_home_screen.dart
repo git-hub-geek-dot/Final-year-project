@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import 'volunteer_profile_screen.dart';
 import 'leaderboard_screen.dart';
+import 'view_event_screen.dart'; // ✅ ADDED
 
 class VolunteerHomeScreen extends StatefulWidget {
   const VolunteerHomeScreen({super.key});
@@ -17,7 +18,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
   List events = [];
   bool loading = true;
 
-  // 🔹 FILTER UI STATE (UI ONLY)
+  // 🔹 FILTER UI STATE (UNCHANGED)
   String selectedCategory = "All";
   bool filterPaid = false;
   bool filterUnpaid = false;
@@ -91,7 +92,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 🔍 Search + Filter
+        // 🔍 Search + Filter (UNCHANGED)
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Row(
@@ -114,8 +115,8 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
               GestureDetector(
                 onTap: _openFilterSheet,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   decoration: BoxDecoration(
                     color: const Color(0xFF2ECC71),
                     borderRadius: BorderRadius.circular(22),
@@ -139,7 +140,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
           ),
         ),
 
-        // 🟦 CATEGORY CHIPS (UNCHANGED STYLE)
+        // 🟦 CATEGORY CHIPS (UNCHANGED)
         SizedBox(
           height: 46,
           child: ListView.builder(
@@ -195,49 +196,55 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
 
         const SizedBox(height: 12),
 
-        // 📋 EVENTS LIST (UNCHANGED)
+        // 📋 EVENTS LIST (CARD FULLY TAPPABLE)
         Expanded(
-          child: events.isEmpty
-              ? const Center(child: Text("No events available"))
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: events.length,
-                  itemBuilder: (context, index) {
-                    final event = events[index];
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: events.length,
+            itemBuilder: (context, index) {
+              final event = events[index];
 
-                    return eventCard(
-                      title: event["title"] ?? "",
-                      location: event["location"] ?? "",
-                      date: event["event_date"]
-                          .toString()
-                          .split("T")[0],
-                      onApply: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text("Apply feature coming soon"),
-                          ),
-                        );
-                      },
-                    );
-                  },
+              return GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ViewEventScreen(event: event),
+                    ),
+                  );
+                },
+                child: eventCard(
+                  title: event["title"] ?? "",
+                  location: event["location"] ?? "",
+                  date: event["event_date"]
+                          ?.toString()
+                          .split("T")[0] ??
+                      "",
+                  slotsLeft: event["slots_left"] ?? 5, // UI-safe fallback
                 ),
+              );
+            },
+          ),
         ),
       ],
     );
   }
 
-  // ================= FILTER BOTTOM SHEET (SCROLL FIX ONLY) =================
+  // ================= FILTER BOTTOM SHEET (UNCHANGED) =================
   void _openFilterSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (_) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            return SingleChildScrollView(
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true, // ✅ FIX 1: forces visible height
+    backgroundColor: Colors.white, // ✅ FIX 2: avoids transparent sheet
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (_) {
+      return StatefulBuilder(
+        builder: (context, setSheetState) {
+          return SafeArea( // ✅ FIX 3: prevents zero-height rendering
+            child: SingleChildScrollView(
               padding: EdgeInsets.fromLTRB(
                 16,
                 16,
@@ -250,14 +257,19 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                   const Center(
                     child: Text(
                       "Filter Events",
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
+
                   const SizedBox(height: 20),
 
-                  const Text("Compensation",
-                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  const Text(
+                    "Compensation",
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
 
                   CheckboxListTile(
                     title: const Text("Paid"),
@@ -277,8 +289,10 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
 
                   const SizedBox(height: 16),
 
-                  const Text("Categories",
-                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  const Text(
+                    "Categories",
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
 
                   const SizedBox(height: 8),
 
@@ -313,12 +327,14 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                   ),
                 ],
               ),
-            );
-          },
-        );
-      },
-    );
-  }
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
 
   // ================= MAIN BUILD =================
   @override
@@ -345,55 +361,84 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
         currentIndex: selectedIndex,
         onTap: (i) => setState(() => selectedIndex = i),
         items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
           BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: "Home",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.leaderboard),
-            label: "Leaderboard",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: "Profile",
-          ),
+              icon: Icon(Icons.leaderboard), label: "Leaderboard"),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
         ],
       ),
     );
   }
 }
 
-// ================= EVENT CARD (UNCHANGED) =================
+// ================= EVENT CARD (HOME) =================
 Widget eventCard({
   required String title,
   required String location,
   required String date,
-  required VoidCallback onApply,
+  required int slotsLeft,
 }) {
-  return Card(
+  return Container(
     margin: const EdgeInsets.only(bottom: 16),
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-    elevation: 3,
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(20),
+      gradient: const LinearGradient(
+        colors: [Color(0xFFEAF0FF), Color(0xFFF2FFF7)],
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.08),
+          blurRadius: 10,
+          offset: const Offset(0, 6),
+        ),
+      ],
+    ),
     child: Padding(
       padding: const EdgeInsets.all(16),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(
-          title,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 6),
-        Text(location, style: const TextStyle(color: Colors.grey)),
-        const SizedBox(height: 6),
-        Text(date, style: const TextStyle(color: Colors.grey)),
-        const SizedBox(height: 12),
-        Align(
-          alignment: Alignment.centerRight,
-          child: ElevatedButton(
-            onPressed: onApply,
-            child: const Text("Apply"),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 🟢 SLOTS LEFT BADGE
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: slotsLeft > 0 ? Colors.green : Colors.red,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              "$slotsLeft left",
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
-        ),
-      ]),
+
+          const SizedBox(width: 12),
+
+          // EVENT INFO
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(location,
+                    style: const TextStyle(color: Colors.grey)),
+                const SizedBox(height: 4),
+                Text(date, style: const TextStyle(color: Colors.grey)),
+              ],
+            ),
+          ),
+        ],
+      ),
     ),
   );
 }

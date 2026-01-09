@@ -4,7 +4,9 @@ const router = express.Router();
 const authenticateToken = require("../middleware/auth");
 const applicationController = require("../controllers/applicationController");
 
-// Volunteer applies to event
+/* ================= EXISTING ROUTES (UNCHANGED) ================= */
+
+// Volunteer applies (OLD — kept to avoid breaking anything)
 router.post(
   "/applications",
   authenticateToken,
@@ -16,6 +18,22 @@ router.get(
   "/applications/my",
   authenticateToken,
   applicationController.getMyApplications
+);
+
+/* ================= REQUIRED ROUTES (ADDED) ================= */
+
+// 🔥 REQUIRED: Flutter Apply API
+router.post(
+  "/events/:id/apply",
+  authenticateToken,
+  applicationController.applyToEvent
+);
+
+// 🔥 REQUIRED: Flutter Application Status API
+router.get(
+  "/events/:id/application-status",
+  authenticateToken,
+  applicationController.getApplicationStatus
 );
 
 module.exports = router;

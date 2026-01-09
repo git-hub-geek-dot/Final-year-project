@@ -50,7 +50,7 @@ exports.createEvent = async (req, res) => {
     const eventResult = await pool.query(
       `
       INSERT INTO events (
-        organizer_id,
+        organiser_id,
         title,
         description,
         location,
@@ -113,7 +113,7 @@ exports.getMyEvents = async (req, res) => {
       `
       SELECT *
       FROM events
-      WHERE organizer_id = $1
+      WHERE organiser_id = $1
       ORDER BY id DESC
       `,
       [req.user.id]

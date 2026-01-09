@@ -25,7 +25,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   DateTime? eventStartDate;
   DateTime? eventEndDate;
   DateTime? applicationDeadline;
-
   TimeOfDay? eventStartTime;
   TimeOfDay? eventEndTime;
 
@@ -33,7 +32,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   String eventType = "unpaid";
 
   final List<String> categories = [
-    "All",
     "Education",
     "Healthcare",
     "Environment",
@@ -57,14 +55,14 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
   final List<String> selectedCategories = [];
 
-  @override
-  void dispose() {
-    titleController.dispose();
-    descriptionController.dispose();
-    locationController.dispose();
-    volunteersController.dispose();
-    paymentController.dispose();
-    super.dispose();
+  // ---------------- HELPERS ----------------
+
+  String _fmtDate(DateTime d) =>
+      "${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
+
+  void _toast(String msg) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg)));
   }
 
   Future<void> pickDate(bool isStart) async {
@@ -75,19 +73,17 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       lastDate: DateTime(2100),
     );
     if (picked != null) {
-      setState(() {
-        isStart ? eventStartDate = picked : eventEndDate = picked;
-      });
+      setState(() => isStart ? eventStartDate = picked : eventEndDate = picked);
     }
   }
 
   Future<void> pickTime(bool isStart) async {
-    final picked =
-        await showTimePicker(context: context, initialTime: TimeOfDay.now());
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
     if (picked != null) {
-      setState(() {
-        isStart ? eventStartTime = picked : eventEndTime = picked;
-      });
+      setState(() => isStart ? eventStartTime = picked : eventEndTime = picked);
     }
   }
 
@@ -98,9 +94,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       firstDate: DateTime.now(),
       lastDate: DateTime(2100),
     );
-    if (picked != null) {
-      setState(() => applicationDeadline = picked);
-    }
+    if (picked != null) setState(() => applicationDeadline = picked);
   }
 
   Future<void> pickBannerImage() async {
@@ -108,24 +102,43 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     if (image != null) setState(() => bannerImage = image);
   }
 
+  // ---------------- SUBMIT ----------------
+
   Future<void> handleCreateEvent() async {
-    if (titleController.text.isEmpty ||
-        locationController.text.isEmpty ||
-        descriptionController.text.isEmpty ||
-        volunteersController.text.isEmpty ||
-        eventStartDate == null ||
-        eventEndDate == null ||
-        eventStartTime == null ||
-        eventEndTime == null ||
-        applicationDeadline == null ||
-        bannerImage == null ||
-        selectedCategories.isEmpty) {
-      _toast("Please fill all required fields");
+    if (titleController.text.trim().isEmpty) {
+      _toast("Event title is required");
       return;
     }
-
-    if (eventEndDate!.isBefore(eventStartDate!)) {
-      _toast("End date must be after start date");
+    if (locationController.text.trim().isEmpty) {
+      _toast("Location is required");
+      return;
+    }
+    if (descriptionController.text.trim().isEmpty) {
+      _toast("Description is required");
+      return;
+    }
+    if (volunteersController.text.trim().isEmpty) {
+      _toast("Volunteers required is missing");
+      return;
+    }
+    if (eventStartDate == null || eventEndDate == null) {
+      _toast("Select event start and end dates");
+      return;
+    }
+    if (eventStartTime == null || eventEndTime == null) {
+      _toast("Select event start and end time");
+      return;
+    }
+    if (applicationDeadline == null) {
+      _toast("Select application deadline");
+      return;
+    }
+    if (bannerImage == null) {
+      _toast("Upload event banner");
+      return;
+    }
+    if (selectedCategories.isEmpty) {
+      _toast("Select at least one category");
       return;
     }
 
@@ -144,8 +157,14 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         title: titleController.text.trim(),
         description: descriptionController.text.trim(),
         location: locationController.text.trim(),
-        eventDate:
-            "${eventStartDate!.year}-${eventStartDate!.month.toString().padLeft(2, '0')}-${eventStartDate!.day.toString().padLeft(2, '0')}",
+        eventDate: _fmtDate(eventStartDate!),
+        applicationDeadline: _fmtDate(applicationDeadline!),
+        volunteersRequired: int.parse(volunteersController.text),
+        eventType: eventType,
+        paymentPerDay:
+            eventType == "paid" ? double.parse(paymentController.text) : null,
+        bannerUrl: null,
+        categories: selectedCategories.map((_) => 1).toList(), // backend mapping
       );
 
       if (success && mounted) {
@@ -161,10 +180,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     }
   }
 
-  void _toast(String msg) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
-  }
+  // ---------------- UI ----------------
 
   @override
   Widget build(BuildContext context) {
@@ -173,58 +189,51 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         title: const Text("Create Event"),
         flexibleSpace: const DecoratedBox(
           decoration: BoxDecoration(
-            gradient:
-                LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF22C55E)]),
+            gradient: LinearGradient(
+              colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
+            ),
           ),
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        padding: const EdgeInsets.all(16),
+        child: Column(children: [
+          _sectionCard("Basic Details", [
             _input("Event Title", titleController),
             _input("Location", locationController),
             _input("Description", descriptionController, maxLines: 4),
             _input("Volunteers Required", volunteersController,
                 keyboardType: TextInputType.number),
+          ]),
 
-            // 📅 START & END DATE (SIDE BY SIDE)
-            Row(
-              children: [
-                Expanded(
-                  child: _dateTile(
-                      "Start Date", eventStartDate, () => pickDate(true)),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _dateTile(
-                      "End Date", eventEndDate, () => pickDate(false)),
-                ),
-              ],
-            ),
-
-            // ⏰ START & END TIME (SIDE BY SIDE)
-            Row(
-              children: [
-                Expanded(
-                  child: _timeTile(
-                      "Start Time", eventStartTime, () => pickTime(true)),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _timeTile(
-                      "End Time", eventEndTime, () => pickTime(false)),
-                ),
-              ],
-            ),
-
+          _sectionCard("Schedule", [
+            Row(children: [
+              Expanded(
+                child: _dateTile(
+                    "Start Date", eventStartDate, () => pickDate(true)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _dateTile(
+                    "End Date", eventEndDate, () => pickDate(false)),
+              ),
+            ]),
+            Row(children: [
+              Expanded(
+                child: _timeTile(
+                    "Start Time", eventStartTime, () => pickTime(true)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child:
+                    _timeTile("End Time", eventEndTime, () => pickTime(false)),
+              ),
+            ]),
             _dateTile(
                 "Application Deadline", applicationDeadline, pickDeadline),
+          ]),
 
-            const SizedBox(height: 14),
-
-            // 🖼 EVENT BANNER
+          _sectionCard("Event Banner", [
             InkWell(
               onTap: pickBannerImage,
               child: Container(
@@ -245,15 +254,82 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                       ),
               ),
             ),
+          ]),
 
-            const SizedBox(height: 30),
+          _sectionCard("Event Type", [
+            RadioListTile(
+              value: "paid",
+              groupValue: eventType,
+              title: const Text("Paid"),
+              onChanged: (v) => setState(() => eventType = v!),
+            ),
+            RadioListTile(
+              value: "unpaid",
+              groupValue: eventType,
+              title: const Text("Unpaid"),
+              onChanged: (v) => setState(() => eventType = v!),
+            ),
+            if (eventType == "paid")
+              _input("Payment per day (₹)", paymentController,
+                  keyboardType: TextInputType.number),
+          ]),
 
-            loading
-                ? const Center(child: CircularProgressIndicator())
-                : _submitButton(),
-          ],
-        ),
+          _sectionCard("Categories", [
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: categories.map((c) {
+                final selected = selectedCategories.contains(c);
+                return ChoiceChip(
+                  label: Text(c),
+                  selected: selected,
+                  selectedColor: const Color(0xFF22C55E),
+                  labelStyle: TextStyle(
+                      color: selected ? Colors.white : Colors.black),
+                  onSelected: (v) {
+                    setState(() {
+                      v
+                          ? selectedCategories.add(c)
+                          : selectedCategories.remove(c);
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+          ]),
+
+          const SizedBox(height: 24),
+
+          loading
+              ? const CircularProgressIndicator()
+              : _submitButton(),
+        ]),
       ),
+    );
+  }
+
+  // ---------------- WIDGETS ----------------
+
+  Widget _sectionCard(String title, List<Widget> children) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(color: Colors.black12, blurRadius: 6),
+        ],
+      ),
+      child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title,
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            ...children,
+          ]),
     );
   }
 
@@ -261,17 +337,17 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         onTap: handleCreateEvent,
         child: Container(
           height: 56,
+          width: double.infinity,
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-                colors: [Color(0xFF3B82F6), Color(0xFF22C55E)]),
+              colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
+            ),
             borderRadius: BorderRadius.circular(30),
           ),
           child: const Center(
-            child: Text(
-              "Create Event",
-              style:
-                  TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-            ),
+            child: Text("Create Event",
+                style:
+                    TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ),
       );
@@ -279,7 +355,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   Widget _input(String hint, TextEditingController c,
       {int maxLines = 1, TextInputType keyboardType = TextInputType.text}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.only(bottom: 12),
       child: TextField(
         controller: c,
         maxLines: maxLines,
@@ -294,26 +370,18 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   }
 
   Widget _dateTile(String title, DateTime? value, VoidCallback onTap) {
-    return _tile(
-      Icons.calendar_today_outlined,
-      value == null
-          ? title
-          : "${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}",
-      onTap,
-    );
+    return _tile(Icons.calendar_today,
+        value == null ? title : _fmtDate(value), onTap);
   }
 
   Widget _timeTile(String title, TimeOfDay? value, VoidCallback onTap) {
-    return _tile(
-      Icons.access_time,
-      value == null ? title : value.format(context),
-      onTap,
-    );
+    return _tile(Icons.access_time,
+        value == null ? title : value.format(context), onTap);
   }
 
   Widget _tile(IconData icon, String text, VoidCallback onTap) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         onTap: onTap,
         child: Container(
@@ -322,13 +390,11 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.grey),
           ),
-          child: Row(
-            children: [
-              Icon(icon),
-              const SizedBox(width: 12),
-              Text(text),
-            ],
-          ),
+          child: Row(children: [
+            Icon(icon),
+            const SizedBox(width: 12),
+            Text(text),
+          ]),
         ),
       ),
     );

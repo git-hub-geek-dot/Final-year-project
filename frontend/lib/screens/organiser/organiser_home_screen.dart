@@ -4,7 +4,6 @@ import 'create_event_screen.dart';
 import 'leaderboard_screen.dart';
 import 'review_application_screen.dart';
 
-
 class OrganiserHomeScreen extends StatefulWidget {
   const OrganiserHomeScreen({super.key});
 
@@ -34,8 +33,42 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
     }
   }
 
+  // ================= FILTER LOGIC =================
+
+  DateTime _onlyDate(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  List _upcomingEvents() {
+    final today = _onlyDate(DateTime.now());
+    return events.where((e) {
+      final date = _onlyDate(DateTime.parse(e["event_date"]));
+      return date.isAfter(today);
+    }).toList();
+  }
+
+  List _ongoingEvents() {
+    final today = _onlyDate(DateTime.now());
+    return events.where((e) {
+      final date = _onlyDate(DateTime.parse(e["event_date"]));
+      return date.isAtSameMomentAs(today);
+    }).toList();
+  }
+
+  List _completedEvents() {
+    final today = _onlyDate(DateTime.now());
+    return events.where((e) {
+      final date = _onlyDate(DateTime.parse(e["event_date"]));
+      return date.isBefore(today);
+    }).toList();
+  }
+
+  // ================= UI =================
+
   @override
   Widget build(BuildContext context) {
+    final ongoing = _ongoingEvents();
+    final upcoming = _upcomingEvents();
+    final completed = _completedEvents();
+
     return Scaffold(
       body: Column(
         children: [
@@ -46,12 +79,9 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
               ),
-              borderRadius: BorderRadius.vertical(
-                bottom: Radius.circular(40),
-              ),
+              borderRadius:
+                  BorderRadius.vertical(bottom: Radius.circular(40)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -71,7 +101,7 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
 
           const SizedBox(height: 20),
 
-          // 🔘 Create Event Button
+          // 🔘 Create Event
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: InkWell(
@@ -79,8 +109,7 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const CreateEventScreen(),
-                  ),
+                      builder: (_) => const CreateEventScreen()),
                 ).then((_) => loadMyEvents());
               },
               child: Container(
@@ -95,10 +124,9 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
                   child: Text(
                     "Create Event",
                     style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -107,54 +135,21 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
 
           const SizedBox(height: 20),
 
-          // 📋 MY EVENTS SECTION
+          // 📋 EVENTS LIST
           Expanded(
             child: loading
                 ? const Center(child: CircularProgressIndicator())
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                : ListView(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
                     children: [
-                      const Padding(
-                        padding: EdgeInsets.fromLTRB(24, 10, 24, 10),
-                        child: Text(
-                          "My Events",
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: events.isEmpty
-                            ? const Center(
-                                child: Text(
-                                  "No events created yet",
-                                  style: TextStyle(fontSize: 16),
-                                ),
-                              )
-                            : ListView.builder(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 20),
-                                itemCount: events.length,
-                                itemBuilder: (context, index) {
-                                  final event = events[index];
-                                  return eventCard(
-                                    context: context,
-                                    title: event["title"] ?? "Untitled",
-                                    location: event["location"] ?? "",
-                                    date: event["event_date"]
-                                        .toString()
-                                        .split("T")[0],
-                                    eventId: event["id"],
-                                  );
-                                },
-                              ),
-                      ),
+                      _section("Ongoing Events", ongoing),
+                      _section("Upcoming Events", upcoming),
+                      _section("Completed Events", completed),
                     ],
                   ),
           ),
 
-          // 📊 Quick Stats
+          // 📊 Stats
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Container(
@@ -169,8 +164,8 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
                   StatItem(events.length.toString(), "Total Events"),
-                  const StatItem("—", "Volunteers"),
-                  const StatItem("—", "Pending"),
+                  StatItem(ongoing.length.toString(), "Ongoing"),
+                  StatItem(upcoming.length.toString(), "Upcoming"),
                 ],
               ),
             ),
@@ -189,32 +184,53 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
           if (index == 1) {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const LeaderboardScreen()),
+              MaterialPageRoute(
+                  builder: (_) => const LeaderboardScreen()),
             );
           } else if (index == 2) {
             Navigator.pushNamed(context, "/organiser-profile");
           }
         },
         items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
           BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: "Home",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.leaderboard),
-            label: "Leaderboard",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: "Profile",
-          ),
+              icon: Icon(Icons.leaderboard), label: "Leaderboard"),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
         ],
       ),
     );
   }
+
+  // ================= HELPERS =================
+
+  Widget _section(String title, List list) {
+    if (list.isEmpty) return const SizedBox();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Text(
+            title,
+            style: const TextStyle(
+                fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+        ),
+        ...list.map((event) => eventCard(
+              context: context,
+              title: event["title"],
+              location: event["location"],
+              date: event["event_date"].toString().split("T")[0],
+              eventId: event["id"],
+            )),
+      ],
+    );
+  }
 }
 
-/// 🔹 Event Card Widget
+/// ================= EVENT CARD =================
+
 Widget eventCard({
   required BuildContext context,
   required String title,
@@ -232,23 +248,14 @@ Widget eventCard({
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text("📍 $location"),
-            Text("📅 $date"),
-          ],
-        ),
-
-        // ✅ REVIEW APPLICATIONS BUTTON (WORKING)
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title,
+              style:
+                  const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 6),
+          Text("📍 $location"),
+          Text("📅 $date"),
+        ]),
         InkWell(
           onTap: () {
             Navigator.push(
@@ -260,7 +267,8 @@ Widget eventCard({
             );
           },
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
@@ -270,10 +278,9 @@ Widget eventCard({
             child: const Text(
               "Review Applications",
               style: TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold),
             ),
           ),
         ),
@@ -282,7 +289,8 @@ Widget eventCard({
   );
 }
 
-/// 🔹 Stats Item
+/// ================= STATS =================
+
 class StatItem extends StatelessWidget {
   final String value;
   final String label;
@@ -293,19 +301,14 @@ class StatItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        Text(value,
+            style: const TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(color: Colors.white70, fontSize: 12),
-        ),
+        Text(label,
+            style: const TextStyle(color: Colors.white70, fontSize: 12)),
       ],
     );
   }

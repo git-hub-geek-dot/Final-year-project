@@ -19,8 +19,9 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
   int selectedIndex = 0;
   List events = [];
   bool loading = true;
-  
-String searchQuery = "";
+
+  String searchQuery = "";
+
 
   // 🔹 FILTER UI STATE (UNCHANGED)
   String selectedCategory = "All";

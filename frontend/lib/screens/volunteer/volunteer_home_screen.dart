@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import 'volunteer_profile_screen.dart';
+import 'leaderboard_screen.dart';
 
 class VolunteerHomeScreen extends StatefulWidget {
   const VolunteerHomeScreen({super.key});
@@ -70,13 +71,18 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     }
   }
 
+  // ================= TAB BODY =================
   Widget getBody() {
-    return selectedIndex == 0
-        ? buildHome()
-        : const VolunteerProfileScreen();
+    if (selectedIndex == 0) {
+      return buildHome();
+    } else if (selectedIndex == 1) {
+      return const LeaderboardScreen();
+    } else {
+      return const VolunteerProfileScreen();
+    }
   }
 
-  // ================= UI (UNCHANGED) =================
+  // ================= HOME UI =================
   Widget buildHome() {
     if (loading) {
       return const Center(child: CircularProgressIndicator());
@@ -108,21 +114,22 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
               GestureDetector(
                 onTap: _openFilterSheet,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 12),
                   decoration: BoxDecoration(
                     color: const Color(0xFF2ECC71),
                     borderRadius: BorderRadius.circular(22),
                   ),
-                  child: Row(
-                    children: const [
+                  child: const Row(
+                    children: [
                       Icon(Icons.tune, color: Colors.white, size: 18),
                       SizedBox(width: 6),
                       Text(
                         "Filter",
                         style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600),
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),
@@ -132,7 +139,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
           ),
         ),
 
-        // 🟦 BLUE CATEGORY CHIPS (RESTORED)
+        // 🟦 CATEGORY CHIPS (UNCHANGED STYLE)
         SizedBox(
           height: 46,
           child: ListView.builder(
@@ -188,7 +195,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
 
         const SizedBox(height: 12),
 
-        // 📋 Events list (UNCHANGED UI)
+        // 📋 EVENTS LIST (UNCHANGED)
         Expanded(
           child: events.isEmpty
               ? const Center(child: Text("No events available"))
@@ -207,7 +214,8 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                       onApply: () {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                              content: Text("Apply feature coming soon")),
+                            content: Text("Apply feature coming soon"),
+                          ),
                         );
                       },
                     );
@@ -218,110 +226,99 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     );
   }
 
-  // ================= FILTER BOTTOM SHEET (NEW, UI ONLY) =================
+  // ================= FILTER BOTTOM SHEET (SCROLL FIX ONLY) =================
   void _openFilterSheet() {
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true, // ✅ required for scrolling
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
-    builder: (_) {
-      return StatefulBuilder(
-        builder: (context, setSheetState) {
-          return SingleChildScrollView( // ✅ ONLY ADDITION
-            padding: EdgeInsets.fromLTRB(
-              16,
-              16,
-              16,
-              MediaQuery.of(context).viewInsets.bottom + 24,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-
-              // ⬇️ EVERYTHING BELOW IS YOUR EXISTING CODE
-              children: [
-                const Center(
-                  child: Text(
-                    "Filter Events",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Center(
+                    child: Text(
+                      "Filter Events",
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                   ),
-                ),
+                  const SizedBox(height: 20),
 
-                const SizedBox(height: 20),
+                  const Text("Compensation",
+                      style: TextStyle(fontWeight: FontWeight.w600)),
 
-                const Text(
-                  "Compensation",
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-
-                CheckboxListTile(
-                  title: const Text("Paid"),
-                  value: filterPaid,
-                  onChanged: (val) =>
-                      setSheetState(() => filterPaid = val!),
-                  controlAffinity: ListTileControlAffinity.leading,
-                ),
-
-                CheckboxListTile(
-                  title: const Text("Unpaid"),
-                  value: filterUnpaid,
-                  onChanged: (val) =>
-                      setSheetState(() => filterUnpaid = val!),
-                  controlAffinity: ListTileControlAffinity.leading,
-                ),
-
-                const SizedBox(height: 16),
-
-                const Text(
-                  "Categories",
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-
-                const SizedBox(height: 8),
-
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: eventCategories
-                      .where((c) => c != "All")
-                      .map(
-                        (cat) => ChoiceChip(
-                          label: Text(cat),
-                          selected: selectedCategory == cat,
-                          onSelected: (_) {
-                            setSheetState(() {
-                              selectedCategory = cat;
-                            });
-                          },
-                        ),
-                      )
-                      .toList(),
-                ),
-
-                const SizedBox(height: 24),
-
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text("Apply Filters"),
+                  CheckboxListTile(
+                    title: const Text("Paid"),
+                    value: filterPaid,
+                    onChanged: (v) =>
+                        setSheetState(() => filterPaid = v!),
+                    controlAffinity: ListTileControlAffinity.leading,
                   ),
-                ),
-              ],
-            ),
-          );
-        },
-      );
-    },
-  );
-}
 
+                  CheckboxListTile(
+                    title: const Text("Unpaid"),
+                    value: filterUnpaid,
+                    onChanged: (v) =>
+                        setSheetState(() => filterUnpaid = v!),
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  const Text("Categories",
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+
+                  const SizedBox(height: 8),
+
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: eventCategories
+                        .where((c) => c != "All")
+                        .map(
+                          (cat) => ChoiceChip(
+                            label: Text(cat),
+                            selected: selectedCategory == cat,
+                            onSelected: (_) {
+                              setSheetState(() {
+                                selectedCategory = cat;
+                              });
+                            },
+                          ),
+                        )
+                        .toList(),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text("Apply Filters"),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 
   // ================= MAIN BUILD =================
   @override
@@ -338,16 +335,28 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
             ),
           ),
         ),
-        title: const Text("VolunteerX",
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          "VolunteerX",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
       ),
       body: getBody(),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: selectedIndex,
         onTap: (i) => setState(() => selectedIndex = i),
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: "Home",
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.leaderboard),
+            label: "Leaderboard",
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: "Profile",
+          ),
         ],
       ),
     );
@@ -368,9 +377,10 @@ Widget eventCard({
     child: Padding(
       padding: const EdgeInsets.all(16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title,
-            style:
-                const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text(
+          title,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 6),
         Text(location, style: const TextStyle(color: Colors.grey)),
         const SizedBox(height: 6),
@@ -378,7 +388,10 @@ Widget eventCard({
         const SizedBox(height: 12),
         Align(
           alignment: Alignment.centerRight,
-          child: ElevatedButton(onPressed: onApply, child: const Text("Apply")),
+          child: ElevatedButton(
+            onPressed: onApply,
+            child: const Text("Apply"),
+          ),
         ),
       ]),
     ),

@@ -142,6 +142,53 @@ const deleteEvent = async (req, res) => {
   }
 };
 
+// Volunteer leaderboard
+const getVolunteerLeaderboard = async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        u.id,
+        u.name,
+        COUNT(a.id) AS completed_events
+      FROM users u
+      JOIN applications a ON a.volunteer_id = u.id
+      WHERE u.role = 'volunteer'
+        AND a.status = 'completed'
+      GROUP BY u.id
+      ORDER BY completed_events DESC
+    `);
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("VOLUNTEER LEADERBOARD ERROR:", err);
+    res.status(500).json({ error: "Failed to load volunteer leaderboard" });
+  }
+};
+
+// Organiser leaderboard
+const getOrganiserLeaderboard = async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        u.id,
+        u.name,
+        COUNT(e.id) AS completed_events
+      FROM users u
+      JOIN events e ON e.organiser_id = u.id
+      WHERE u.role = 'organiser'
+        AND e.status = 'completed'
+      GROUP BY u.id
+      ORDER BY completed_events DESC
+    `);
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("ORGANISER LEADERBOARD ERROR:", err);
+    res.status(500).json({ error: "Failed to load organiser leaderboard" });
+  }
+};
+
+
 
 module.exports = {
   getUsers,
@@ -151,4 +198,6 @@ module.exports = {
   updateUserStatus,
   cancelApplication,
   deleteEvent,
+  getVolunteerLeaderboard,
+  getOrganiserLeaderboard,
 };

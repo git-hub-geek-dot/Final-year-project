@@ -58,5 +58,19 @@ router.delete(
   adminController.deleteEvent
 );
 
+router.get(
+  "/leaderboard/volunteers",
+  authenticateToken,
+  adminOnly,
+  adminController.getVolunteerLeaderboard
+);
+
+router.get(
+  "/leaderboard/organisers",
+  authenticateToken,
+  adminOnly,
+  adminController.getOrganiserLeaderboard
+);
+
 
 module.exports = router;

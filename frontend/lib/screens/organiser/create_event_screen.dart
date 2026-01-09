@@ -22,8 +22,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   final ImagePicker _picker = ImagePicker();
   XFile? bannerImage;
 
-  DateTime? eventDate;
+  DateTime? eventStartDate;
+  DateTime? eventEndDate;
   DateTime? applicationDeadline;
+
+  TimeOfDay? eventStartTime;
+  TimeOfDay? eventEndTime;
 
   bool loading = false;
   String eventType = "unpaid";
@@ -63,26 +67,45 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     super.dispose();
   }
 
-  Future<void> pickDate(bool isDeadline) async {
+  Future<void> pickDate(bool isStart) async {
     final picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
       firstDate: DateTime.now(),
       lastDate: DateTime(2100),
     );
-
     if (picked != null) {
       setState(() {
-        isDeadline ? applicationDeadline = picked : eventDate = picked;
+        isStart ? eventStartDate = picked : eventEndDate = picked;
       });
+    }
+  }
+
+  Future<void> pickTime(bool isStart) async {
+    final picked =
+        await showTimePicker(context: context, initialTime: TimeOfDay.now());
+    if (picked != null) {
+      setState(() {
+        isStart ? eventStartTime = picked : eventEndTime = picked;
+      });
+    }
+  }
+
+  Future<void> pickDeadline() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      setState(() => applicationDeadline = picked);
     }
   }
 
   Future<void> pickBannerImage() async {
     final image = await _picker.pickImage(source: ImageSource.gallery);
-    if (image != null) {
-      setState(() => bannerImage = image);
-    }
+    if (image != null) setState(() => bannerImage = image);
   }
 
   Future<void> handleCreateEvent() async {
@@ -90,7 +113,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         locationController.text.isEmpty ||
         descriptionController.text.isEmpty ||
         volunteersController.text.isEmpty ||
-        eventDate == null ||
+        eventStartDate == null ||
+        eventEndDate == null ||
+        eventStartTime == null ||
+        eventEndTime == null ||
         applicationDeadline == null ||
         bannerImage == null ||
         selectedCategories.isEmpty) {
@@ -98,14 +124,14 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       return;
     }
 
-    if (applicationDeadline!.isAfter(eventDate!)) {
-      _toast("Application deadline must be before event date");
+    if (eventEndDate!.isBefore(eventStartDate!)) {
+      _toast("End date must be after start date");
       return;
     }
 
     if (eventType == "paid") {
-      final payment = double.tryParse(paymentController.text);
-      if (payment == null || payment <= 0) {
+      final pay = double.tryParse(paymentController.text);
+      if (pay == null || pay <= 0) {
         _toast("Enter valid payment per day");
         return;
       }
@@ -119,7 +145,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         description: descriptionController.text.trim(),
         location: locationController.text.trim(),
         eventDate:
-            "${eventDate!.year}-${eventDate!.month.toString().padLeft(2, '0')}-${eventDate!.day.toString().padLeft(2, '0')}",
+            "${eventStartDate!.year}-${eventStartDate!.month.toString().padLeft(2, '0')}-${eventStartDate!.day.toString().padLeft(2, '0')}",
       );
 
       if (success && mounted) {
@@ -147,9 +173,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         title: const Text("Create Event"),
         flexibleSpace: const DecoratedBox(
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
-            ),
+            gradient:
+                LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF22C55E)]),
           ),
         ),
       ),
@@ -164,11 +189,42 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             _input("Volunteers Required", volunteersController,
                 keyboardType: TextInputType.number),
 
-            _dateTile("Event Date", eventDate, () => pickDate(false)),
-            _dateTile(
-                "Application Deadline", applicationDeadline, () => pickDate(true)),
+            // 📅 START & END DATE (SIDE BY SIDE)
+            Row(
+              children: [
+                Expanded(
+                  child: _dateTile(
+                      "Start Date", eventStartDate, () => pickDate(true)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _dateTile(
+                      "End Date", eventEndDate, () => pickDate(false)),
+                ),
+              ],
+            ),
 
-            // 🖼 Banner
+            // ⏰ START & END TIME (SIDE BY SIDE)
+            Row(
+              children: [
+                Expanded(
+                  child: _timeTile(
+                      "Start Time", eventStartTime, () => pickTime(true)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _timeTile(
+                      "End Time", eventEndTime, () => pickTime(false)),
+                ),
+              ],
+            ),
+
+            _dateTile(
+                "Application Deadline", applicationDeadline, pickDeadline),
+
+            const SizedBox(height: 14),
+
+            // 🖼 EVENT BANNER
             InkWell(
               onTap: pickBannerImage,
               child: Container(
@@ -190,63 +246,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
               ),
             ),
 
-            const SizedBox(height: 20),
-
-            // 💰 Event Type
-            const Text("Event Type",
-                style: TextStyle(fontWeight: FontWeight.bold)),
-            RadioListTile(
-              value: "paid",
-              groupValue: eventType,
-              title: const Text("Paid"),
-              onChanged: (v) => setState(() => eventType = v!),
-            ),
-            RadioListTile(
-              value: "unpaid",
-              groupValue: eventType,
-              title: const Text("Unpaid"),
-              onChanged: (v) => setState(() => eventType = v!),
-            ),
-
-            if (eventType == "paid")
-              _input("Payment per day (₹)", paymentController,
-                  keyboardType: TextInputType.number),
-
-            const SizedBox(height: 16),
-
-            // 🏷 Categories
-            const Text("Categories (Select at least one)",
-                style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-
-            Wrap(
-              spacing: 8,
-              children: categories.map((tag) {
-                final selected = selectedCategories.contains(tag);
-                return ChoiceChip(
-                  label: Text(tag),
-                  selected: selected,
-                  selectedColor: const Color(0xFF22C55E),
-                  labelStyle:
-                      TextStyle(color: selected ? Colors.white : Colors.black),
-                  onSelected: (val) {
-                    setState(() {
-                      if (tag == "All") {
-                        selectedCategories
-                          ..clear()
-                          ..add("All");
-                      } else {
-                        selectedCategories.remove("All");
-                        val
-                            ? selectedCategories.add(tag)
-                            : selectedCategories.remove(tag);
-                      }
-                    });
-                  },
-                );
-              }).toList(),
-            ),
-
             const SizedBox(height: 30),
 
             loading
@@ -264,14 +263,15 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           height: 56,
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
-            ),
+                colors: [Color(0xFF3B82F6), Color(0xFF22C55E)]),
             borderRadius: BorderRadius.circular(30),
           ),
           child: const Center(
-            child: Text("Create Event",
-                style:
-                    TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: Text(
+              "Create Event",
+              style:
+                  TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
           ),
         ),
       );
@@ -294,6 +294,24 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   }
 
   Widget _dateTile(String title, DateTime? value, VoidCallback onTap) {
+    return _tile(
+      Icons.calendar_today_outlined,
+      value == null
+          ? title
+          : "${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}",
+      onTap,
+    );
+  }
+
+  Widget _timeTile(String title, TimeOfDay? value, VoidCallback onTap) {
+    return _tile(
+      Icons.access_time,
+      value == null ? title : value.format(context),
+      onTap,
+    );
+  }
+
+  Widget _tile(IconData icon, String text, VoidCallback onTap) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: InkWell(
@@ -306,11 +324,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           ),
           child: Row(
             children: [
-              const Icon(Icons.calendar_today_outlined),
+              Icon(icon),
               const SizedBox(width: 12),
-              Text(value == null
-                  ? title
-                  : "${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}"),
+              Text(text),
             ],
           ),
         ),

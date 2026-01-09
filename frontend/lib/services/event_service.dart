@@ -5,13 +5,28 @@ import '../config/api_config.dart';
 import 'token_service.dart';
 
 class EventService {
-
   /// ================= CREATE EVENT =================
   static Future<bool> createEvent({
     required String title,
     required String description,
     required String location,
-    required String eventDate,
+
+    /// Dates
+    required String eventDate, // start date (YYYY-MM-DD)
+    required String applicationDeadline,
+
+    /// Volunteers
+    required int volunteersRequired,
+
+    /// Paid / Unpaid
+    required String eventType, // "paid" | "unpaid"
+    double? paymentPerDay,
+
+    /// Optional
+    String? bannerUrl,
+
+    /// Categories (list of category IDs)
+    required List<int> categories,
   }) async {
     final token = await TokenService.getToken();
 
@@ -30,6 +45,12 @@ class EventService {
         "description": description,
         "location": location,
         "event_date": eventDate,
+        "application_deadline": applicationDeadline,
+        "volunteers_required": volunteersRequired,
+        "event_type": eventType,
+        "payment_per_day": eventType == "paid" ? paymentPerDay : null,
+        "banner_url": bannerUrl,
+        "categories": categories,
       }),
     );
 

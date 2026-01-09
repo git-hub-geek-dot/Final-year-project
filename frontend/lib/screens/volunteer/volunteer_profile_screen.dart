@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../services/token_service.dart';
 import '../auth/login_screen.dart';
 
+import 'edit_profile_screen.dart';
 import 'my_applications_screen.dart';
 import 'my_badges_screen.dart';
 import 'payment_history_screen.dart';
@@ -100,16 +101,28 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
                     style: TextStyle(color: Colors.white70),
                   ),
                   const SizedBox(height: 14),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 28, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: const Text(
-                      "Edit Profile",
-                      style: TextStyle(fontWeight: FontWeight.bold),
+
+                  /// 🔹 EDIT PROFILE (ACTIVATED)
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const EditProfileScreen(),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 28, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: const Text(
+                        "Edit Profile",
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ),
                 ],

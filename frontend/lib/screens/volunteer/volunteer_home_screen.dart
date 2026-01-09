@@ -11,12 +11,16 @@ class VolunteerHomeScreen extends StatefulWidget {
 
   @override
   State<VolunteerHomeScreen> createState() => _VolunteerHomeScreenState();
+  
 }
 
 class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
+  
   int selectedIndex = 0;
   List events = [];
   bool loading = true;
+  
+String searchQuery = "";
 
   // 🔹 FILTER UI STATE (UNCHANGED)
   String selectedCategory = "All";
@@ -101,11 +105,31 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
   }
 
   // ✅ THIS IS THE FIX
-  final filteredEvents = selectedCategory == "All"
-      ? events
-      : events
-          .where((e) => e["category"] == selectedCategory)
-          .toList();
+  final filteredEvents = events.where((e) {
+  final title = (e["title"] ?? "").toString().toLowerCase();
+  final location = (e["location"] ?? "").toString().toLowerCase();
+
+  final matchesSearch =
+      title.contains(searchQuery) || location.contains(searchQuery);
+
+  final matchesCategory =
+      selectedCategory == "All" || e["category"] == selectedCategory;
+
+  // ✅ PAID / UNPAID LOGIC
+  final payment = e["payment_per_day"];
+  final isPaid = payment != null && payment > 0;
+
+  bool matchesPayment = true;
+  if (filterPaid && !filterUnpaid) {
+    matchesPayment = isPaid;
+  } else if (!filterPaid && filterUnpaid) {
+    matchesPayment = !isPaid;
+  }
+
+  return matchesSearch && matchesCategory && matchesPayment;
+}).toList();
+
+
 
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -117,7 +141,13 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
           children: [
             Expanded(
               child: TextField(
-                decoration: InputDecoration(
+                
+                  onChanged: (value) {
+                setState(() {
+                searchQuery = value.toLowerCase();
+                      });
+                        },
+                        decoration: InputDecoration(
                   hintText: "Search volunteer jobs",
                   prefixIcon: const Icon(Icons.search),
                   filled: true,

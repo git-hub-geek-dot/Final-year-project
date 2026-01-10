@@ -128,6 +128,73 @@ static Future<Map<String, dynamic>> getStats() async {
   return jsonDecode(res.body);
 }
 
+// Volunteer leaderboard
+static Future<List<dynamic>> getVolunteerLeaderboard() async {
+  final token = await TokenService.getToken();
+
+  final res = await http.get(
+    Uri.parse("${ApiConfig.baseUrl}/admin/leaderboard/volunteers"),
+    headers: {
+      "Authorization": "Bearer $token",
+    },
+  );
+
+  if (res.statusCode != 200) {
+    throw Exception("Failed to load volunteer leaderboard");
+  }
+
+  return jsonDecode(res.body);
+}
+
+// Organiser leaderboard
+static Future<List<dynamic>> getOrganiserLeaderboard() async {
+  final token = await TokenService.getToken();
+
+  final res = await http.get(
+    Uri.parse("${ApiConfig.baseUrl}/admin/leaderboard/organisers"),
+    headers: {
+      "Authorization": "Bearer $token",
+    },
+  );
+
+  if (res.statusCode != 200) {
+    throw Exception("Failed to load organiser leaderboard");
+  }
+
+  return jsonDecode(res.body);
+}
+
+static Future<List<dynamic>> getBadges() async {
+  final token = await TokenService.getToken();
+  final res = await http.get(
+    Uri.parse("${ApiConfig.baseUrl}/admin/badges"),
+    headers: {"Authorization": "Bearer $token"},
+  );
+  return jsonDecode(res.body);
+}
+
+static Future<void> createBadge(Map<String, dynamic> body) async {
+  final token = await TokenService.getToken();
+  await http.post(
+    Uri.parse("${ApiConfig.baseUrl}/admin/badges"),
+    headers: {
+      "Authorization": "Bearer $token",
+      "Content-Type": "application/json",
+    },
+    body: jsonEncode(body),
+  );
+}
+
+static Future<List<dynamic>> getUserBadges() async {
+  final token = await TokenService.getToken();
+  final res = await http.get(
+    Uri.parse("${ApiConfig.baseUrl}/admin/badges/users"),
+    headers: {"Authorization": "Bearer $token"},
+  );
+  return jsonDecode(res.body);
+}
+
+
 
 
 }

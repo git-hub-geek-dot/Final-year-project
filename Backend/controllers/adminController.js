@@ -19,7 +19,7 @@ const getEvents = async (req, res) => {
     const events = await pool.query(
       `SELECT e.*, u.name AS organizer_name
        FROM events e
-       JOIN users u ON e.organizer_id = u.id
+       JOIN users u ON e.organiser_id = u.id
        ORDER BY e.id DESC`
     );
     res.json(events.rows);
@@ -187,6 +187,118 @@ const getOrganiserLeaderboard = async (req, res) => {
     res.status(500).json({ error: "Failed to load organiser leaderboard" });
   }
 };
+ const evaluateBadges = async (req, res) => {
+  try {
+    // 1) Get all badges
+    const badgesRes = await pool.query(
+      "SELECT id, role, threshold FROM badges"
+    );
+    const badges = badgesRes.rows;
+
+    for (const badge of badges) {
+      if (badge.role === "volunteer") {
+        // Volunteers: count completed applications
+        const usersRes = await pool.query(`
+          SELECT u.id, COUNT(a.id)::int AS completed
+          FROM users u
+          JOIN applications a ON a.volunteer_id = u.id
+          WHERE u.role = 'volunteer'
+            AND a.status = 'completed'
+          GROUP BY u.id
+        `);
+
+        for (const u of usersRes.rows) {
+          if (u.completed >= badge.threshold) {
+            await pool.query(
+              `
+              INSERT INTO user_badges (user_id, badge_id)
+              VALUES ($1, $2)
+              ON CONFLICT DO NOTHING
+              `,
+              [u.id, badge.id]
+            );
+          }
+        }
+      }
+
+      if (badge.role === "organiser") {
+        // Organisers: count completed events
+        const usersRes = await pool.query(`
+          SELECT u.id, COUNT(e.id)::int AS completed
+          FROM users u
+          JOIN events e ON e.organiser_id = u.id
+          WHERE u.role = 'organiser'
+            AND e.status = 'completed'
+          GROUP BY u.id
+        `);
+
+        for (const u of usersRes.rows) {
+          if (u.completed >= badge.threshold) {
+            await pool.query(
+              `
+              INSERT INTO user_badges (user_id, badge_id)
+              VALUES ($1, $2)
+              ON CONFLICT DO NOTHING
+              `,
+              [u.id, badge.id]
+            );
+          }
+        }
+      }
+    }
+
+    res.json({ message: "Badges evaluated and awarded" });
+  } catch (err) {
+    console.error("EVALUATE BADGES ERROR:", err);
+    res.status(500).json({ error: "Failed to evaluate badges" });
+  }
+};
+
+const getBadges = async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM badges ORDER BY role, threshold"
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to load badges" });
+  }
+};
+
+const createBadge = async (req, res) => {
+  try {
+    const { name, description, role, threshold } = req.body;
+
+    await pool.query(
+      `INSERT INTO badges (name, description, role, threshold)
+       VALUES ($1, $2, $3, $4)`,
+      [name, description, role, threshold]
+    );
+
+    res.status(201).json({ message: "Badge created" });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to create badge" });
+  }
+};
+
+const getUserBadges = async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        ub.user_id,
+        b.name
+      FROM user_badges ub
+      JOIN badges b ON b.id = ub.badge_id
+    `);
+
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to load user badges" });
+  }
+};
+
+
+
 
 
 
@@ -200,4 +312,8 @@ module.exports = {
   deleteEvent,
   getVolunteerLeaderboard,
   getOrganiserLeaderboard,
+  evaluateBadges,
+  getBadges,
+  createBadge,
+  getUserBadges,
 };

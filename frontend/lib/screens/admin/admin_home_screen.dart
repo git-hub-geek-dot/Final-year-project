@@ -7,6 +7,8 @@ import 'admin_events_screen.dart';
 import 'admin_users_screen.dart';
 import 'admin_applications_screen.dart';
 import 'admin_stats_screen.dart';
+import 'admin_leaderboard_screen.dart';
+import  'admin_badges_screen.dart';
 
 
 class AdminHomeScreen extends StatefulWidget {
@@ -24,7 +26,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
   }
 
   @override
@@ -51,6 +53,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
             Tab(text: "Events"),
             Tab(text: "Users"),
             Tab(text: "Applications"),
+            Tab(text: "Leaderboard"),
+            Tab(text: "Badges"),
           ],
         ),
         actions: [
@@ -76,6 +80,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
             AdminEventsScreen(),
             AdminUsersScreen(),
             AdminApplicationsScreen(),
+            AdminLeaderboardScreen(),
+            AdminBadgesScreen(),
           ],
         ),
       ),

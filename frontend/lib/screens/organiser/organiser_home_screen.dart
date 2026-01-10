@@ -3,6 +3,7 @@ import '../../services/event_service.dart';
 import 'create_event_screen.dart';
 import 'leaderboard_screen.dart';
 import 'review_application_screen.dart';
+import 'event_details_screen.dart';
 
 class OrganiserHomeScreen extends StatefulWidget {
   const OrganiserHomeScreen({super.key});
@@ -33,46 +34,28 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
     }
   }
 
-  // ================= FILTER LOGIC =================
+  // ✅ SAFE STATUS HANDLER
+  String _status(Map e) => e["computed_status"] ?? e["status"] ?? "upcoming";
 
-  DateTime _onlyDate(DateTime d) => DateTime(d.year, d.month, d.day);
+  List getUpcomingEvents() =>
+      events.where((e) => _status(e) == "upcoming").toList();
 
-  List _upcomingEvents() {
-    final today = _onlyDate(DateTime.now());
-    return events.where((e) {
-      final date = _onlyDate(DateTime.parse(e["event_date"]));
-      return date.isAfter(today);
-    }).toList();
-  }
+  List getOngoingEvents() =>
+      events.where((e) => _status(e) == "ongoing").toList();
 
-  List _ongoingEvents() {
-    final today = _onlyDate(DateTime.now());
-    return events.where((e) {
-      final date = _onlyDate(DateTime.parse(e["event_date"]));
-      return date.isAtSameMomentAs(today);
-    }).toList();
-  }
-
-  List _completedEvents() {
-    final today = _onlyDate(DateTime.now());
-    return events.where((e) {
-      final date = _onlyDate(DateTime.parse(e["event_date"]));
-      return date.isBefore(today);
-    }).toList();
-  }
-
-  // ================= UI =================
+  List getCompletedEvents() =>
+      events.where((e) => _status(e) == "completed").toList();
 
   @override
   Widget build(BuildContext context) {
-    final ongoing = _ongoingEvents();
-    final upcoming = _upcomingEvents();
-    final completed = _completedEvents();
+    final upcoming = getUpcomingEvents();
+    final ongoing = getOngoingEvents();
+    final completed = getCompletedEvents();
 
     return Scaffold(
       body: Column(
         children: [
-          // 🔷 Header
+          // 🔷 HEADER
           Container(
             height: 180,
             padding: const EdgeInsets.fromLTRB(20, 50, 20, 20),
@@ -89,10 +72,9 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
                 Text(
                   "Volunteerx",
                   style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold),
                 ),
                 Icon(Icons.notifications, color: Colors.white),
               ],
@@ -101,7 +83,7 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
 
           const SizedBox(height: 20),
 
-          // 🔘 Create Event
+          // 🔘 CREATE EVENT
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: InkWell(
@@ -149,7 +131,7 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
                   ),
           ),
 
-          // 📊 Stats
+          // 📊 STATS
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Container(
@@ -163,7 +145,7 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  StatItem(events.length.toString(), "Total Events"),
+                  StatItem(events.length.toString(), "Total"),
                   StatItem(ongoing.length.toString(), "Ongoing"),
                   StatItem(upcoming.length.toString(), "Upcoming"),
                 ],
@@ -175,34 +157,34 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
         ],
       ),
 
-      // 🔻 Bottom Navigation
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 0,
-        selectedItemColor: const Color(0xFF22C55E),
-        unselectedItemColor: Colors.grey,
-        onTap: (index) {
-          if (index == 1) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => const LeaderboardScreen()),
-            );
-          } else if (index == 2) {
-            Navigator.pushNamed(context, "/organiser-profile");
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.leaderboard), label: "Leaderboard"),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
-        ],
-      ),
+     bottomNavigationBar: BottomNavigationBar(
+  currentIndex: 0,
+  selectedItemColor: const Color(0xFF22C55E),
+  unselectedItemColor: Colors.grey,
+  onTap: (index) {
+    if (index == 1) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const LeaderboardScreen()),
+      );
+    } else if (index == 2) {
+      Navigator.pushNamed(context, "/organiser-profile");
+      // or if you have a screen:
+      // Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+    }
+  },
+  items: const [
+    BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
+    BottomNavigationBarItem(
+        icon: Icon(Icons.leaderboard), label: "Leaderboard"),
+    BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
+  ],
+),
+
     );
   }
 
-  // ================= HELPERS =================
-
+  // 🔹 SECTION
   Widget _section(String title, List list) {
     if (list.isEmpty) return const SizedBox();
 
@@ -213,84 +195,81 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
           padding: const EdgeInsets.symmetric(vertical: 12),
           child: Text(
             title,
-            style: const TextStyle(
-                fontSize: 18, fontWeight: FontWeight.bold),
+            style:
+                const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
         ),
-        ...list.map((event) => eventCard(
-              context: context,
-              title: event["title"],
-              location: event["location"],
-              date: event["event_date"].toString().split("T")[0],
-              eventId: event["id"],
-            )),
+        ...list.map((event) => eventCard(context, event)),
       ],
     );
   }
 }
 
 /// ================= EVENT CARD =================
-
-Widget eventCard({
-  required BuildContext context,
-  required String title,
-  required String location,
-  required String date,
-  required int eventId,
-}) {
-  return Container(
-    margin: const EdgeInsets.only(bottom: 12),
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      border: Border.all(color: Colors.grey.shade300),
-      borderRadius: BorderRadius.circular(16),
-    ),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title,
-              style:
-                  const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 6),
-          Text("📍 $location"),
-          Text("📅 $date"),
-        ]),
-        InkWell(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) =>
-                    ReviewApplicationsScreen(eventId: eventId),
+Widget eventCard(BuildContext context, Map event) {
+  return InkWell(
+    onTap: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => EventDetailsScreen(event: event),
+        ),
+      );
+    },
+    child: Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(event["title"] ?? "Untitled",
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6),
+            Text("📍 ${event["location"] ?? ""}"),
+            Text(
+                "📅 ${event["event_date"].toString().split("T")[0]}"),
+          ]),
+          InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      ReviewApplicationsScreen(eventId: event["id"]),
+                ),
+              );
+            },
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
+                ),
+                borderRadius: BorderRadius.circular(20),
               ),
-            );
-          },
-          child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
+              child: const Text(
+                "Review Applications",
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold),
               ),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Text(
-              "Review Applications",
-              style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     ),
   );
 }
 
 /// ================= STATS =================
-
 class StatItem extends StatelessWidget {
   final String value;
   final String label;
@@ -308,7 +287,8 @@ class StatItem extends StatelessWidget {
                 fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
         Text(label,
-            style: const TextStyle(color: Colors.white70, fontSize: 12)),
+            style:
+                const TextStyle(color: Colors.white70, fontSize: 12)),
       ],
     );
   }

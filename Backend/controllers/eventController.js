@@ -4,7 +4,7 @@ const pool = require("../config/db");
 EVENTS TABLE (SOURCE OF TRUTH)
 
 id
-organizer_id
+organiser_id
 title
 description
 location
@@ -71,7 +71,7 @@ exports.createEvent = async (req, res) => {
 
       `
       INSERT INTO events (
-        organizer_id,
+        organiser_id,
         title,
         description,
         location,
@@ -149,7 +149,7 @@ exports.getMyEvents = async (req, res) => {
         END AS computed_status
 
       FROM events
-      WHERE organizer_id = $1
+      WHERE organiser_id = $1
       ORDER BY event_date DESC
       `,
       [req.user.id]

@@ -113,12 +113,13 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
   final matchesSearch =
       title.contains(searchQuery) || location.contains(searchQuery);
 
+  // ✅ categories is a LIST, not a string
+  final List categories = (e["categories"] ?? []);
   final matchesCategory =
-      selectedCategory == "All" || e["category"] == selectedCategory;
+      selectedCategory == "All" || categories.contains(selectedCategory);
 
-  // ✅ PAID / UNPAID LOGIC
-  final payment = e["payment_per_day"];
-  final isPaid = payment != null && payment > 0;
+  // ✅ use event_type instead of payment_per_day
+  final isPaid = e["event_type"] == "paid";
 
   bool matchesPayment = true;
   if (filterPaid && !filterUnpaid) {
@@ -271,7 +272,8 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                               ?.toString()
                               .split("T")[0] ??
                           "",
-                      slotsLeft: event["slots_left"] ?? 0,
+                      slotsLeft: event["volunteers_required"] ?? 0,
+
                     ),
                   );
                 },

@@ -163,7 +163,7 @@ exports.getAllEvents = async (req, res) => {
           ELSE 'completed'
         END AS computed_status
       FROM events
-      WHERE status = 'upcoming'
+      WHERE status = 'open'
       ORDER BY event_date ASC
     `);
 

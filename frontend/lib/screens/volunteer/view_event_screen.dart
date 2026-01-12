@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../services/token_service.dart';
+import '../../config/api_config.dart';
+
 
 class ViewEventScreen extends StatefulWidget {
   final Map<String, dynamic> event;
@@ -31,9 +33,10 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
       final token = await TokenService.getToken();
 
       final response = await http.get(
-        Uri.parse(
-          "http://10.0.2.2:4000/api/events/${widget.event["id"]}/application-status",
-        ),
+       Uri.parse(
+  "${ApiConfig.baseUrl}/events/${widget.event["id"]}/application-status",
+),
+
         headers: {
           "Authorization": "Bearer $token",
         },
@@ -62,9 +65,10 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
       final token = await TokenService.getToken();
 
       final response = await http.post(
-        Uri.parse(
-          "http://10.0.2.2:4000/api/events/${widget.event["id"]}/apply",
-        ),
+       Uri.parse(
+  "${ApiConfig.baseUrl}/events/${widget.event["id"]}/application-status",
+),
+
         headers: {
           "Authorization": "Bearer $token",
           "Content-Type": "application/json",

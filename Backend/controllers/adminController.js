@@ -78,7 +78,7 @@ const getStats = async (req, res) => {
     const userId = req.params.id;
     const { status } = req.body;
 
-    if (!["active", "blocked"].includes(status)) {
+    if (!["active", "banned"].includes(status)) {
       return res.status(400).json({ error: "Invalid status" });
     }
 

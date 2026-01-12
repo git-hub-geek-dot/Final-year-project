@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+//// ENUMS (replaces CHECK constraints)
+
+enum UserRole {
+  admin
+  volunteer
+  organiser
+}
+
+enum UserStatus {
+  active
+  inactive
+  banned
+}
+
+enum EventStatus {
+  open
+  closed
+  completed
+}
+
+enum EventType {
+  paid
+  unpaid
+}
+
+//// MODELS
+
+model Application {
+  id           Int       @id @default(autoincrement())
+  eventId      Int?      @map("event_id")
+  volunteerId  Int?      @map("volunteer_id")
+  status       String?   @default("pending") @db.VarChar(20)
+  appliedAt    DateTime? @default(now()) @map("applied_at") @db.Timestamp(6)
+
+  event        Event?    @relation(fields: [eventId], references: [id])
+  volunteer    User?     @relation(fields: [volunteerId], references: [id])
+
+  @@map("applications")
+}
+
+model Badge {
+  id          Int           @id @default(autoincrement())
+  name        String
+  description String?
+  role        UserRole?     
+  threshold   Int
+
+  userBadges  UserBadge[]
+
+  @@map("badges")
+}
+
+model Category {
+  id               Int              @id @default(autoincrement())
+  name             String           @unique @db.VarChar(100)
+  eventCategories  EventCategory[]
+
+  @@map("categories")
+}
+
+model EventCategory {
+  eventId     Int @map("event_id")
+  categoryId  Int @map("category_id")
+
+  event       Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  category    Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, categoryId])
+  @@map("event_categories")
+}
+
+model Event {
+  id                   Int              @id @default(autoincrement())
+  organiserId          Int?             @map("organiser_id")
+  title                String
+  description          String?
+  location             String?
+  eventDate            DateTime?        @map("event_date") @db.Date
+  status               EventStatus?     @default(open)
+  volunteersRequired   Int              @default(0) @map("volunteers_required")
+  applicationDeadline  DateTime?        @map("application_deadline") @db.Date
+  bannerUrl            String?          @map("banner_url")
+  eventType            EventType        @default(unpaid) @map("event_type")
+  paymentPerDay        Decimal?         @map("payment_per_day") @db.Decimal(10, 2)
+  startTime            DateTime?        @map("start_time") @db.Time(6)
+  endTime              DateTime?        @map("end_time") @db.Time(6)
+
+  organiser             User?            @relation(fields: [organiserId], references: [id])
+  applications          Application[]
+  eventCategories       EventCategory[]
+  ratings               Rating[]
+
+  @@index([status], map: "idx_events_status")
+  @@map("events")
+}
+
+model Rating {
+  id        Int       @id @default(autoincrement())
+  eventId   Int?      @map("event_id")
+  raterId   Int?      @map("rater_id")
+  rateeId   Int?      @map("ratee_id")
+  score     Int?
+  comment   String?
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+
+  event     Event? @relation(fields: [eventId], references: [id])
+  rater     User?  @relation("RatingRater", fields: [raterId], references: [id])
+  ratee     User?  @relation("RatingRatee", fields: [rateeId], references: [id])
+
+  @@map("ratings")
+}
+
+model UserBadge {
+  userId     Int @map("user_id")
+  badgeId    Int @map("badge_id")
+  awardedAt  DateTime? @default(now()) @map("awarded_at") @db.Timestamp(6)
+
+  user       User  @relation(fields: [userId], references: [id])
+  badge      Badge @relation(fields: [badgeId], references: [id])
+
+  @@id([userId, badgeId])
+  @@map("user_badges")
+}
+
+model User {
+  id          Int        @id @default(autoincrement())
+  name        String
+  email       String     @unique
+  role        UserRole?  
+  createdAt   DateTime?  @default(now()) @map("created_at") @db.Timestamp(6)
+  password    String?
+  status      UserStatus? @default(active) 
+  contact     String?    @map("contact_number")
+  city        String?
+  govtId      String?    @map("government_id")
+
+  applications Application[]
+  events        Event[]
+  ratingsGiven  Rating[] @relation("RatingRater")
+  ratingsTaken  Rating[] @relation("RatingRatee")
+  userBadges    UserBadge[]
+
+  @@map("users")
+}

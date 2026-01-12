@@ -12,18 +12,15 @@ event_date
 category
 slots_total
 slots_filled
-status          -- 'open' | 'approved' | 'closed'
+status          -- 'upcoming' | 'closed'
 created_at
 */
-
 
 // =======================================================
 // CREATE EVENT (ORGANISER)
 // =======================================================
 exports.createEvent = async (req, res) => {
   try {
-
-
     if (req.user.role !== "organiser") {
       return res.status(403).json({
         error: "Only organisers can create events",
@@ -35,7 +32,6 @@ exports.createEvent = async (req, res) => {
       description,
       location,
       event_date,
-
       volunteers_required,
       application_deadline,
       event_type,
@@ -54,12 +50,10 @@ exports.createEvent = async (req, res) => {
       !application_deadline ||
       !event_type
     ) {
-
       return res.status(400).json({
         error: "Missing required event fields",
       });
     }
-
 
     if (event_type === "paid" && (!payment_per_day || payment_per_day <= 0)) {
       return res.status(400).json({
@@ -68,7 +62,6 @@ exports.createEvent = async (req, res) => {
     }
 
     const eventResult = await pool.query(
-
       `
       INSERT INTO events (
         organiser_id,
@@ -76,7 +69,6 @@ exports.createEvent = async (req, res) => {
         description,
         location,
         event_date,
-
         volunteers_required,
         application_deadline,
         event_type,
@@ -86,7 +78,6 @@ exports.createEvent = async (req, res) => {
         end_time
       )
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-
       RETURNING *
       `,
       [
@@ -95,7 +86,6 @@ exports.createEvent = async (req, res) => {
         description ?? null,
         location,
         event_date,
-
         volunteers_required,
         application_deadline,
         event_type,
@@ -122,14 +112,12 @@ exports.createEvent = async (req, res) => {
     res.status(201).json({
       message: "Event created successfully",
       event: createdEvent,
-
     });
   } catch (err) {
     console.error("CREATE EVENT ERROR:", err);
     res.status(500).json({ error: "Event creation failed" });
   }
 };
-
 
 // =======================================================
 // ORGANISER → MY EVENTS
@@ -139,7 +127,6 @@ exports.getMyEvents = async (req, res) => {
     const result = await pool.query(
       `
       SELECT
-
         *,
         CASE
           WHEN NOW() < (event_date + start_time) THEN 'upcoming'
@@ -147,7 +134,6 @@ exports.getMyEvents = async (req, res) => {
                           AND (event_date + end_time) THEN 'ongoing'
           ELSE 'completed'
         END AS computed_status
-
       FROM events
       WHERE organiser_id = $1
       ORDER BY event_date DESC
@@ -162,14 +148,13 @@ exports.getMyEvents = async (req, res) => {
   }
 };
 
-
-// ================= PUBLIC EVENTS =================
-
+// =======================================================
+// VOLUNTEER → PUBLIC EVENTS
+// =======================================================
 exports.getAllEvents = async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT
-
         *,
         CASE
           WHEN NOW() < (event_date + start_time) THEN 'upcoming'
@@ -177,9 +162,8 @@ exports.getAllEvents = async (req, res) => {
                           AND (event_date + end_time) THEN 'ongoing'
           ELSE 'completed'
         END AS computed_status
-
       FROM events
-      WHERE status IN ('open', 'approved')
+      WHERE status = 'upcoming'
       ORDER BY event_date ASC
     `);
 

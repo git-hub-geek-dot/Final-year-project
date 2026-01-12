@@ -16,8 +16,8 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
   bool isLoadingStatus = true;
   bool isApplying = false;
 
-  bool hasApplied = false;
-  String? applicationStatus; // pending | accepted | rejected
+  /// null | pending | accepted | rejected
+  String? applicationStatus;
 
   @override
   void initState() {
@@ -34,16 +34,14 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
         Uri.parse(
           "http://10.0.2.2:4000/api/events/${widget.event["id"]}/application-status",
         ),
-        headers: {
-          "Authorization": "Bearer $token",
-        },
+        headers: {"Authorization": "Bearer $token"},
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() {
-          hasApplied = data["applied"] == true;
-          applicationStatus = data["status"];
+          applicationStatus =
+              data["applied"] == true ? data["status"] : null;
           isLoadingStatus = false;
         });
       } else {
@@ -54,7 +52,7 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
     }
   }
 
-  // ================= APPLY TO EVENT =================
+  // ================= APPLY =================
   Future<void> _applyToEvent() async {
     setState(() => isApplying = true);
 
@@ -73,20 +71,12 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body);
-
         setState(() {
-          hasApplied = true;
-          applicationStatus = data["status"]; // pending
+          applicationStatus = data["status"];
           isApplying = false;
         });
-      } else if (response.statusCode == 409) {
-        _snack("You have already applied");
-        isApplying = false;
-      } else if (response.statusCode == 400) {
-        _snack("Event slots are full");
-        isApplying = false;
       } else {
-        _snack("Something went wrong");
+        _snack("Unable to apply");
         isApplying = false;
       }
     } catch (_) {
@@ -95,15 +85,15 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
     }
   }
 
-  // ================= MAIN BUILD =================
+  // ================= MAIN UI =================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
         title: const Text("Event Details"),
-        backgroundColor: Colors.transparent,
         elevation: 0,
+        backgroundColor: Colors.transparent,
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
@@ -112,57 +102,26 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
           ),
         ),
       ),
-      body: Column(
+      body: Stack(
         children: [
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.event["title"] ?? "",
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  Text(
-                    widget.event["description"] ??
-                        "No description provided by organiser.",
-                    style: const TextStyle(
-                      fontSize: 15,
-                      height: 1.5,
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  _detailRow(
-                    Icons.location_on,
-                    widget.event["location"] ?? "Location not specified",
-                  ),
-                  _detailRow(
-                    Icons.calendar_today,
-                    widget.event["event_date"]
-                            ?.toString()
-                            .split("T")[0] ??
-                        "",
-                  ),
-                  _detailRow(
-                    Icons.people,
-                    "${widget.event["slots_left"] ?? "N/A"} slots left",
-                  ),
-                ],
-              ),
+          SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+            child: Column(
+              children: [
+                _eventHeaderCard(),
+                const SizedBox(height: 16),
+                _aboutCard(),
+                const SizedBox(height: 16),
+                _responsibilitiesCard(),
+                const SizedBox(height: 16),
+                _organiserCard(),
+              ],
             ),
           ),
-
-          Padding(
-            padding: const EdgeInsets.all(16),
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 16,
             child: _buildApplySection(),
           ),
         ],
@@ -170,16 +129,114 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
     );
   }
 
-  // ================= APPLY UI =================
+  // ================= HEADER CARD =================
+  Widget _eventHeaderCard() {
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            widget.event["title"] ?? "",
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            widget.event["description"] ?? "",
+            style: const TextStyle(color: Colors.grey),
+          ),
+          const SizedBox(height: 16),
+          _iconRow(Icons.location_on, widget.event["location"] ?? "N/A"),
+          _iconRow(
+            Icons.calendar_today,
+            widget.event["event_date"]?.toString().split("T")[0] ?? "",
+          ),
+          _iconRow(
+            Icons.people,
+            "Volunteers Needed: ${widget.event["volunteers_required"] ?? "N/A"}",
+          ),
+          if (applicationStatus != null) ...[
+            const SizedBox(height: 16),
+            _statusPill(
+              _statusText(applicationStatus!),
+              _statusColor(applicationStatus!),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ================= ABOUT =================
+  Widget _aboutCard() {
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          Text(
+            "About this Event",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  // ================= RESPONSIBILITIES =================
+  Widget _responsibilitiesCard() {
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Your Responsibilities",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          _checkItem("Assist in cleanup activities"),
+          _checkItem("Segregate recyclable and non-recyclable waste"),
+          _checkItem("Follow safety and cleanliness guidelines"),
+        ],
+      ),
+    );
+  }
+
+  // ================= ORGANISER =================
+  Widget _organiserCard() {
+    return _card(
+      child: Row(
+        children: const [
+          CircleAvatar(
+            radius: 22,
+            backgroundColor: Colors.green,
+            child: Icon(Icons.eco, color: Colors.white),
+          ),
+          SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("Green Earth Foundation",
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+              SizedBox(height: 4),
+              Text("⭐ 4.6 rating | 120+ volunteers engaged",
+                  style: TextStyle(color: Colors.grey)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ================= APPLY =================
   Widget _buildApplySection() {
     if (isLoadingStatus) {
-      return const CircularProgressIndicator();
+      return const Center(child: CircularProgressIndicator());
     }
 
-    if (!hasApplied) {
+    if (applicationStatus == null) {
       return SizedBox(
+        height: 54,
         width: double.infinity,
-        height: 52,
         child: ElevatedButton(
           onPressed: isApplying ? null : () => _showTerms(context),
           style: ElevatedButton.styleFrom(
@@ -200,10 +257,9 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
                   : const Text(
                       "Apply for this Event",
                       style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white),
                     ),
             ),
           ),
@@ -211,32 +267,97 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
       );
     }
 
-    switch (applicationStatus) {
-      case "pending":
-        return const Text("⏳ Application Pending",
-            style: TextStyle(color: Colors.orange, fontSize: 16));
-      case "accepted":
-        return const Text("✅ Accepted",
-            style: TextStyle(color: Colors.green, fontSize: 16));
-      case "rejected":
-        return const Text("❌ Rejected",
-            style: TextStyle(color: Colors.red, fontSize: 16));
-      default:
-        return const SizedBox();
-    }
+    return const SizedBox.shrink();
   }
 
   // ================= HELPERS =================
-  Widget _detailRow(IconData icon, String text) {
+  Widget _card({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
+        ],
+      ),
+      child: child,
+    );
+  }
+
+  Widget _iconRow(IconData icon, String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: Colors.grey),
+          Icon(icon, size: 18, color: Colors.green),
           const SizedBox(width: 8),
           Expanded(child: Text(text)),
         ],
       ),
+    );
+  }
+
+  Widget _checkItem(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: const [
+          Icon(Icons.check_circle, color: Colors.green, size: 20),
+          SizedBox(width: 8),
+        ],
+      ),
+    );
+  }
+
+  Widget _statusPill(String text, Color color) {
+    return Container(
+      height: 54,
+      width: double.infinity,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(30),
+      ),
+      child: Text(
+        text,
+        style:
+            TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 16),
+      ),
+    );
+  }
+
+  Color _statusColor(String status) {
+    switch (status) {
+      case "pending":
+        return Colors.orange;
+      case "accepted":
+        return Colors.green;
+      case "rejected":
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _statusText(String status) {
+    switch (status) {
+      case "pending":
+        return "⏳ Application Pending";
+      case "accepted":
+        return "✅ Application Approved";
+      case "rejected":
+        return "❌ Application Rejected";
+      default:
+        return "";
+    }
+  }
+
+  Widget _term(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text("• $text", style: const TextStyle(fontSize: 14)),
     );
   }
 
@@ -245,7 +366,7 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
         .showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  // ================= T&C MODAL =================
+  // ================= TERMS =================
   void _showTerms(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -259,64 +380,61 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
         return StatefulBuilder(
           builder: (context, setState) {
             return Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Center(
-                    child: Text(
-                      "Terms & Conditions",
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                MediaQuery.of(context).viewInsets.bottom + 16,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Center(
+                      child: Text("Terms & Conditions",
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold)),
                     ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  _term("Profile information must be accurate."),
-                  _term("Participation requires organiser approval."),
-                  _term("Attendance is mandatory if accepted."),
-                  _term("Misconduct may result in removal."),
-                  _term(
-                    "VolunteerX is only a discovery and coordination platform and does not handle, guarantee, or take responsibility for any payments, financial transactions, or agreements between volunteers and organizers.",
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  CheckboxListTile(
-                    value: agreed,
-                    onChanged: (v) => setState(() => agreed = v!),
-                    title: const Text("I agree to the Terms & Conditions"),
-                    controlAffinity: ListTileControlAffinity.leading,
-                  ),
-
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: agreed
-                          ? () {
-                              Navigator.pop(context);
-                              _applyToEvent();
-                            }
-                          : null,
-                      child: const Text("Confirm & Apply"),
+                    const SizedBox(height: 16),
+                    _term("Profile information must be accurate and up to date."),
+                    _term(
+                        "Participation in this event is subject to organiser approval."),
+                    _term(
+                        "If accepted, attendance is mandatory unless informed in advance."),
+                    _term(
+                        "Volunteers must follow safety, cleanliness, and conduct guidelines."),
+                    _term(
+                        "Any form of misconduct may result in removal from the event."),
+                    _term(
+                        "VolunteerX acts only as a coordination platform and is not responsible for disputes, payments, or liabilities between volunteers and organisers."),
+                    CheckboxListTile(
+                      value: agreed,
+                      onChanged: (v) => setState(() => agreed = v!),
+                      title:
+                          const Text("I agree to the Terms & Conditions"),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
                     ),
-                  ),
-                ],
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: agreed
+                            ? () {
+                                Navigator.pop(context);
+                                _applyToEvent();
+                              }
+                            : null,
+                        child: const Text("Confirm & Apply"),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
           },
         );
       },
-    );
-  }
-
-  Widget _term(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Text("• $text"),
     );
   }
 }

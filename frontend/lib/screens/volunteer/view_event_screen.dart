@@ -66,8 +66,9 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
 
       final response = await http.post(
        Uri.parse(
-  "${ApiConfig.baseUrl}/events/${widget.event["id"]}/application-status",
+  "${ApiConfig.baseUrl}/events/${widget.event["id"]}/apply",
 ),
+
 
         headers: {
           "Authorization": "Bearer $token",

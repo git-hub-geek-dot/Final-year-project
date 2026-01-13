@@ -4,7 +4,7 @@ const pool = require("../config/db");
 EVENTS TABLE (SOURCE OF TRUTH)
 
 id
-organizer_id
+organiser_id
 title
 description
 location
@@ -12,17 +12,15 @@ event_date
 category
 slots_total
 slots_filled
-status          -- 'open' | 'approved' | 'closed'
+status          -- 'upcoming' | 'closed'
 created_at
 */
-
 
 // =======================================================
 // CREATE EVENT (ORGANISER)
 // =======================================================
 exports.createEvent = async (req, res) => {
   try {
-    // Role guard
     if (req.user.role !== "organiser") {
       return res.status(403).json({
         error: "Only organisers can create events",
@@ -34,31 +32,52 @@ exports.createEvent = async (req, res) => {
       description,
       location,
       event_date,
-      category,
-      slots_total,
+      volunteers_required,
+      application_deadline,
+      event_type,
+      payment_per_day,
+      banner_url,
+      categories,
+      start_time,
+      end_time,
     } = req.body;
 
-    // Required field validation (MATCHES DB)
-    if (!title || !location || !event_date || !category || !slots_total) {
+    if (
+      !title ||
+      !location ||
+      !event_date ||
+      !volunteers_required ||
+      !application_deadline ||
+      !event_type
+    ) {
       return res.status(400).json({
         error: "Missing required event fields",
       });
     }
 
-    const result = await pool.query(
+    if (event_type === "paid" && (!payment_per_day || payment_per_day <= 0)) {
+      return res.status(400).json({
+        error: "Payment per day is required for paid events",
+      });
+    }
+
+    const eventResult = await pool.query(
       `
       INSERT INTO events (
-        organizer_id,
+        organiser_id,
         title,
         description,
         location,
         event_date,
-        category,
-        slots_total,
-        slots_filled,
-        status
+        volunteers_required,
+        application_deadline,
+        event_type,
+        payment_per_day,
+        banner_url,
+        start_time,
+        end_time
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 0, 'open')
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
       RETURNING *
       `,
       [
@@ -67,21 +86,38 @@ exports.createEvent = async (req, res) => {
         description ?? null,
         location,
         event_date,
-        category,
-        slots_total,
+        volunteers_required,
+        application_deadline,
+        event_type,
+        event_type === "paid" ? payment_per_day : null,
+        banner_url ?? null,
+        start_time ?? null,
+        end_time ?? null,
       ]
     );
 
+    const createdEvent = eventResult.rows[0];
+
+    if (Array.isArray(categories) && categories.length > 0) {
+      const values = categories.map((_, i) => `($1, $${i + 2})`).join(",");
+      await pool.query(
+        `
+        INSERT INTO event_categories (event_id, category_id)
+        VALUES ${values}
+        `,
+        [createdEvent.id, ...categories]
+      );
+    }
+
     res.status(201).json({
       message: "Event created successfully",
-      event: result.rows[0],
+      event: createdEvent,
     });
   } catch (err) {
     console.error("CREATE EVENT ERROR:", err);
     res.status(500).json({ error: "Event creation failed" });
   }
 };
-
 
 // =======================================================
 // ORGANISER → MY EVENTS
@@ -91,16 +127,15 @@ exports.getMyEvents = async (req, res) => {
     const result = await pool.query(
       `
       SELECT
-        id,
-        title,
-        location,
-        event_date,
-        category,
-        slots_total,
-        slots_filled,
-        status
+        *,
+        CASE
+          WHEN NOW() < (event_date + start_time) THEN 'upcoming'
+          WHEN NOW() BETWEEN (event_date + start_time)
+                          AND (event_date + end_time) THEN 'ongoing'
+          ELSE 'completed'
+        END AS computed_status
       FROM events
-      WHERE organizer_id = $1
+      WHERE organiser_id = $1
       ORDER BY event_date DESC
       `,
       [req.user.id]
@@ -113,23 +148,22 @@ exports.getMyEvents = async (req, res) => {
   }
 };
 
-
 // =======================================================
-// PUBLIC EVENTS (VOLUNTEERS)
+// VOLUNTEER → PUBLIC EVENTS
 // =======================================================
 exports.getAllEvents = async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT
-        id,
-        title,
-        description,
-        location,
-        event_date,
-        category,
-        (slots_total - slots_filled) AS slots_left
+        *,
+        CASE
+          WHEN NOW() < (event_date + start_time) THEN 'upcoming'
+          WHEN NOW() BETWEEN (event_date + start_time)
+                          AND (event_date + end_time) THEN 'ongoing'
+          ELSE 'completed'
+        END AS computed_status
       FROM events
-      WHERE status IN ('open', 'approved')
+      WHERE status = 'open'
       ORDER BY event_date ASC
     `);
 

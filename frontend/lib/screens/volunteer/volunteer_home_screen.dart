@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import 'volunteer_profile_screen.dart';
 import 'leaderboard_screen.dart';
 import 'view_event_screen.dart'; // ✅ ADDED
+import '../../config/api_config.dart';
+
 
 class VolunteerHomeScreen extends StatefulWidget {
   const VolunteerHomeScreen({super.key});
@@ -21,6 +23,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
   bool loading = true;
   
 String searchQuery = "";
+
 
   // 🔹 FILTER UI STATE (UNCHANGED)
   String selectedCategory = "All";
@@ -59,8 +62,9 @@ String searchQuery = "";
   // ================= LOGIC UNCHANGED =================
   Future<void> fetchEvents() async {
   try {
-    final response =
-        await http.get(Uri.parse("http://10.0.2.2:4000/api/events"));
+   final response =
+    await http.get(Uri.parse("${ApiConfig.baseUrl}/events"));
+
 
     debugPrint("==== EVENTS API CALL ====");
     debugPrint("STATUS CODE: ${response.statusCode}");
@@ -112,12 +116,13 @@ String searchQuery = "";
   final matchesSearch =
       title.contains(searchQuery) || location.contains(searchQuery);
 
+  // ✅ categories is a LIST, not a string
+  final List categories = (e["categories"] ?? []);
   final matchesCategory =
-      selectedCategory == "All" || e["category"] == selectedCategory;
+      selectedCategory == "All" || categories.contains(selectedCategory);
 
-  // ✅ PAID / UNPAID LOGIC
-  final payment = e["payment_per_day"];
-  final isPaid = payment != null && payment > 0;
+  // ✅ use event_type instead of payment_per_day
+  final isPaid = e["event_type"] == "paid";
 
   bool matchesPayment = true;
   if (filterPaid && !filterUnpaid) {
@@ -270,7 +275,8 @@ String searchQuery = "";
                               ?.toString()
                               .split("T")[0] ??
                           "",
-                      slotsLeft: event["slots_left"] ?? 0,
+                      slotsLeft: event["volunteers_required"] ?? 0,
+
                     ),
                   );
                 },

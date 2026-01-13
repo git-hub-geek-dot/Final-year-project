@@ -24,12 +24,12 @@ exports.register = async (req, res) => {
 
     const finalRole = role ?? "volunteer";
 
-    // Allowed roles
-    if (!["volunteer", "organiser"].includes(finalRole)) {
+    // Allowed roles (admin added)
+    if (!["volunteer", "organiser", "admin"].includes(finalRole)) {
       return res.status(400).json({ error: "Invalid role" });
     }
 
-    // Organiser-specific validation
+    // Organiser-specific validation (admin bypasses this)
     if (finalRole === "organiser" && !contact_number) {
       return res.status(400).json({
         error: "Contact number is required for organiser",
@@ -61,7 +61,7 @@ exports.register = async (req, res) => {
         email,
         hashedPassword,
         finalRole,
-        contact_number ?? null,
+        finalRole === "organiser" ? contact_number ?? null : null,
         finalRole === "volunteer" ? city ?? null : null,
         finalRole === "organiser" ? government_id ?? null : null,
       ]
@@ -107,7 +107,6 @@ exports.login = async (req, res) => {
       { expiresIn: "1d" }
     );
 
-    // ✅ FIXED RESPONSE STRUCTURE
     res.status(200).json({
       token,
       user: {

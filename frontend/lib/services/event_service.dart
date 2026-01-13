@@ -1,35 +1,70 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/api_config.dart';
 import 'token_service.dart';
+import 'package:image_picker/image_picker.dart'; // for XFile
+
 
 class EventService {
+  /// 🔼 Upload image (Web + Mobile) and return public URL
+  static Future<String> uploadImage(XFile file) async {
+    final token = await TokenService.getToken();
+    if (token == null) {
+      throw Exception("No token found");
+    }
+
+    final request = http.MultipartRequest(
+      "POST",
+      Uri.parse("${ApiConfig.baseUrl}/upload"),
+    );
+
+    request.headers["Authorization"] = "Bearer $token";
+
+    if (kIsWeb) {
+      // 🌐 Web: send bytes
+      final bytes = await file.readAsBytes();
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          "image",
+          bytes,
+          filename: file.name,
+        ),
+      );
+    } else {
+      // 📱 Mobile/Desktop: send file path
+      request.files.add(
+        await http.MultipartFile.fromPath("image", file.path),
+      );
+    }
+
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data["url"]; // e.g. http://localhost:4000/uploads/xxx.jpg
+    } else {
+      throw Exception("Image upload failed: ${response.body}");
+    }
+  }
+
   /// ================= CREATE EVENT =================
   static Future<bool> createEvent({
     required String title,
     required String description,
     required String location,
-
-    /// Dates
-    required String eventDate, // start date (YYYY-MM-DD)
+    required String eventDate,
     required String applicationDeadline,
-
-    /// Volunteers
     required int volunteersRequired,
-
-    /// Paid / Unpaid
-    required String eventType, // "paid" | "unpaid"
+    required String eventType,
     double? paymentPerDay,
-
-    /// Optional
     String? bannerUrl,
-
-    /// Categories (list of category IDs)
     required List<int> categories,
   }) async {
     final token = await TokenService.getToken();
-
     if (token == null) {
       throw Exception("No token found");
     }
@@ -65,7 +100,6 @@ class EventService {
   /// ================= MY EVENTS =================
   static Future<List<dynamic>> fetchMyEvents() async {
     final token = await TokenService.getToken();
-
     if (token == null) {
       throw Exception("No token found");
     }

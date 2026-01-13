@@ -153,7 +153,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     setState(() => loading = true);
 
     try {
-      final success = await EventService.createEvent(
+      // 🔼 Upload image first and get real URL
+final bannerUrl = await EventService.uploadImage(bannerImage!);
+
+final success = await EventService.createEvent(
   title: titleController.text.trim(),
   description: descriptionController.text.trim(),
   location: locationController.text.trim(),
@@ -164,11 +167,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   paymentPerDay:
       eventType == "paid" ? double.parse(paymentController.text) : null,
 
-  // TEMP: store local image path as banner_url
-  bannerUrl: bannerImage!.path,
+  // ✅ Save REAL URL returned by backend
+  bannerUrl: bannerUrl,
 
   categories: selectedCategories.map((_) => 1).toList(),
 );
+
 
 
       if (success && mounted) {

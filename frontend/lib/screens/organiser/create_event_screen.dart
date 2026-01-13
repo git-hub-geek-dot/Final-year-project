@@ -154,18 +154,22 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
     try {
       final success = await EventService.createEvent(
-        title: titleController.text.trim(),
-        description: descriptionController.text.trim(),
-        location: locationController.text.trim(),
-        eventDate: _fmtDate(eventStartDate!),
-        applicationDeadline: _fmtDate(applicationDeadline!),
-        volunteersRequired: int.parse(volunteersController.text),
-        eventType: eventType,
-        paymentPerDay:
-            eventType == "paid" ? double.parse(paymentController.text) : null,
-        bannerUrl: null,
-        categories: selectedCategories.map((_) => 1).toList(), // backend mapping
-      );
+  title: titleController.text.trim(),
+  description: descriptionController.text.trim(),
+  location: locationController.text.trim(),
+  eventDate: _fmtDate(eventStartDate!),
+  applicationDeadline: _fmtDate(applicationDeadline!),
+  volunteersRequired: int.parse(volunteersController.text),
+  eventType: eventType,
+  paymentPerDay:
+      eventType == "paid" ? double.parse(paymentController.text) : null,
+
+  // TEMP: store local image path as banner_url
+  bannerUrl: bannerImage!.path,
+
+  categories: selectedCategories.map((_) => 1).toList(),
+);
+
 
       if (success && mounted) {
         Navigator.pushReplacement(

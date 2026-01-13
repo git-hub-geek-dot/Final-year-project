@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'; // kIsWeb
 
 class EventDetailsScreen extends StatelessWidget {
   final Map event;
@@ -8,6 +10,10 @@ class EventDetailsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bannerUrl = event["banner_url"];
+    final status =
+        (event["computed_status"] ?? event["status"] ?? "upcoming")
+            .toString()
+            .toUpperCase();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FB),
@@ -25,19 +31,31 @@ class EventDetailsScreen extends StatelessWidget {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // 🔝 Banner
+            // 🔝 Banner (Web + Mobile safe)
             SizedBox(
               width: double.infinity,
               height: 200,
               child: bannerUrl != null && bannerUrl.toString().isNotEmpty
-                  ? Image.network(bannerUrl, fit: BoxFit.cover)
-                  : Container(
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
-                        ),
-                      ),
-                    ),
+                  ? kIsWeb
+                      ? Image.network(
+                          bannerUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _fallbackBanner(),
+                        )
+                      : (bannerUrl.toString().startsWith("http")
+                          ? Image.network(
+                              bannerUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  _fallbackBanner(),
+                            )
+                          : Image.file(
+                              File(bannerUrl),
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  _fallbackBanner(),
+                            ))
+                  : _fallbackBanner(),
             ),
 
             const SizedBox(height: 16),
@@ -56,12 +74,10 @@ class EventDetailsScreen extends StatelessWidget {
 
                   Row(
                     children: [
-                      _statusChip(event["status"] ?? "Open"),
+                      _statusChip(status),
                       const SizedBox(width: 10),
                       Text(
-                        event["event_date"]
-                            .toString()
-                            .split("T")[0],
+                        event["event_date"].toString().split("T")[0],
                         style: const TextStyle(color: Colors.grey),
                       ),
                     ],
@@ -94,19 +110,19 @@ class EventDetailsScreen extends StatelessWidget {
               ),
             ),
 
-            // 📊 Overview Stats
+            // 📊 Overview
             _card(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
                     "Event Overview",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 14),
 
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: const [
                       _statBox("Applied", "32", Icons.person),
                       _statBox("Approved", "18", Icons.check_circle),
@@ -119,53 +135,55 @@ class EventDetailsScreen extends StatelessWidget {
 
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: const [
-                      Text("Volunteers Needed: 20"),
-                      Text("Slots Remaining: 12"),
+                    children: [
+                      Text(
+                          "Volunteers Needed: ${event["volunteers_required"] ?? 0}"),
+                      const Text("Slots Remaining: 12"),
                     ],
                   )
                 ],
               ),
             ),
 
-            // 📍 Event Info
+            // 📍 Info
             _card(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    "Event Overview",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    "Event Info",
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
                   _infoRow(Icons.location_on, event["location"]),
-                  _infoRow(Icons.category, event["category"]),
+                  _infoRow(Icons.category, event["event_type"]),
                   _infoRow(
                     Icons.calendar_today,
                     event["event_date"].toString().split("T")[0],
                   ),
-                  _infoRow(Icons.timer, "Application Deadline: 15 Jan 2025"),
-                ],
-              ),
-            ),
-
-            // ⚠ Alerts
-            _card(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    "Event Details",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  _infoRow(
+                    Icons.timer,
+                    "Application Deadline: ${event["application_deadline"]}",
                   ),
-                  SizedBox(height: 10),
-                  _warning("2 approved volunteers have not confirmed attendance"),
-                  _warning("Less than 24 hours left — 10 approvals pending"),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  static Widget _fallbackBanner() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
+        ),
+      ),
+      child: const Center(
+        child: Icon(Icons.image, size: 40, color: Colors.white),
       ),
     );
   }
@@ -242,30 +260,11 @@ class _statBox extends StatelessWidget {
             Icon(icon, size: 20),
             const SizedBox(height: 6),
             Text(value,
-                style:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.bold)),
             Text(label, style: const TextStyle(fontSize: 12)),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _warning extends StatelessWidget {
-  final String text;
-  const _warning(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          const Icon(Icons.warning, size: 16, color: Colors.orange),
-          const SizedBox(width: 8),
-          Expanded(child: Text(text)),
-        ],
       ),
     );
   }

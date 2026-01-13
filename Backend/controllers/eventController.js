@@ -135,7 +135,7 @@ exports.getMyEvents = async (req, res) => {
           ELSE 'completed'
         END AS computed_status
       FROM events
-      WHERE organiser_id = $1
+      WHERE organiser_id = $1 AND status IN ('open', 'deleted','closed','completed','upcoming')
       ORDER BY event_date DESC
       `,
       [req.user.id]

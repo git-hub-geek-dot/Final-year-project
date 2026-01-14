@@ -108,8 +108,11 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
           SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
             child: Column(
-              children: [
-                _eventHeaderCard(),
+  children: [
+    _eventBanner(),
+    const SizedBox(height: 16),
+    _eventHeaderCard(),
+
                 const SizedBox(height: 16),
                 _aboutCard(),
                 const SizedBox(height: 16),
@@ -129,6 +132,41 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
       ),
     );
   }
+Widget _eventBanner() {
+  final imageUrl = widget.event["banner_url"];
+
+  if (imageUrl == null || imageUrl.isEmpty) {
+    return const SizedBox.shrink();
+  }
+
+  return ClipRRect(
+    borderRadius: const BorderRadius.only(
+      bottomLeft: Radius.circular(24),
+      bottomRight: Radius.circular(24),
+    ),
+    child: Image.network(
+      imageUrl,
+      height: 220,
+      width: double.infinity,
+      fit: BoxFit.cover,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return Container(
+          height: 220,
+          color: Colors.grey.shade200,
+          child: const Center(child: CircularProgressIndicator()),
+        );
+      },
+      errorBuilder: (_, __, ___) {
+        return Container(
+          height: 220,
+          color: Colors.grey.shade300,
+          child: const Icon(Icons.image, size: 48),
+        );
+      },
+    ),
+  );
+}
 
   // ================= HEADER =================
   Widget _eventHeaderCard() {
@@ -137,14 +175,22 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            widget.event["title"] ?? "",
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            widget.event["description"] ?? "",
-            style: const TextStyle(color: Colors.grey),
-          ),
+  widget.event["title"] ?? "",
+  style: const TextStyle(
+    fontSize: 24,
+    fontWeight: FontWeight.w700,
+    letterSpacing: 0.3,
+  ),
+),
+const SizedBox(height: 6),
+Text(
+  widget.event["description"] ?? "",
+  style: TextStyle(
+    color: Colors.grey.shade600,
+    height: 1.4,
+  ),
+),
+
           const SizedBox(height: 16),
           _iconRow(Icons.location_on, widget.event["location"] ?? "N/A"),
           _iconRow(
@@ -294,32 +340,57 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
 
   // ================= HELPERS =================
   Widget _card({required Widget child}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(18),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(22),
+      gradient: LinearGradient(
+        colors: [
+          Colors.white,
+          const Color(0xFFF7FAFF),
         ],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
       ),
-      child: child,
-    );
-  }
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.06),
+          blurRadius: 18,
+          offset: const Offset(0, 8),
+        ),
+      ],
+    ),
+    child: child,
+  );
+}
+
 
   Widget _iconRow(IconData icon, String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: Colors.green),
-          const SizedBox(width: 8),
-          Expanded(child: Text(text)),
-        ],
-      ),
-    );
-  }
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: Colors.green.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 16, color: Colors.green),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(fontWeight: FontWeight.w500),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 
   Widget _checkItem(String text) {
     return Padding(
@@ -335,24 +406,31 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
   }
 
   Widget _statusPill(String text, Color color) {
-    return Container(
-      height: 54,
-      width: double.infinity,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(30),
+  return Container(
+    height: 52,
+    width: double.infinity,
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        colors: [
+          color.withOpacity(0.15),
+          color.withOpacity(0.25),
+        ],
       ),
+      borderRadius: BorderRadius.circular(30),
+    ),
+    child: Center(
       child: Text(
         text,
         style: TextStyle(
           color: color,
           fontWeight: FontWeight.w600,
-          fontSize: 16,
+          fontSize: 15,
         ),
       ),
-    );
-  }
+    ),
+  );
+}
+
 
   Color _statusColor(String status) {
     switch (status) {
@@ -387,59 +465,77 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
 
   // ================= TERMS =================
   void _showTerms(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (_) {
-        bool agreed = false;
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (_) {
+      bool agreed = false;
 
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return Padding(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                16,
-                16,
-                MediaQuery.of(context).viewInsets.bottom + 16,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Center(
-                    child: Text(
-                      "Terms & Conditions",
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return Padding(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              16,
+              16,
+              MediaQuery.of(context).viewInsets.bottom + 16,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Center(
+                  child: Text(
+                    "Volunteer Terms & Conditions",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                  const SizedBox(height: 16),
-                  CheckboxListTile(
-                    value: agreed,
-                    onChanged: (v) => setState(() => agreed = v!),
-                    title: const Text("I agree to the Terms & Conditions"),
+                ),
+                const SizedBox(height: 16),
+
+                const Text("• Participation is voluntary and does not constitute employment."),
+                const SizedBox(height: 8),
+                const Text("• Volunteers must follow organiser instructions and maintain respectful conduct."),
+                const SizedBox(height: 8),
+                const Text("• Volunteers are responsible for their own safety during the event."),
+                const SizedBox(height: 8),
+                const Text("• Accurate profile and contact information must be maintained at all times."),
+                const SizedBox(height: 8),
+                const Text(
+                  "• VolunteerX is not responsible for any payments, donations, reimbursements, or financial matters related to events; all such transactions are solely between the volunteer and the organiser.",
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+
+                const SizedBox(height: 16),
+
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: agreed,
+                  onChanged: (v) => setState(() => agreed = v!),
+                  title: const Text("I agree to the Terms & Conditions"),
+                ),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: agreed
+                        ? () {
+                            Navigator.pop(context);
+                            _applyToEvent();
+                          }
+                        : null,
+                    child: const Text("Confirm & Apply"),
                   ),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: agreed
-                          ? () {
-                              Navigator.pop(context);
-                              _applyToEvent();
-                            }
-                          : null,
-                      child: const Text("Confirm & Apply"),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
   }
 }

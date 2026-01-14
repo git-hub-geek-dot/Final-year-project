@@ -15,7 +15,6 @@ exports.register = async (req, res) => {
       government_id,
     } = req.body;
 
-    // Basic validation
     if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
@@ -41,7 +40,6 @@ exports.register = async (req, res) => {
       });
     }
 
-    // Check existing user
     const existing = await pool.query(
       "SELECT id FROM users WHERE email = $1",
       [email]
@@ -54,7 +52,6 @@ exports.register = async (req, res) => {
       });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Insert user (status defaults to 'active')
@@ -118,7 +115,7 @@ exports.login = async (req, res) => {
 
     const user = result.rows[0];
 
-    // 🔐 BLOCK INACTIVE / BANNED USERS
+    // Block inactive / banned users
     if (user.status !== "active") {
       return res.status(403).json({
         success: false,
@@ -134,7 +131,7 @@ exports.login = async (req, res) => {
       });
     }
 
-    // 🔑 JWT WITH USER ID + ROLE
+    // JWT token
     const token = jwt.sign(
       { id: user.id, role: user.role },
       process.env.JWT_SECRET,

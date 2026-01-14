@@ -12,7 +12,7 @@ event_date
 category
 slots_total
 slots_filled
-status          -- 'upcoming' | 'closed'
+status          -- 'open' | 'closed' | 'completed' | 'deleted'
 created_at
 */
 
@@ -135,7 +135,8 @@ exports.getMyEvents = async (req, res) => {
           ELSE 'completed'
         END AS computed_status
       FROM events
-      WHERE organiser_id = $1 AND status IN ('open', 'deleted','closed','completed')
+      WHERE organiser_id = $1
+        AND status IN ('open', 'closed', 'completed', 'deleted')
       ORDER BY event_date DESC
       `,
       [req.user.id]
@@ -172,25 +173,32 @@ exports.getAllEvents = async (req, res) => {
     console.error("GET EVENTS ERROR:", err);
     res.status(500).json({ error: "Internal server error" });
   }
-
 };
-exports.updateEvent = async (req, res) => {
-  const { id } = req.params;
-  const {
-    title,
-    description,
-    location,
-    event_date,
-    application_deadline,
-    volunteers_required,
-    event_type,
-    payment_per_day,
-    banner_url,
-  } = req.body;
 
+// =======================================================
+// UPDATE EVENT (ORGANISER)
+// =======================================================
+exports.updateEvent = async (req, res) => {
   try {
-    await pool.query(
-      `UPDATE events SET
+    const organiserId = req.user.id;
+    const eventId = req.params.id;
+
+    const {
+      title,
+      description,
+      location,
+      event_date,
+      application_deadline,
+      volunteers_required,
+      event_type,
+      payment_per_day,
+      banner_url,
+    } = req.body;
+
+    const result = await pool.query(
+      `
+      UPDATE events
+      SET
         title = $1,
         description = $2,
         location = $3,
@@ -200,7 +208,9 @@ exports.updateEvent = async (req, res) => {
         event_type = $7,
         payment_per_day = $8,
         banner_url = $9
-       WHERE id = $10`,
+      WHERE id = $10 AND organiser_id = $11
+      RETURNING *
+      `,
       [
         title,
         description,
@@ -211,13 +221,18 @@ exports.updateEvent = async (req, res) => {
         event_type,
         payment_per_day,
         banner_url,
-        id,
+        eventId,
+        organiserId,
       ]
     );
 
-    res.json({ success: true });
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Update failed" });
+    console.error("UPDATE EVENT ERROR:", err);
+    res.status(500).json({ error: "Failed to update event" });
   }
 };

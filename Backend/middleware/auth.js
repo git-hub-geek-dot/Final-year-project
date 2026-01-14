@@ -28,7 +28,7 @@ module.exports = (req, res, next) => {
     // ✅ Attach only trusted fields
     req.user = {
       id: decoded.id,
-      role: decoded.role, // useful for role-based access
+      role: decoded.role,
     };
 
     next();

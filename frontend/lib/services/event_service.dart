@@ -7,7 +7,6 @@ import '../config/api_config.dart';
 import 'token_service.dart';
 import 'package:image_picker/image_picker.dart'; // for XFile
 
-
 class EventService {
   /// 🔼 Upload image (Web + Mobile) and return public URL
   static Future<String> uploadImage(XFile file) async {
@@ -24,7 +23,6 @@ class EventService {
     request.headers["Authorization"] = "Bearer $token";
 
     if (kIsWeb) {
-      // 🌐 Web: send bytes
       final bytes = await file.readAsBytes();
       request.files.add(
         http.MultipartFile.fromBytes(
@@ -34,7 +32,6 @@ class EventService {
         ),
       );
     } else {
-      // 📱 Mobile/Desktop: send file path
       request.files.add(
         await http.MultipartFile.fromPath("image", file.path),
       );
@@ -45,7 +42,7 @@ class EventService {
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return data["url"]; // e.g. http://localhost:4000/uploads/xxx.jpg
+      return data["url"];
     } else {
       throw Exception("Image upload failed: ${response.body}");
     }
@@ -116,7 +113,63 @@ class EventService {
       return jsonDecode(response.body);
     } else {
       print("FETCH EVENTS ERROR → ${response.body}");
-      throw Exception("Failed to fetch my events");
+      throw Exception("Failed to fetch organiser events");
     }
+  }
+
+  /// ================= APPLICATIONS =================
+  static Future<List<dynamic>> fetchApplications(int eventId) async {
+    final token = await TokenService.getToken();
+
+    final response = await http.get(
+      Uri.parse("${ApiConfig.baseUrl}/events/$eventId/applications"),
+      headers: {
+        "Authorization": "Bearer $token",
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception("Failed to fetch applications");
+    }
+  }
+
+  /// ================= UPDATE EVENT =================
+  static Future<bool> updateEvent({
+    required int id,
+    required String title,
+    required String description,
+    required String location,
+    required String eventDate,
+    required String applicationDeadline,
+    required int volunteersRequired,
+    required String eventType,
+    double? paymentPerDay,
+    String? bannerUrl,
+  }) async {
+    final token = await TokenService.getToken();
+    if (token == null) throw Exception("No token");
+
+    final response = await http.put(
+      Uri.parse("${ApiConfig.baseUrl}/events/$id"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
+      body: jsonEncode({
+        "title": title,
+        "description": description,
+        "location": location,
+        "event_date": eventDate,
+        "application_deadline": applicationDeadline,
+        "volunteers_required": volunteersRequired,
+        "event_type": eventType,
+        "payment_per_day": eventType == "paid" ? paymentPerDay : null,
+        "banner_url": bannerUrl,
+      }),
+    );
+
+    return response.statusCode == 200;
   }
 }

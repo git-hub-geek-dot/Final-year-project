@@ -123,22 +123,21 @@ class _EditEventScreenState extends State<EditEventScreen> {
         bannerUrl = await EventService.uploadImage(bannerImage!);
       }
 
-      await EventService.createEvent(
-        title: titleController.text.trim(),
-        description: descriptionController.text.trim(),
-        location: locationController.text.trim(),
-        eventDate: _fmtDate(eventStartDate ?? DateTime.now()),
-        applicationDeadline:
-            _fmtDate(applicationDeadline ?? DateTime.now()),
-        volunteersRequired: int.parse(volunteersController.text),
-        eventType: eventType,
-        paymentPerDay:
-            eventType == "paid" ? double.parse(paymentController.text) : null,
-        bannerUrl: bannerUrl,
-        categories: const [],
-      );
+      final success = await EventService.updateEvent(
+  id: widget.event["id"],
+  title: titleController.text.trim(),
+  description: descriptionController.text.trim(),
+  location: locationController.text.trim(),
+  eventDate: _fmtDate(eventStartDate ?? DateTime.now()),
+  applicationDeadline: _fmtDate(applicationDeadline ?? DateTime.now()),
+  volunteersRequired: int.parse(volunteersController.text),
+  eventType: eventType,
+  paymentPerDay:
+      eventType == "paid" ? double.parse(paymentController.text) : null,
+  bannerUrl: bannerUrl,
+);
 
-   if (mounted) Navigator.pop(context, true);
+if (success && mounted) Navigator.pop(context, true);
 
     } catch (e) {
       _toast("Update failed: $e");

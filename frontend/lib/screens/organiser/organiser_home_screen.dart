@@ -34,7 +34,6 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
     }
   }
 
-  // ✅ SAFE STATUS HANDLER
   String _status(Map e) => e["computed_status"] ?? e["status"] ?? "upcoming";
 
   List getUpcomingEvents() =>
@@ -55,7 +54,6 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
     return Scaffold(
       body: Column(
         children: [
-          // 🔷 HEADER
           Container(
             height: 180,
             padding: const EdgeInsets.fromLTRB(20, 50, 20, 20),
@@ -83,7 +81,6 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
 
           const SizedBox(height: 20),
 
-          // 🔘 CREATE EVENT
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: InkWell(
@@ -117,7 +114,6 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
 
           const SizedBox(height: 20),
 
-          // 📋 EVENTS LIST
           Expanded(
             child: loading
                 ? const Center(child: CircularProgressIndicator())
@@ -131,7 +127,6 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
                   ),
           ),
 
-          // 📊 STATS
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Container(
@@ -156,35 +151,30 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
           const SizedBox(height: 10),
         ],
       ),
-
-     bottomNavigationBar: BottomNavigationBar(
-  currentIndex: 0,
-  selectedItemColor: const Color(0xFF22C55E),
-  unselectedItemColor: Colors.grey,
-  onTap: (index) {
-    if (index == 1) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const LeaderboardScreen()),
-      );
-    } else if (index == 2) {
-      Navigator.pushNamed(context, "/organiser-profile");
-      // or if you have a screen:
-      // Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
-    }
-  },
-  items: const [
-    BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-    BottomNavigationBarItem(
-        icon: Icon(Icons.leaderboard), label: "Leaderboard"),
-    BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
-  ],
-),
-
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: 0,
+        selectedItemColor: const Color(0xFF22C55E),
+        unselectedItemColor: Colors.grey,
+        onTap: (index) {
+          if (index == 1) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const LeaderboardScreen()),
+            );
+          } else if (index == 2) {
+            Navigator.pushNamed(context, "/organiser-profile");
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.leaderboard), label: "Leaderboard"),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
+        ],
+      ),
     );
   }
 
-  // 🔹 SECTION
   Widget _section(String title, List list) {
     if (list.isEmpty) return const SizedBox();
 
@@ -199,14 +189,17 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
                 const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
         ),
-        ...list.map((event) => eventCard(context, event)),
+        ...list.map((event) => eventCard(context, event, loadMyEvents)),
       ],
     );
   }
 }
 
-/// ================= EVENT CARD =================
-Widget eventCard(BuildContext context, Map event) {
+Widget eventCard(
+  BuildContext context,
+  Map event,
+  VoidCallback onRefresh,
+) {
   return InkWell(
     onTap: () {
       Navigator.push(
@@ -214,7 +207,11 @@ Widget eventCard(BuildContext context, Map event) {
         MaterialPageRoute(
           builder: (_) => EventDetailsScreen(event: event),
         ),
-      );
+      ).then((updated) {
+        if (updated == true) {
+          onRefresh();
+        }
+      });
     },
     child: Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -232,8 +229,7 @@ Widget eventCard(BuildContext context, Map event) {
                     fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
             Text("📍 ${event["location"] ?? ""}"),
-            Text(
-                "📅 ${event["event_date"].toString().split("T")[0]}"),
+            Text("📅 ${event["event_date"].toString().split("T")[0]}"),
           ]),
           InkWell(
             onTap: () {
@@ -269,7 +265,6 @@ Widget eventCard(BuildContext context, Map event) {
   );
 }
 
-/// ================= STATS =================
 class StatItem extends StatelessWidget {
   final String value;
   final String label;

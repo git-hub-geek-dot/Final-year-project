@@ -22,18 +22,25 @@ router.get(
 
 /* ================= REQUIRED ROUTES (ADDED) ================= */
 
-// 🔥 REQUIRED: Flutter Apply API
+// 🔥 Flutter: Volunteer applies to event
 router.post(
   "/events/:id/apply",
   authenticateToken,
   applicationController.applyToEvent
 );
 
-// 🔥 REQUIRED: Flutter Application Status API
+// 🔥 Flutter: Volunteer checks application status
 router.get(
   "/events/:id/application-status",
   authenticateToken,
   applicationController.getApplicationStatus
+);
+
+// 🔥 Flutter: Organiser views applications for an event
+router.get(
+  "/events/:id/applications",
+  authenticateToken,
+  applicationController.getEventApplications
 );
 
 module.exports = router;

@@ -37,4 +37,10 @@ class PreferencesService {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool(_promotionsKey) ?? false;
   }
+
+  // 🔥 CLEAR ALL DATA (USED FOR DELETE ACCOUNT / LOGOUT)
+  static Future<void> clearAll() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+  }
 }

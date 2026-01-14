@@ -4,27 +4,37 @@ const router = express.Router();
 const {
   createEvent,
   getMyEvents,
-  getAllEvents
+  getAllEvents,
+  updateEvent,
 } = require("../controllers/eventController");
 
 const {
   applyToEvent,
   getApplicationStatus,
-  getMyApplications
+  getEventApplications,
 } = require("../controllers/applicationController");
 
 const authMiddleware = require("../middleware/auth");
 
-// organiser
+// ================= ORGANISER =================
 router.post("/events", authMiddleware, createEvent);
 router.get("/events/my-events", authMiddleware, getMyEvents);
+router.put("/events/:id", authMiddleware, updateEvent);
+router.get(
+  "/events/:id/applications",
+  authMiddleware,
+  getEventApplications
+);
 
-// volunteer
+// ================= VOLUNTEER =================
 router.post("/events/:id/apply", authMiddleware, applyToEvent);
-router.get("/events/:id/application-status", authMiddleware, getApplicationStatus);
-router.get("/my-applications", authMiddleware, getMyApplications);
+router.get(
+  "/events/:id/application-status",
+  authMiddleware,
+  getApplicationStatus
+);
 
-// public
+// ================= PUBLIC =================
 router.get("/events", getAllEvents);
 
 module.exports = router;

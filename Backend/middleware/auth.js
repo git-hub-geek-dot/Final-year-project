@@ -25,15 +25,15 @@ module.exports = (req, res, next) => {
       });
     }
 
-    // ✅ Attach ONLY what we trust
+    // ✅ Attach only trusted fields
     req.user = {
       id: decoded.id,
-      role: decoded.role, // optional, but useful later
+      role: decoded.role, // useful for role-based access
     };
 
     next();
   } catch (err) {
-    console.error("AUTH ERROR:", err);
+    console.error("AUTH ERROR:", err.message);
 
     return res.status(401).json({
       success: false,

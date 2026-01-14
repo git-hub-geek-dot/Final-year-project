@@ -159,3 +159,39 @@ exports.login = async (req, res) => {
     });
   }
 };
+
+// ================= UPDATE PROFILE =================
+exports.updateProfile = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const { name, city, contact_number } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    if (!name) {
+      return res.status(400).json({ error: "Name is required" });
+    }
+
+    const result = await pool.query(
+      `
+      UPDATE users
+      SET name = $1,
+          city = $2,
+          contact_number = $3
+      WHERE id = $4
+      RETURNING id, name, email, role, city, contact_number
+      `,
+      [name, city ?? null, contact_number ?? null, userId]
+    );
+
+    return res.status(200).json({
+      message: "Profile updated successfully",
+      user: result.rows[0],
+    });
+  } catch (err) {
+    console.error("UPDATE PROFILE ERROR:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};

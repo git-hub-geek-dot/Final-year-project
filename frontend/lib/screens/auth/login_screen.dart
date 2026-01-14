@@ -53,7 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
         final String role = data["user"]["role"];
         final String userId = data["user"]["id"].toString();
 
-        // ✅ SAVE TOKEN + USER ID (FIX)
+        // ✅ Save auth data in ONE place (TokenService)
         await TokenService.saveAuthData(
           token: token,
           userId: userId,
@@ -65,6 +65,7 @@ class _LoginScreenState extends State<LoginScreen> {
           const SnackBar(content: Text("Login successful")),
         );
 
+        // ✅ Role-based navigation
         if (role == "admin") {
           Navigator.pushReplacementNamed(context, "/admin-home");
         } else if (role == "organiser") {
@@ -138,7 +139,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   const Icon(Icons.volunteer_activism, size: 60),
                   const SizedBox(height: 12),
-
                   const Text(
                     "Login",
                     style: TextStyle(
@@ -182,10 +182,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 12),
 
                   TextButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, "/register");
-                    },
-                    child: const Text("Don't have an account? Register"),
+                    onPressed: () =>
+                        Navigator.pushNamed(context, "/register"),
+                    child: const Text(
+                      "Don't have an account? Register",
+                    ),
                   ),
                 ],
               ),

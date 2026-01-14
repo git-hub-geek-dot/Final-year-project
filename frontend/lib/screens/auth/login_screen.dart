@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/token_service.dart';
 import '../../config/api_config.dart';
@@ -38,45 +37,35 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => loading = true);
 
     try {
-      print("LOGIN STARTED");
-
-      final response = await http
-          .post(
-            Uri.parse("${ApiConfig.baseUrl}/login"),
-            headers: {"Content-Type": "application/json"},
-            body: jsonEncode({
-              "email": emailController.text.trim(),
-              "password": passwordController.text.trim(),
-            }),
-          )
-          .timeout(const Duration(seconds: 5));
-
-      print("STATUS: ${response.statusCode}");
-      print("BODY: ${response.body}");
+      final response = await http.post(
+        Uri.parse("${ApiConfig.baseUrl}/login"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "email": emailController.text.trim(),
+          "password": passwordController.text.trim(),
+        }),
+      );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
         final String token = data["token"];
-        final Map<String, dynamic> user = data["user"];
-        final String role = user["role"];
+        final String role = data["user"]["role"];
+        final String userId = data["user"]["id"].toString();
 
-        // ✅ SAVE TOKEN (TokenService - your existing system)
-        await TokenService.saveToken(token);
-
-        // ✅ ALSO SAVE TOKEN IN SharedPreferences (so EditProfile can read it)
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString("token", token);
-        await prefs.setString("user", jsonEncode(user));
-
-        print("TOKEN SAVED IN PREFS: ${prefs.getString("token")}");
+        // ✅ Save auth data in ONE place (TokenService)
+        await TokenService.saveAuthData(
+          token: token,
+          userId: userId,
+        );
 
         if (!mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Login successful ✅")),
+          const SnackBar(content: Text("Login successful")),
         );
 
+        // ✅ Role-based navigation
         if (role == "admin") {
           Navigator.pushReplacementNamed(context, "/admin-home");
         } else if (role == "organiser") {
@@ -87,11 +76,11 @@ class _LoginScreenState extends State<LoginScreen> {
           showError("Unknown role: $role");
         }
       } else {
-        showError(response.body);
+        final err = jsonDecode(response.body);
+        showError(err["message"] ?? "Login failed");
       }
     } catch (e) {
-      print("LOGIN ERROR: $e");
-      showError(e.toString());
+      showError("Network error. Please try again.");
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -152,7 +141,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 12),
                   const Text(
                     "Login",
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 20),
 
@@ -190,8 +182,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 12),
 
                   TextButton(
-                    onPressed: () => Navigator.pushNamed(context, "/register"),
-                    child: const Text("Don't have an account? Register"),
+                    onPressed: () =>
+                        Navigator.pushNamed(context, "/register"),
+                    child: const Text(
+                      "Don't have an account? Register",
+                    ),
                   ),
                 ],
               ),

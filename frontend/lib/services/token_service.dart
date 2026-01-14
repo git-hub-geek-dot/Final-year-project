@@ -1,23 +1,35 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 class TokenService {
-  static const String _tokenKey = 'jwt_token';
+  static const String _tokenKey = 'token';
+  static const String _userIdKey = 'userId';
 
-  /// Save JWT after login
-  static Future<void> saveToken(String token) async {
+  /// ✅ Save JWT + User ID after login
+  static Future<void> saveAuthData({
+    required String token,
+    required String userId,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenKey, token);
+    await prefs.setString(_userIdKey, userId);
   }
 
-  /// Get JWT for authenticated requests
+  /// ✅ Get JWT for authenticated requests
   static Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_tokenKey);
   }
 
-  /// Clear JWT on logout
+  /// ✅ Get logged-in user ID
+  static Future<String?> getUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_userIdKey);
+  }
+
+  /// ✅ Clear ALL auth data (logout / delete)
   static Future<void> clearToken() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
+    await prefs.remove(_userIdKey);
   }
 }

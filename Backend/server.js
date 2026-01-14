@@ -1,8 +1,10 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
 
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 
@@ -16,6 +18,7 @@ app.use("/api", require("./routes/applicationRoutes"));
 app.use("/api", require("./routes/ratingRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
 app.use("/api", require("./routes/upload"));
+app.use("/api", require("./routes/userRoutes"));
 
 app.get("/", (req, res) => {
   res.json({ message: "API running" });

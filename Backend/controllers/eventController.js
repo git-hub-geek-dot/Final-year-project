@@ -172,4 +172,52 @@ exports.getAllEvents = async (req, res) => {
     console.error("GET EVENTS ERROR:", err);
     res.status(500).json({ error: "Internal server error" });
   }
+
+};
+exports.updateEvent = async (req, res) => {
+  const { id } = req.params;
+  const {
+    title,
+    description,
+    location,
+    event_date,
+    application_deadline,
+    volunteers_required,
+    event_type,
+    payment_per_day,
+    banner_url,
+  } = req.body;
+
+  try {
+    await pool.query(
+      `UPDATE events SET
+        title = $1,
+        description = $2,
+        location = $3,
+        event_date = $4,
+        application_deadline = $5,
+        volunteers_required = $6,
+        event_type = $7,
+        payment_per_day = $8,
+        banner_url = $9
+       WHERE id = $10`,
+      [
+        title,
+        description,
+        location,
+        event_date,
+        application_deadline,
+        volunteers_required,
+        event_type,
+        payment_per_day,
+        banner_url,
+        id,
+      ]
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Update failed" });
+  }
 };

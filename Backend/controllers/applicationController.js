@@ -16,19 +16,22 @@ exports.applyToEvent = async (req, res) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO applications (event_id, volunteer_id, status)
-       VALUES ($1, $2, 'pending')
-       RETURNING *`,
+      `
+      INSERT INTO applications (event_id, volunteer_id, status)
+      VALUES ($1, $2, 'pending')
+      RETURNING id, status
+      `,
       [eventId, volunteerId]
     );
 
     res.status(201).json({
       success: true,
+      application_id: result.rows[0].id,
       status: result.rows[0].status,
     });
   } catch (err) {
     console.error("APPLY ERROR:", err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Failed to apply" });
   }
 };
 
@@ -53,27 +56,52 @@ exports.getApplicationStatus = async (req, res) => {
     });
   } catch (err) {
     console.error("STATUS ERROR:", err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Failed to get status" });
   }
 };
 
-// ================= MY APPLICATIONS =================
+// ================= EVENT APPLICATIONS (ORGANISER) =================
+exports.getEventApplications = async (req, res) => {
+  try {
+    const eventId = req.params.id;
+
+    const result = await pool.query(
+      `
+      SELECT a.id, u.name, u.city, a.status
+      FROM applications a
+      JOIN users u ON u.id = a.volunteer_id
+      WHERE a.event_id = $1
+      ORDER BY a.created_at DESC
+      `,
+      [eventId]
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("GET APPLICATIONS ERROR:", err);
+    res.status(500).json({ error: "Failed to fetch applications" });
+  }
+};
+
+// ================= MY APPLICATIONS (VOLUNTEER) =================
 exports.getMyApplications = async (req, res) => {
   try {
     const volunteerId = req.user.id;
 
     const result = await pool.query(
-      `SELECT a.*, e.title, e.location, e.event_date
-       FROM applications a
-       JOIN events e ON e.id = a.event_id
-       WHERE a.volunteer_id = $1
-       ORDER BY a.applied_at DESC`,
+      `
+      SELECT a.id, a.status, e.title, e.location, e.event_date
+      FROM applications a
+      JOIN events e ON e.id = a.event_id
+      WHERE a.volunteer_id = $1
+      ORDER BY a.created_at DESC
+      `,
       [volunteerId]
     );
 
     res.json(result.rows);
   } catch (err) {
     console.error("MY APPLICATIONS ERROR:", err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Failed to fetch my applications" });
   }
 };

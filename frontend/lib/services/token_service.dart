@@ -10,7 +10,11 @@ class TokenService {
     required String userId,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_tokenKey, token);
+
+    // Ensure token is clean (no whitespace / line breaks)
+    final cleanToken = token.replaceAll(RegExp(r'\s+'), '');
+
+    await prefs.setString(_tokenKey, cleanToken);
     await prefs.setString(_userIdKey, userId);
   }
 
@@ -26,8 +30,8 @@ class TokenService {
     return prefs.getString(_userIdKey);
   }
 
-  /// ✅ Clear ALL auth data (logout / delete)
-  static Future<void> clearToken() async {
+  /// ✅ Clear ALL auth data (logout)
+  static Future<void> clearAuthData() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
     await prefs.remove(_userIdKey);

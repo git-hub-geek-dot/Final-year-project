@@ -4,7 +4,6 @@ import 'package:http/http.dart' as http;
 import '../../services/token_service.dart';
 import 'view_organiser_profile_screen.dart';
 
-
 class ViewEventScreen extends StatefulWidget {
   final Map<String, dynamic> event;
 
@@ -209,47 +208,46 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
 
   // ================= ORGANISER =================
   Widget _organiserCard() {
-  return GestureDetector(
-    behavior: HitTestBehavior.opaque,
-    onTap: () {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const ViewOrganiserProfileScreen(
-            organiserId: 1, // dummy for now
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const ViewOrganiserProfileScreen(
+              organiserId: 1, // TODO: dynamic later
+            ),
           ),
+        );
+      },
+      child: _card(
+        child: Row(
+          children: const [
+            CircleAvatar(
+              radius: 22,
+              backgroundColor: Colors.green,
+              child: Icon(Icons.eco, color: Colors.white),
+            ),
+            SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Green Earth Foundation",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  "⭐ 4.6 rating | 120+ volunteers engaged",
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ],
+            ),
+          ],
         ),
-      );
-    },
-    child: _card(
-      child: Row(
-        children: const [
-          CircleAvatar(
-            radius: 22,
-            backgroundColor: Colors.green,
-            child: Icon(Icons.eco, color: Colors.white),
-          ),
-          SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "Green Earth Foundation",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 4),
-              Text(
-                "⭐ 4.6 rating | 120+ volunteers engaged",
-                style: TextStyle(color: Colors.grey),
-              ),
-            ],
-          ),
-        ],
       ),
-    ),
-  );
-}
-
+    );
+  }
 
   // ================= APPLY =================
   Widget _buildApplySection() {
@@ -281,10 +279,9 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
                   : const Text(
                       "Apply for this Event",
                       style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white),
                     ),
             ),
           ),
@@ -383,13 +380,6 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
     }
   }
 
-  Widget _term(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text("• $text", style: const TextStyle(fontSize: 14)),
-    );
-  }
-
   void _snack(String msg) {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(msg)));
@@ -415,52 +405,36 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
                 16,
                 MediaQuery.of(context).viewInsets.bottom + 16,
               ),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Center(
-                      child: Text(
-                        "Terms & Conditions",
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Center(
+                    child: Text(
+                      "Terms & Conditions",
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(height: 16),
-                    _term("Profile information must be accurate and up to date."),
-                    _term(
-                        "Participation in this event is subject to organiser approval."),
-                    _term(
-                        "If accepted, attendance is mandatory unless informed in advance."),
-                    _term(
-                        "Volunteers must follow safety, cleanliness, and conduct guidelines."),
-                    _term(
-                        "Any form of misconduct may result in removal from the event."),
-                    _term(
-                        "VolunteerX acts only as a coordination platform and is not responsible for disputes, payments, or liabilities between volunteers and organisers."),
-                    CheckboxListTile(
-                      value: agreed,
-                      onChanged: (v) => setState(() => agreed = v!),
-                      title:
-                          const Text("I agree to the Terms & Conditions"),
-                      controlAffinity: ListTileControlAffinity.leading,
-                      contentPadding: EdgeInsets.zero,
+                  ),
+                  const SizedBox(height: 16),
+                  CheckboxListTile(
+                    value: agreed,
+                    onChanged: (v) => setState(() => agreed = v!),
+                    title: const Text("I agree to the Terms & Conditions"),
+                  ),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: agreed
+                          ? () {
+                              Navigator.pop(context);
+                              _applyToEvent();
+                            }
+                          : null,
+                      child: const Text("Confirm & Apply"),
                     ),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton(
-                        onPressed: agreed
-                            ? () {
-                                Navigator.pop(context);
-                                _applyToEvent();
-                              }
-                            : null,
-                        child: const Text("Confirm & Apply"),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             );
           },

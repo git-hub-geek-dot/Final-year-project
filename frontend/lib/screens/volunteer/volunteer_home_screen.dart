@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import 'volunteer_profile_screen.dart';
 import 'leaderboard_screen.dart';
 import 'view_event_screen.dart'; // ✅ ADDED
+import '../../config/api_config.dart';
+
 
 class VolunteerHomeScreen extends StatefulWidget {
   const VolunteerHomeScreen({super.key});
@@ -19,8 +21,8 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
   int selectedIndex = 0;
   List events = [];
   bool loading = true;
-
-  String searchQuery = "";
+  
+String searchQuery = "";
 
 
   // 🔹 FILTER UI STATE (UNCHANGED)
@@ -60,8 +62,9 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
   // ================= LOGIC UNCHANGED =================
   Future<void> fetchEvents() async {
   try {
-    final response =
-        await http.get(Uri.parse("http://10.0.2.2:4000/api/events"));
+   final response =
+    await http.get(Uri.parse("${ApiConfig.baseUrl}/events"));
+
 
     debugPrint("==== EVENTS API CALL ====");
     debugPrint("STATUS CODE: ${response.statusCode}");

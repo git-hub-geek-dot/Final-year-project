@@ -8,14 +8,22 @@ const {
   updateEvent // 👈 add this
 } = require("../controllers/eventController");
 
+const {
+  applyToEvent,
+  getApplicationStatus,
+  getMyApplications
+} = require("../controllers/applicationController");
+
 const authMiddleware = require("../middleware/auth");
 
 // organiser
 router.post("/events", authMiddleware, createEvent);
 router.get("/events/my-events", authMiddleware, getMyEvents);
 
-// 👇 NEW ROUTE for editing event
-router.put("/events/:id", authMiddleware, updateEvent);
+// volunteer
+router.post("/events/:id/apply", authMiddleware, applyToEvent);
+router.get("/events/:id/application-status", authMiddleware, getApplicationStatus);
+router.get("/my-applications", authMiddleware, getMyApplications);
 
 // public
 router.get("/events", getAllEvents);

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:frontend/config/api_config.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -17,34 +18,55 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final TextEditingController contactController = TextEditingController();
 
   bool isLoading = false;
+  bool loadingProfile = true;
 
   @override
   void initState() {
     super.initState();
-    _loadSavedProfile(); // ✅ auto fill from saved user
+    _fetchProfileFromApi();
   }
 
-  Future<void> _loadSavedProfile() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userStr = prefs.getString("user");
+  // ================= FETCH PROFILE =================
+  Future<void> _fetchProfileFromApi() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString("token");
 
-    if (userStr != null) {
-      try {
-        final user = jsonDecode(userStr);
+      if (token == null || token.isEmpty) {
+        setState(() => loadingProfile = false);
+        return;
+      }
+
+      final url = Uri.parse("${ApiConfig.baseUrl}/profile");
+
+      final response = await http.get(
+        url,
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final user = jsonDecode(response.body);
 
         setState(() {
           nameController.text = user["name"] ?? "";
           emailController.text = user["email"] ?? "";
           cityController.text = user["city"] ?? "";
           contactController.text =
-              user["contact_number"]?.toString() ?? user["contact"]?.toString() ?? "";
+              user["contact_number"]?.toString() ?? "";
+          loadingProfile = false;
         });
-      } catch (_) {
-        // If invalid JSON ignore
+      } else {
+        loadingProfile = false;
       }
+    } catch (e) {
+      loadingProfile = false;
     }
   }
 
+  // ================= SAVE PROFILE =================
   Future<void> _saveChanges() async {
     final name = nameController.text.trim();
     final city = cityController.text.trim();
@@ -60,7 +82,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     setState(() => isLoading = true);
 
     try {
-      // ✅ GET TOKEN FROM SHARED PREFERENCES
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString("token");
 
@@ -72,14 +93,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         return;
       }
 
-      // ✅ Flutter Web: use 127.0.0.1 instead of localhost
-      final url = Uri.parse("http://127.0.0.1:4000/api/profile/update");
+      final url = Uri.parse("${ApiConfig.baseUrl}/profile/update");
 
       final response = await http.put(
         url,
         headers: {
-          "Content-Type": "application/json",
           "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
         },
         body: jsonEncode({
           "name": name,
@@ -91,20 +111,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       setState(() => isLoading = false);
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final updatedUser = data["user"] ?? data;
-
-        // ✅ Save updated user locally so Profile Screen can show updated name
-        await prefs.setString("user", jsonEncode(updatedUser));
-
         if (!mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Profile updated ✅")),
         );
 
-        // ✅ Auto refresh trigger
-        Navigator.pop(context, true);
+        Navigator.pop(context, true); // 🔁 trigger refresh
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Update failed: ${response.body}")),
@@ -139,69 +152,74 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            const CircleAvatar(
-              radius: 48,
-              backgroundColor: Color(0xFFE6E6FA),
-              child: Icon(Icons.person, size: 48, color: Colors.deepPurple),
-            ),
-            const SizedBox(height: 30),
+      body: loadingProfile
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  const CircleAvatar(
+                    radius: 48,
+                    backgroundColor: Color(0xFFE6E6FA),
+                    child:
+                        Icon(Icons.person, size: 48, color: Colors.deepPurple),
+                  ),
+                  const SizedBox(height: 30),
 
-            _inputField(
-              label: "Full Name",
-              icon: Icons.person,
-              controller: nameController,
-            ),
+                  _inputField(
+                    label: "Full Name",
+                    icon: Icons.person,
+                    controller: nameController,
+                  ),
 
-            _inputField(
-              label: "Email",
-              icon: Icons.email,
-              controller: emailController,
-              enabled: false,
-            ),
+                  _inputField(
+                    label: "Email",
+                    icon: Icons.email,
+                    controller: emailController,
+                    enabled: false,
+                  ),
 
-            _inputField(
-              label: "City (Optional)",
-              icon: Icons.location_on,
-              controller: cityController,
-            ),
+                  _inputField(
+                    label: "City (Optional)",
+                    icon: Icons.location_on,
+                    controller: cityController,
+                  ),
 
-            _inputField(
-              label: "Contact Number (Optional)",
-              icon: Icons.phone,
-              controller: contactController,
-              keyboardType: TextInputType.phone,
-            ),
+                  _inputField(
+                    label: "Contact Number (Optional)",
+                    icon: Icons.phone,
+                    controller: contactController,
+                    keyboardType: TextInputType.phone,
+                  ),
 
-            const SizedBox(height: 30),
+                  const SizedBox(height: 30),
 
-            GestureDetector(
-              onTap: isLoading ? null : _saveChanges,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(
-                  color: isLoading ? Colors.grey : const Color(0xFF2ECC71),
-                  borderRadius: BorderRadius.circular(30),
-                ),
-                child: Center(
-                  child: Text(
-                    isLoading ? "Saving..." : "Save Changes",
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                  GestureDetector(
+                    onTap: isLoading ? null : _saveChanges,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: isLoading
+                            ? Colors.grey
+                            : const Color(0xFF2ECC71),
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: Center(
+                        child: Text(
+                          isLoading ? "Saving..." : "Save Changes",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -230,7 +248,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               prefixIcon: Icon(icon),
               filled: true,
               fillColor: Colors.white,
-              contentPadding: const EdgeInsets.symmetric(vertical: 14),
+              contentPadding:
+                  const EdgeInsets.symmetric(vertical: 14),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
                 borderSide: BorderSide.none,

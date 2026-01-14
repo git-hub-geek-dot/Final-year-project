@@ -31,7 +31,7 @@ class TokenService {
   }
 
   /// ✅ Clear ALL auth data (logout)
-  static Future<void> clearAuthData() async {
+  static Future<void> clearToken() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
     await prefs.remove(_userIdKey);

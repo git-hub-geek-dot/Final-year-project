@@ -1,13 +1,103 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../services/token_service.dart';
 import 'leaderboard_screen.dart';
 import 'account_settings_screen.dart';
 import 'help_support_screen.dart';
 import 'about_volunteerx_screen.dart';
-import 'edit_profile_screen.dart'; // ✅ ADDED
+import 'edit_profile_screen.dart';
 
 class OrganiserProfileScreen extends StatelessWidget {
   const OrganiserProfileScreen({super.key});
+
+  /// 🔥 DELETE ACCOUNT FUNCTION
+  Future<void> handleDeleteAccount(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    final userId = prefs.getString('userId');
+
+    // 🔍 DEBUG (remove later)
+    debugPrint("DELETE TOKEN: $token");
+    debugPrint("DELETE USER ID: $userId");
+
+    if (token == null || userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Authentication error")),
+      );
+      return;
+    }
+
+    // ⚠️ Confirmation dialog
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Delete Account"),
+        content: const Text(
+          "Are you sure you want to permanently delete your account?",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              "Delete",
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    // ⏳ LOADING
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final response = await http.delete(
+        // ✅ ANDROID EMULATOR FIX
+        Uri.parse('http://10.0.2.2:4000/api/users/$userId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      Navigator.pop(context); // close loader
+
+      final data = jsonDecode(response.body);
+      debugPrint("DELETE RESPONSE: $data");
+
+      if (data['success'] == true) {
+        await prefs.clear();
+
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/',
+          (route) => false,
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(data['message'] ?? "Delete failed")),
+        );
+      }
+    } catch (e) {
+      Navigator.pop(context); // close loader
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Server error")),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,15 +133,12 @@ class OrganiserProfileScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 20),
-
                   const CircleAvatar(
                     radius: 38,
                     backgroundColor: Colors.white,
                     child: Icon(Icons.person, size: 40),
                   ),
-
                   const SizedBox(height: 10),
-
                   const Text(
                     "Ankit Verma",
                     style: TextStyle(
@@ -60,17 +147,13 @@ class OrganiserProfileScreen extends StatelessWidget {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-
                   const SizedBox(height: 4),
-
                   const Text(
                     "Bengaluru, India",
                     style: TextStyle(color: Colors.white70),
                   ),
-
                   const SizedBox(height: 12),
 
-                  // ✅ EDIT PROFILE BUTTON (FIXED)
                   InkWell(
                     onTap: () {
                       Navigator.push(
@@ -99,30 +182,6 @@ class OrganiserProfileScreen extends StatelessWidget {
                     ),
                   ),
                 ],
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // 📊 STATS
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: const [
-                    _StatItem("9", "Events Posted"),
-                    _StatItem("82", "Volunteers Hired"),
-                    _StatItem("26", "Requests Pending"),
-                  ],
-                ),
               ),
             ),
 
@@ -178,79 +237,19 @@ class OrganiserProfileScreen extends StatelessWidget {
                     text: "Logout",
                     isLogout: true,
                   ),
+                  _profileOption(
+                    context: context,
+                    icon: Icons.delete_forever,
+                    text: "Delete Account",
+                    isDelete: true,
+                    onTap: () => handleDeleteAccount(context),
+                  ),
                 ],
               ),
             ),
-
-            const SizedBox(height: 30),
           ],
         ),
       ),
-
-      // 🔻 BOTTOM NAVIGATION
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 2,
-        selectedItemColor: const Color(0xFF22C55E),
-        unselectedItemColor: Colors.grey,
-        onTap: (index) {
-          if (index == 0) {
-            Navigator.pushReplacementNamed(context, '/organiser-home');
-          } else if (index == 1) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const LeaderboardScreen(),
-              ),
-            );
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: "Home",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.leaderboard),
-            label: "Leaderboard",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: "Profile",
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 🔹 STAT ITEM
-class _StatItem extends StatelessWidget {
-  final String value;
-  final String label;
-
-  const _StatItem(this.value, this.label);
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 12,
-          ),
-        ),
-      ],
     );
   }
 }
@@ -261,6 +260,7 @@ Widget _profileOption({
   required IconData icon,
   required String text,
   bool isLogout = false,
+  bool isDelete = false,
   VoidCallback? onTap,
 }) {
   return InkWell(
@@ -291,14 +291,19 @@ Widget _profileOption({
       ),
       child: Row(
         children: [
-          Icon(icon, color: isLogout ? Colors.red : Colors.grey),
+          Icon(
+            icon,
+            color: (isLogout || isDelete) ? Colors.red : Colors.grey,
+          ),
           const SizedBox(width: 14),
           Expanded(
             child: Text(
               text,
               style: TextStyle(
                 fontWeight: FontWeight.w600,
-                color: isLogout ? Colors.red : Colors.black,
+                color: (isLogout || isDelete)
+                    ? Colors.red
+                    : Colors.black,
               ),
             ),
           ),

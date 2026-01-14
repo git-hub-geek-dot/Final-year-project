@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../services/event_service.dart';
 import 'view_application_screen.dart';
 
 class ReviewApplicationsScreen extends StatefulWidget {
@@ -13,6 +14,26 @@ class ReviewApplicationsScreen extends StatefulWidget {
 
 class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
   bool showActive = true;
+  bool loading = true;
+  List applications = [];
+
+  @override
+  void initState() {
+    super.initState();
+    loadApplications();
+  }
+
+  Future<void> loadApplications() async {
+    try {
+      final data = await EventService.fetchApplications(widget.eventId);
+      setState(() {
+        applications = data;
+        loading = false;
+      });
+    } catch (e) {
+      setState(() => loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -72,26 +93,23 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
 
           // 📋 Applications List
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              children: const [
-                ApplicationCard(
-                  name: "Rahul Sharma",
-                  location: "Navelim, Goa",
-                  applicationId: 1,
-                ),
-                ApplicationCard(
-                  name: "Anand Dessai",
-                  location: "Navelim, Goa",
-                  applicationId: 2,
-                ),
-                ApplicationCard(
-                  name: "Prasad Naik",
-                  location: "Navelim, Goa",
-                  applicationId: 3,
-                ),
-              ],
-            ),
+            child: loading
+                ? const Center(child: CircularProgressIndicator())
+                : applications.isEmpty
+                    ? const Center(child: Text("No applications yet"))
+                    : ListView.builder(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: applications.length,
+                        itemBuilder: (context, i) {
+                          final a = applications[i];
+                          return ApplicationCard(
+                            name: a["name"] ?? "Unknown",
+                            location: a["city"] ?? "-",
+                            applicationId: a["id"],
+                          );
+                        },
+                      ),
           ),
         ],
       ),
@@ -167,21 +185,20 @@ class ApplicationCard extends StatelessWidget {
                 ),
                 Text(
                   "📍 $location",
-                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  style:
+                      const TextStyle(color: Colors.white70, fontSize: 12),
                 ),
               ],
             ),
           ),
 
-          // ✅ VIEW APPLICATION BUTTON (CORRECT)
           InkWell(
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => ViewApplicationScreen(
-                    applicationId: applicationId,
-                  ),
+                  builder: (_) =>
+                      ViewApplicationScreen(applicationId: applicationId),
                 ),
               );
             },

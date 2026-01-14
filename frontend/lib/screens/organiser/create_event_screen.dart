@@ -153,19 +153,27 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     setState(() => loading = true);
 
     try {
-      final success = await EventService.createEvent(
-        title: titleController.text.trim(),
-        description: descriptionController.text.trim(),
-        location: locationController.text.trim(),
-        eventDate: _fmtDate(eventStartDate!),
-        applicationDeadline: _fmtDate(applicationDeadline!),
-        volunteersRequired: int.parse(volunteersController.text),
-        eventType: eventType,
-        paymentPerDay:
-            eventType == "paid" ? double.parse(paymentController.text) : null,
-        bannerUrl: null,
-        categories: selectedCategories.map((_) => 1).toList(), // backend mapping
-      );
+      // 🔼 Upload image first and get real URL
+final bannerUrl = await EventService.uploadImage(bannerImage!);
+
+final success = await EventService.createEvent(
+  title: titleController.text.trim(),
+  description: descriptionController.text.trim(),
+  location: locationController.text.trim(),
+  eventDate: _fmtDate(eventStartDate!),
+  applicationDeadline: _fmtDate(applicationDeadline!),
+  volunteersRequired: int.parse(volunteersController.text),
+  eventType: eventType,
+  paymentPerDay:
+      eventType == "paid" ? double.parse(paymentController.text) : null,
+
+  // ✅ Save REAL URL returned by backend
+  bannerUrl: bannerUrl,
+
+  categories: selectedCategories.map((_) => 1).toList(),
+);
+
+
 
       if (success && mounted) {
         Navigator.pushReplacement(

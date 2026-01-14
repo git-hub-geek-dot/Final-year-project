@@ -119,7 +119,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       itemCount: filtered.length,
                       itemBuilder: (context, i) {
                         final u = filtered[i];
-                        final isBlocked = u["status"] == "blocked";
+                        final isBlocked = u["status"] == "banned";
                         final isAdmin = u["role"] == "admin";
 
                         return Card(
@@ -134,7 +134,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                   : () async {
                                       await AdminService.updateUserStatus(
                                         u["id"],
-                                        isBlocked ? "active" : "blocked",
+                                        isBlocked ? "active" : "banned",
                                       );
                                       refresh();
                                     },

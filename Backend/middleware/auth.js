@@ -4,18 +4,40 @@ module.exports = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
+    // ❌ No Authorization header
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "No token provided" });
+      return res.status(401).json({
+        success: false,
+        message: "Authorization token missing",
+      });
     }
 
     const token = authHeader.split(" ")[1];
 
+    // 🔐 Verify JWT
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    req.user = decoded; // { id, role }
+    // ❌ Token valid but no user ID
+    if (!decoded.id) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid token payload",
+      });
+    }
+
+    // ✅ Attach ONLY what we trust
+    req.user = {
+      id: decoded.id,
+      role: decoded.role, // optional, but useful later
+    };
+
     next();
   } catch (err) {
     console.error("AUTH ERROR:", err);
-    return res.status(401).json({ error: "Invalid token" });
+
+    return res.status(401).json({
+      success: false,
+      message: "Invalid or expired token",
+    });
   }
 };

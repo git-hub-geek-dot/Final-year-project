@@ -3,10 +3,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 class TokenService {
   static const String _tokenKey = 'jwt_token';
 
-  /// Save JWT after login
+  /// Save JWT after login (fully cleaned)
   static Future<void> saveToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_tokenKey, token);
+    final clean = token.replaceAll(RegExp(r'\s+'), '');
+    await prefs.setString(_tokenKey, clean);
   }
 
   /// Get JWT for authenticated requests

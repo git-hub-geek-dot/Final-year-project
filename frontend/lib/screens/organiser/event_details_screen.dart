@@ -106,7 +106,7 @@ class EventDetailsScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 10),
-                     OutlinedButton.icon(
+OutlinedButton.icon(
   onPressed: () async {
     final updated = await Navigator.push(
       context,
@@ -115,13 +115,14 @@ class EventDetailsScreen extends StatelessWidget {
       ),
     );
 
-    if (updated == true && context.mounted) {
-      Navigator.pop(context); // go back to list
+    if (updated == true) {
+      Navigator.pop(context, true); // bubble refresh to parent
     }
   },
   icon: const Icon(Icons.edit),
   label: const Text("Edit Event"),
 ),
+
 
 
                       const SizedBox(width: 10),

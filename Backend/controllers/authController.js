@@ -15,7 +15,6 @@ exports.register = async (req, res) => {
       government_id,
     } = req.body;
 
-    // Basic validation
     if (!name || !email || !password) {
       return res
         .status(400)
@@ -24,19 +23,16 @@ exports.register = async (req, res) => {
 
     const finalRole = role ?? "volunteer";
 
-    // Allowed roles (admin added)
     if (!["volunteer", "organiser", "admin"].includes(finalRole)) {
       return res.status(400).json({ error: "Invalid role" });
     }
 
-    // Organiser-specific validation (admin bypasses this)
     if (finalRole === "organiser" && !contact_number) {
       return res.status(400).json({
         error: "Contact number is required for organiser",
       });
     }
 
-    // Check existing user
     const existing = await pool.query(
       "SELECT id FROM users WHERE email = $1",
       [email]
@@ -46,10 +42,8 @@ exports.register = async (req, res) => {
       return res.status(400).json({ error: "Email already exists" });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Insert user
     await pool.query(
       `
       INSERT INTO users
@@ -101,11 +95,14 @@ exports.login = async (req, res) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    const token = jwt.sign(
+    const rawToken = jwt.sign(
       { id: user.id, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
+
+    // 🔧 Ensure token is a single uninterrupted string
+    const token = rawToken.replace(/\s+/g, "");
 
     res.status(200).json({
       token,

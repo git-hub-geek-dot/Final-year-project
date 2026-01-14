@@ -7,8 +7,7 @@ datasource db {
   provider = "postgresql"
 }
 
-
-//// ENUMS (replaces CHECK constraints)
+//// ENUMS
 
 enum UserRole {
   admin
@@ -26,6 +25,7 @@ enum EventStatus {
   open
   closed
   completed
+  deleted
 }
 
 enum EventType {
@@ -49,13 +49,13 @@ model Application {
 }
 
 model Badge {
-  id          Int           @id @default(autoincrement())
-  name        String
-  description String?
-  role        UserRole?     
-  threshold   Int
+  id           Int        @id @default(autoincrement())
+  name         String
+  description  String?
+  role         UserRole?
+  threshold    Int
 
-  userBadges  UserBadge[]
+  userBadges   UserBadge[]
 
   @@map("badges")
 }
@@ -86,7 +86,7 @@ model Event {
   description          String?
   location             String?
   eventDate            DateTime?        @map("event_date") @db.Date
-  status               EventStatus?     @default(open)
+  status               EventStatus      @default(open)
   volunteersRequired   Int              @default(0) @map("volunteers_required")
   applicationDeadline  DateTime?        @map("application_deadline") @db.Date
   bannerUrl            String?          @map("banner_url")
@@ -133,16 +133,16 @@ model UserBadge {
 }
 
 model User {
-  id          Int        @id @default(autoincrement())
+  id          Int         @id @default(autoincrement())
   name        String
-  email       String     @unique
-  role        UserRole?  
-  createdAt   DateTime?  @default(now()) @map("created_at") @db.Timestamp(6)
+  email       String      @unique
   password    String?
-  status      UserStatus? @default(active) 
-  contact     String?    @map("contact_number")
+  role        UserRole?
+  status      UserStatus  @default(active)   // 🔥 SOFT DELETE FIELD (NON-NULL)
+  contact     String?     @map("contact_number")
   city        String?
-  govtId      String?    @map("government_id")
+  govtId      String?     @map("government_id")
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamp(6)
 
   applications Application[]
   events        Event[]

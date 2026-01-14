@@ -12,7 +12,7 @@ event_date
 category
 slots_total
 slots_filled
-status          -- 'upcoming' | 'closed'
+status          -- 'open' | 'closed' | 'completed' | 'deleted'
 created_at
 */
 
@@ -136,6 +136,7 @@ exports.getMyEvents = async (req, res) => {
         END AS computed_status
       FROM events
       WHERE organiser_id = $1
+        AND status IN ('open', 'closed', 'completed', 'deleted')
       ORDER BY event_date DESC
       `,
       [req.user.id]
@@ -171,5 +172,67 @@ exports.getAllEvents = async (req, res) => {
   } catch (err) {
     console.error("GET EVENTS ERROR:", err);
     res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// =======================================================
+// UPDATE EVENT (ORGANISER)
+// =======================================================
+exports.updateEvent = async (req, res) => {
+  try {
+    const organiserId = req.user.id;
+    const eventId = req.params.id;
+
+    const {
+      title,
+      description,
+      location,
+      event_date,
+      application_deadline,
+      volunteers_required,
+      event_type,
+      payment_per_day,
+      banner_url,
+    } = req.body;
+
+    const result = await pool.query(
+      `
+      UPDATE events
+      SET
+        title = $1,
+        description = $2,
+        location = $3,
+        event_date = $4,
+        application_deadline = $5,
+        volunteers_required = $6,
+        event_type = $7,
+        payment_per_day = $8,
+        banner_url = $9
+      WHERE id = $10 AND organiser_id = $11
+      RETURNING *
+      `,
+      [
+        title,
+        description,
+        location,
+        event_date,
+        application_deadline,
+        volunteers_required,
+        event_type,
+        payment_per_day,
+        banner_url,
+        eventId,
+        organiserId,
+      ]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("UPDATE EVENT ERROR:", err);
+    res.status(500).json({ error: "Failed to update event" });
   }
 };

@@ -6,15 +6,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 🔹 EXISTING ROUTES
+// Serve uploaded images
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// Routes
 app.use("/api", require("./routes/authRoutes"));
 app.use("/api", require("./routes/eventRoutes"));
 app.use("/api", require("./routes/applicationRoutes"));
 app.use("/api", require("./routes/ratingRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
-
-// 🔥 ADD THIS LINE (USER ROUTES)
-app.use("/api", require("./routes/userRoutes"));
+app.use("/api", require("./routes/upload"));
 
 app.get("/", (req, res) => {
   res.json({ message: "API running" });

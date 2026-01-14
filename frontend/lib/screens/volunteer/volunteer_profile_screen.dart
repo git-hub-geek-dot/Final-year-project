@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../services/token_service.dart';
 import '../auth/login_screen.dart';
 
@@ -14,14 +16,14 @@ class VolunteerProfileScreen extends StatefulWidget {
   const VolunteerProfileScreen({super.key});
 
   @override
-  State<VolunteerProfileScreen> createState() =>
-      _VolunteerProfileScreenState();
+  State<VolunteerProfileScreen> createState() => _VolunteerProfileScreenState();
 }
 
 class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
   String? name;
   String? email;
   String? role;
+  String? city; // ✅ ADDED
 
   @override
   void initState() {
@@ -29,7 +31,28 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
     loadProfile();
   }
 
+  /// ✅ UPDATED: Load profile from SharedPreferences "user" first,
+  /// fallback to token decoding.
   Future<void> loadProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userStr = prefs.getString("user");
+
+    if (userStr != null) {
+      try {
+        final user = jsonDecode(userStr);
+        setState(() {
+          name = user["name"] ?? "Volunteer";
+          email = user["email"] ?? "Not available";
+          role = user["role"]?.toString();
+          city = user["city"]?.toString(); // ✅ ADDED
+        });
+        return;
+      } catch (_) {
+        // fallback to token
+      }
+    }
+
+    // 2) fallback: decode from token
     final token = await TokenService.getToken();
     if (token == null) return;
 
@@ -41,12 +64,17 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
     setState(() {
       name = payload["name"] ?? "Volunteer";
       email = payload["email"] ?? "Not available";
-      role = payload["role"];
+      role = payload["role"]?.toString();
+      city = payload["city"]?.toString(); // ✅ ADDED (if token has)
     });
   }
 
   Future<void> logout() async {
     await TokenService.clearToken();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove("user");
+    await prefs.remove("token"); // ✅ FIX: remove token too
 
     if (!mounted) return;
 
@@ -96,21 +124,30 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  const Text(
-                    "Bengaluru, India",
-                    style: TextStyle(color: Colors.white70),
+
+                  /// ✅ City dynamic now
+                  Text(
+                    (city == null || city!.trim().isEmpty)
+                        ? "City not set"
+                        : "$city, India",
+                    style: const TextStyle(color: Colors.white70),
                   ),
+
                   const SizedBox(height: 14),
 
-                  /// 🔹 EDIT PROFILE (ACTIVATED)
+                  /// ✅ EDIT PROFILE (refresh after returning)
                   GestureDetector(
-                    onTap: () {
-                      Navigator.push(
+                    onTap: () async {
+                      final updated = await Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (_) => const EditProfileScreen(),
                         ),
                       );
+
+                      if (updated == true) {
+                        loadProfile(); // ✅ refresh updated name/city
+                      }
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -178,8 +215,7 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
                 children: [
                   const Text(
                     "Volunteer Activities",
-                    style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
 
@@ -290,7 +326,6 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
   }
 
   /// ================= HELPERS =================
-
   Widget _statCard({
     required IconData icon,
     required String value,

@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/token_service.dart';
-
 import '../../config/api_config.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/gradient_button.dart';
@@ -55,41 +55,45 @@ class _LoginScreenState extends State<LoginScreen> {
       print("BODY: ${response.body}");
 
       if (response.statusCode == 200) {
-  final data = jsonDecode(response.body);
+        final data = jsonDecode(response.body);
 
-  final String token = data["token"];
-  final String role = data["user"]["role"];
+        final String token = data["token"];
+        final Map<String, dynamic> user = data["user"];
+        final String role = user["role"];
 
-  // ✅ SAVE TOKEN (IMPORTANT)
-  await TokenService.saveToken(token);
+        // ✅ SAVE TOKEN (TokenService - your existing system)
+        await TokenService.saveToken(token);
 
-  if (!mounted) return;
+        // ✅ ALSO SAVE TOKEN IN SharedPreferences (so EditProfile can read it)
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString("token", token);
+        await prefs.setString("user", jsonEncode(user));
 
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text("Login successful")),
-  );
+        print("TOKEN SAVED IN PREFS: ${prefs.getString("token")}");
 
-  if (role == "admin") {
-  Navigator.pushReplacementNamed(context, "/admin-home");
-} else if (role == "organiser") {
-  Navigator.pushReplacementNamed(context, "/organiser-home");
-} else if (role == "volunteer") {
-  Navigator.pushReplacementNamed(context, "/volunteer-home");
-} else {
-  showError("Unknown role: $role");
-}
+        if (!mounted) return;
 
-}
- else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Login successful ✅")),
+        );
+
+        if (role == "admin") {
+          Navigator.pushReplacementNamed(context, "/admin-home");
+        } else if (role == "organiser") {
+          Navigator.pushReplacementNamed(context, "/organiser-home");
+        } else if (role == "volunteer") {
+          Navigator.pushReplacementNamed(context, "/volunteer-home");
+        } else {
+          showError("Unknown role: $role");
+        }
+      } else {
         showError(response.body);
       }
     } catch (e) {
       print("LOGIN ERROR: $e");
       showError(e.toString());
     } finally {
-      if (mounted) {
-        setState(() => loading = false);
-      }
+      if (mounted) setState(() => loading = false);
     }
   }
 
@@ -144,16 +148,11 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // TEMP: replace asset to avoid crash
                   const Icon(Icons.volunteer_activism, size: 60),
                   const SizedBox(height: 12),
-
                   const Text(
                     "Login",
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 20),
 
@@ -191,9 +190,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 12),
 
                   TextButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, "/register");
-                    },
+                    onPressed: () => Navigator.pushNamed(context, "/register"),
                     child: const Text("Don't have an account? Register"),
                   ),
                 ],

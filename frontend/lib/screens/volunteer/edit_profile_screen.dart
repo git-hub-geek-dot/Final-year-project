@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -8,14 +11,121 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
-  final TextEditingController nameController =
-      TextEditingController(text: "Ankit Verma");
-  final TextEditingController emailController =
-      TextEditingController(text: "ankit@email.com");
-  final TextEditingController cityController =
-      TextEditingController(text: "Bengaluru");
-  final TextEditingController contactController =
-      TextEditingController(text: "9876543210");
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController cityController = TextEditingController();
+  final TextEditingController contactController = TextEditingController();
+
+  bool isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedProfile(); // ✅ auto fill from saved user
+  }
+
+  Future<void> _loadSavedProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userStr = prefs.getString("user");
+
+    if (userStr != null) {
+      try {
+        final user = jsonDecode(userStr);
+
+        setState(() {
+          nameController.text = user["name"] ?? "";
+          emailController.text = user["email"] ?? "";
+          cityController.text = user["city"] ?? "";
+          contactController.text =
+              user["contact_number"]?.toString() ?? user["contact"]?.toString() ?? "";
+        });
+      } catch (_) {
+        // If invalid JSON ignore
+      }
+    }
+  }
+
+  Future<void> _saveChanges() async {
+    final name = nameController.text.trim();
+    final city = cityController.text.trim();
+    final contact = contactController.text.trim();
+
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Name cannot be empty")),
+      );
+      return;
+    }
+
+    setState(() => isLoading = true);
+
+    try {
+      // ✅ GET TOKEN FROM SHARED PREFERENCES
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString("token");
+
+      if (token == null || token.isEmpty) {
+        setState(() => isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Token not found. Please login again.")),
+        );
+        return;
+      }
+
+      // ✅ Flutter Web: use 127.0.0.1 instead of localhost
+      final url = Uri.parse("http://127.0.0.1:4000/api/profile/update");
+
+      final response = await http.put(
+        url,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+        body: jsonEncode({
+          "name": name,
+          "city": city,
+          "contact_number": contact,
+        }),
+      );
+
+      setState(() => isLoading = false);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final updatedUser = data["user"] ?? data;
+
+        // ✅ Save updated user locally so Profile Screen can show updated name
+        await prefs.setString("user", jsonEncode(updatedUser));
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Profile updated ✅")),
+        );
+
+        // ✅ Auto refresh trigger
+        Navigator.pop(context, true);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Update failed: ${response.body}")),
+        );
+      }
+    } catch (e) {
+      setState(() => isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    emailController.dispose();
+    cityController.dispose();
+    contactController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,13 +143,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            /// Avatar
             const CircleAvatar(
               radius: 48,
               backgroundColor: Color(0xFFE6E6FA),
               child: Icon(Icons.person, size: 48, color: Colors.deepPurple),
             ),
-
             const SizedBox(height: 30),
 
             _inputField(
@@ -52,7 +160,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               label: "Email",
               icon: Icons.email,
               controller: emailController,
-              enabled: false, // email usually not editable
+              enabled: false,
             ),
 
             _inputField(
@@ -70,27 +178,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
             const SizedBox(height: 30),
 
-            /// Save Button (UI only)
             GestureDetector(
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content:
-                        Text("Profile update will be available soon"),
-                  ),
-                );
-              },
+              onTap: isLoading ? null : _saveChanges,
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2ECC71),
+                  color: isLoading ? Colors.grey : const Color(0xFF2ECC71),
                   borderRadius: BorderRadius.circular(30),
                 ),
-                child: const Center(
+                child: Center(
                   child: Text(
-                    "Save Changes",
-                    style: TextStyle(
+                    isLoading ? "Saving..." : "Save Changes",
+                    style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
@@ -105,7 +205,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  /// ================= INPUT FIELD =================
   Widget _inputField({
     required String label,
     required IconData icon,
@@ -120,10 +219,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         children: [
           Text(
             label,
-            style: const TextStyle(
-              fontSize: 13,
-              color: Colors.grey,
-            ),
+            style: const TextStyle(fontSize: 13, color: Colors.grey),
           ),
           const SizedBox(height: 6),
           TextField(
@@ -134,8 +230,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               prefixIcon: Icon(icon),
               filled: true,
               fillColor: Colors.white,
-              contentPadding:
-                  const EdgeInsets.symmetric(vertical: 14),
+              contentPadding: const EdgeInsets.symmetric(vertical: 14),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
                 borderSide: BorderSide.none,

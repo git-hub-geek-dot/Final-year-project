@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../services/preferences_service.dart';
+import 'change_password_screen.dart';
+import 'update_email_screen.dart';
+import 'update_phone_screen.dart';
 
 class AccountSettingsScreen extends StatefulWidget {
   const AccountSettingsScreen({super.key});
@@ -27,6 +30,31 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     setState(() {});
   }
 
+  /// 🔥 DELETE ACCOUNT LOGIC
+  Future<void> _deleteAccount(BuildContext context) async {
+    // Simulate API delay
+    await Future.delayed(const Duration(seconds: 1));
+
+    // Clear local data
+    await PreferencesService.clearAll();
+
+    if (!context.mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Account deleted successfully"),
+        backgroundColor: Colors.red,
+      ),
+    );
+
+    // Redirect to Login / Welcome screen
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      '/login', // 🔁 change if your route name is different
+      (route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -41,21 +69,38 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
             icon: Icons.lock_outline,
             title: "Change Password",
             onTap: () {
-              // TODO
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ChangePasswordScreen(),
+                ),
+              );
             },
           ),
+
           _settingTile(
             icon: Icons.email_outlined,
             title: "Update Email",
             onTap: () {
-              // TODO
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const UpdateEmailScreen(),
+                ),
+              );
             },
           ),
+
           _settingTile(
             icon: Icons.phone_outlined,
             title: "Update Phone Number",
             onTap: () {
-              // TODO
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const UpdatePhoneScreen(),
+                ),
+              );
             },
           ),
 
@@ -107,9 +152,13 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                 context,
                 "Deactivate Account",
                 "Your account will be temporarily disabled.",
+                onConfirm: () {
+                  // You can add deactivate logic later
+                },
               );
             },
           ),
+
           _dangerTile(
             icon: Icons.delete_outline,
             title: "Delete Account",
@@ -118,6 +167,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                 context,
                 "Delete Account",
                 "This action is irreversible. All data will be lost.",
+                onConfirm: () => _deleteAccount(context),
               );
             },
           ),
@@ -160,12 +210,13 @@ Widget _dangerTile({
   );
 }
 
-/// 🔥 CONFIRMATION DIALOG
+/// 🔥 CONFIRMATION DIALOG (REUSABLE)
 void _showConfirmDialog(
   BuildContext context,
   String title,
-  String message,
-) {
+  String message, {
+  required VoidCallback onConfirm,
+}) {
   showDialog(
     context: context,
     builder: (_) => AlertDialog(
@@ -182,7 +233,7 @@ void _showConfirmDialog(
           ),
           onPressed: () {
             Navigator.pop(context);
-            // TODO: backend API later
+            onConfirm();
           },
           child: const Text("Confirm"),
         ),

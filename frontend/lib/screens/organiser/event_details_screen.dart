@@ -1,6 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'; // kIsWeb
+import 'review_application_screen.dart';
+import 'create_event_screen.dart';
+import 'edit_event_screen.dart';
 
 class EventDetailsScreen extends StatelessWidget {
   final Map event;
@@ -89,19 +92,43 @@ class EventDetailsScreen extends StatelessWidget {
                     children: [
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: () {},
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ReviewApplicationsScreen(
+                                  eventId: event["id"],
+                                ),
+                              ),
+                            );
+                          },
                           child: const Text("View Volunteers"),
                         ),
                       ),
                       const SizedBox(width: 10),
-                      OutlinedButton.icon(
-                        onPressed: () {},
-                        icon: const Icon(Icons.edit),
-                        label: const Text("Edit Event"),
-                      ),
+                     OutlinedButton.icon(
+  onPressed: () async {
+    final updated = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EditEventScreen(event: event),
+      ),
+    );
+
+    if (updated == true && context.mounted) {
+      Navigator.pop(context); // go back to list
+    }
+  },
+  icon: const Icon(Icons.edit),
+  label: const Text("Edit Event"),
+),
+
+
                       const SizedBox(width: 10),
                       OutlinedButton(
-                        onPressed: () {},
+                        onPressed: () {
+                          Navigator.pop(context);
+                        },
                         child: const Text("Close"),
                       ),
                     ],

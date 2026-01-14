@@ -4,7 +4,8 @@ const router = express.Router();
 const {
   createEvent,
   getMyEvents,
-  getAllEvents
+  getAllEvents,
+  updateEvent // 👈 add this
 } = require("../controllers/eventController");
 
 const {

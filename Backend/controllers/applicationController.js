@@ -1,11 +1,12 @@
 const pool = require("../config/db");
 
-// ================= APPLY =================
+// ================= APPLY TO EVENT =================
 exports.applyToEvent = async (req, res) => {
   try {
     const eventId = req.params.id;
     const volunteerId = req.user.id;
 
+    // Prevent double apply
     const existing = await pool.query(
       "SELECT id FROM applications WHERE event_id = $1 AND volunteer_id = $2",
       [eventId, volunteerId]
@@ -15,11 +16,12 @@ exports.applyToEvent = async (req, res) => {
       return res.status(409).json({ error: "Already applied" });
     }
 
+    // Apply
     const result = await pool.query(
       `
       INSERT INTO applications (event_id, volunteer_id, status)
       VALUES ($1, $2, 'pending')
-      RETURNING id, status
+      RETURNING id, status, applied_at
       `,
       [eventId, volunteerId]
     );
@@ -28,6 +30,7 @@ exports.applyToEvent = async (req, res) => {
       success: true,
       application_id: result.rows[0].id,
       status: result.rows[0].status,
+      applied_at: result.rows[0].applied_at
     });
   } catch (err) {
     console.error("APPLY ERROR:", err);
@@ -35,14 +38,18 @@ exports.applyToEvent = async (req, res) => {
   }
 };
 
-// ================= STATUS =================
+// ================= APPLICATION STATUS =================
 exports.getApplicationStatus = async (req, res) => {
   try {
     const eventId = req.params.id;
     const volunteerId = req.user.id;
 
     const result = await pool.query(
-      "SELECT status FROM applications WHERE event_id = $1 AND volunteer_id = $2",
+      `
+      SELECT status
+      FROM applications
+      WHERE event_id = $1 AND volunteer_id = $2
+      `,
       [eventId, volunteerId]
     );
 
@@ -52,7 +59,7 @@ exports.getApplicationStatus = async (req, res) => {
 
     res.json({
       applied: true,
-      status: result.rows[0].status,
+      status: result.rows[0].status
     });
   } catch (err) {
     console.error("STATUS ERROR:", err);
@@ -67,11 +74,17 @@ exports.getEventApplications = async (req, res) => {
 
     const result = await pool.query(
       `
-      SELECT a.id, u.name, u.city, a.status
+      SELECT 
+        a.id,
+        a.status,
+        a.applied_at,
+        u.id AS volunteer_id,
+        u.name,
+        u.city
       FROM applications a
       JOIN users u ON u.id = a.volunteer_id
       WHERE a.event_id = $1
-      ORDER BY a.created_at DESC
+      ORDER BY a.applied_at DESC
       `,
       [eventId]
     );
@@ -90,11 +103,18 @@ exports.getMyApplications = async (req, res) => {
 
     const result = await pool.query(
       `
-      SELECT a.id, a.status, e.title, e.location, e.event_date
+      SELECT 
+        a.id,
+        a.status,
+        a.applied_at,
+        e.id AS event_id,
+        e.title,
+        e.location,
+        e.event_date
       FROM applications a
       JOIN events e ON e.id = a.event_id
       WHERE a.volunteer_id = $1
-      ORDER BY a.created_at DESC
+      ORDER BY a.applied_at DESC
       `,
       [volunteerId]
     );

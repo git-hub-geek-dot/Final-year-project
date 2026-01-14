@@ -9,5 +9,6 @@ router.post("/login", authController.login);
 
 // ✅ FIX: Apply middleware so req.user is available
 router.put("/profile/update", authMiddleware, authController.updateProfile);
+router.get("/profile", authMiddleware, authController.getProfile);
 
 module.exports = router;

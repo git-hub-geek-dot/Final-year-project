@@ -45,6 +45,10 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
   List getCompletedEvents() =>
       events.where((e) => _status(e) == "completed").toList();
 
+  List getDeletedEvents() =>
+    events.where((e) => _status(e) == "deleted_by_admin").toList();
+
+
   @override
   Widget build(BuildContext context) {
     final upcoming = getUpcomingEvents();
@@ -123,6 +127,7 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
                       _section("Ongoing Events", ongoing),
                       _section("Upcoming Events", upcoming),
                       _section("Completed Events", completed),
+                      _section("Deleted Events", getDeletedEvents()),
                     ],
                   ),
           ),

@@ -157,6 +157,7 @@ exports.login = async (req, res) => {
   }
 };
 
+// ================= GET PROFILE =================
 exports.getProfile = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -178,8 +179,6 @@ exports.getProfile = async (req, res) => {
     res.status(500).json({ message: "Failed to fetch profile" });
   }
 };
-
-
 
 // ================= UPDATE PROFILE =================
 exports.updateProfile = async (req, res) => {
@@ -214,5 +213,48 @@ exports.updateProfile = async (req, res) => {
   } catch (err) {
     console.error("UPDATE PROFILE ERROR:", err);
     return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// ================= DEACTIVATE ACCOUNT =================
+exports.deactivateAccount = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const result = await pool.query(
+      `
+      UPDATE users
+      SET status = 'inactive'
+      WHERE id = $1
+      RETURNING id, name, email, role, status
+      `,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Account deactivated successfully",
+      user: result.rows[0],
+    });
+  } catch (err) {
+    console.error("DEACTIVATE ERROR:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
   }
 };

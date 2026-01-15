@@ -128,12 +128,14 @@ exports.getMyEvents = async (req, res) => {
       `
       SELECT
         *,
-        CASE
-          WHEN NOW() < (event_date + start_time) THEN 'upcoming'
-          WHEN NOW() BETWEEN (event_date + start_time)
-                          AND (event_date + end_time) THEN 'ongoing'
-          ELSE 'completed'
-        END AS computed_status
+       CASE
+  WHEN status = 'deleted' THEN 'deleted_by_admin'
+  WHEN NOW() < (event_date + start_time) THEN 'upcoming'
+  WHEN NOW() BETWEEN (event_date + start_time)
+                  AND (event_date + end_time) THEN 'ongoing'
+  ELSE 'completed'
+END AS computed_status
+
       FROM events
       WHERE organiser_id = $1
         AND status IN ('open', 'closed', 'completed', 'deleted')

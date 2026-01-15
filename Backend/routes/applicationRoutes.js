@@ -43,4 +43,20 @@ router.get(
   applicationController.getEventApplications
 );
 
+/* ================= NEW ROUTES (SAFE ADDITIONS) ================= */
+
+// ✅ NEW: Get single application details (for ViewApplicationScreen)
+router.get(
+  "/applications/:id",
+  authenticateToken,
+  applicationController.getApplicationById
+);
+
+// ✅ NEW: Update application status (Approve / Reject)
+router.put(
+  "/applications/:id/status",
+  authenticateToken,
+  applicationController.updateApplicationStatus
+);
+
 module.exports = router;

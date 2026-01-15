@@ -1,3 +1,4 @@
+import 'login_screen.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -11,6 +12,7 @@ abstract class RegisterBaseScreen extends StatefulWidget {
 
   String get role;
   bool get showOrganiserFields => false;
+  bool get showVolunteerFields => false;
 
   @override
   State<RegisterBaseScreen> createState() => _RegisterBaseScreenState();
@@ -21,8 +23,8 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
 
-  final usernameController = TextEditingController();
   final contactController = TextEditingController();
+  final cityController = TextEditingController();
   final govIdController = TextEditingController();
 
   bool loading = false;
@@ -33,59 +35,77 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
     nameController.dispose();
     emailController.dispose();
     passwordController.dispose();
-    usernameController.dispose();
     contactController.dispose();
+    cityController.dispose();
     govIdController.dispose();
     super.dispose();
   }
 
   Future<void> register() async {
-  if (nameController.text.isEmpty ||
-      emailController.text.isEmpty ||
-      passwordController.text.isEmpty) {
-    showError("All fields are required");
-    return;
-  }
-
-  setState(() => loading = true);
-
-  try {
-    final Map<String, dynamic> body = {
-      "name": nameController.text.trim(),
-      "email": emailController.text.trim(),
-      "password": passwordController.text.trim(),
-      "role": widget.role,
-    };
-
-    if (widget.showOrganiserFields) {
-      body.addAll({
-        "username": usernameController.text.trim(),
-        "contact": contactController.text.trim(),
-        "gov_id": govIdController.text.trim().isEmpty
-            ? null
-            : govIdController.text.trim(),
-      });
+    if (nameController.text.isEmpty ||
+        emailController.text.isEmpty ||
+        passwordController.text.isEmpty) {
+      showError("Name, email and password are required");
+      return;
     }
 
-    final response = await http.post(
-      Uri.parse("${ApiConfig.baseUrl}/register"),
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode(body),
-    );
-
-    if (response.statusCode == 201) {
-      if (!mounted) return;
-      Navigator.pop(context);
-    } else {
-      showError(response.body);
+    if (widget.role == "organiser" &&
+        contactController.text.trim().isEmpty) {
+      showError("Contact number is required for organiser");
+      return;
     }
-  } catch (e) {
-    showError(e.toString());
-  } finally {
-    if (mounted) setState(() => loading = false);
-  }
-}
 
+    setState(() => loading = true);
+
+    try {
+      final Map<String, dynamic> body = {
+        "name": nameController.text.trim(),
+        "email": emailController.text.trim(),
+        "password": passwordController.text.trim(),
+        "role": widget.role,
+      };
+
+      if (widget.showVolunteerFields) {
+        body.addAll({
+          "contact_number": contactController.text.trim().isEmpty
+              ? null
+              : contactController.text.trim(),
+          "city": cityController.text.trim().isEmpty
+              ? null
+              : cityController.text.trim(),
+        });
+      }
+
+      if (widget.showOrganiserFields) {
+        body.addAll({
+          "contact_number": contactController.text.trim(),
+          "government_id": govIdController.text.trim().isEmpty
+              ? null
+              : govIdController.text.trim(),
+        });
+      }
+
+      final response = await http.post(
+        Uri.parse("${ApiConfig.baseUrl}/register"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode(body),
+      );
+
+      if (response.statusCode == 201) {
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+        );
+      } else {
+        showError(response.body);
+      }
+    } catch (e) {
+      showError(e.toString());
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
 
   void showError(String msg) {
     setState(() => errorMessage = msg);
@@ -137,14 +157,13 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
                 children: [
                   Text(
                     widget.role == "organiser"
-                        ? "Organiser"
-                        : "Volunteer",
+                        ? "Organiser Registration"
+                        : "Volunteer Registration",
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-
                   const SizedBox(height: 20),
 
                   inputField(
@@ -164,12 +183,20 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
                     obscure: true,
                   ),
 
-                  if (widget.showOrganiserFields) ...[
+                  if (widget.showVolunteerFields) ...[
                     inputField(
-                      icon: Icons.person_outline,
-                      hint: "Username",
-                      controller: usernameController,
+                      icon: Icons.phone,
+                      hint: "Contact number (optional)",
+                      controller: contactController,
                     ),
+                    inputField(
+                      icon: Icons.location_city,
+                      hint: "City (optional)",
+                      controller: cityController,
+                    ),
+                  ],
+
+                  if (widget.showOrganiserFields) ...[
                     inputField(
                       icon: Icons.phone,
                       hint: "Contact number",
@@ -183,8 +210,10 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
                   ],
 
                   if (errorMessage != null)
-                    Text(errorMessage!,
-                        style: const TextStyle(color: Colors.red)),
+                    Text(
+                      errorMessage!,
+                      style: const TextStyle(color: Colors.red),
+                    ),
 
                   const SizedBox(height: 20),
 

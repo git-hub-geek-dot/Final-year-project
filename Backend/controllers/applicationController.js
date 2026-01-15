@@ -1,50 +1,127 @@
 const pool = require("../config/db");
 
-// Volunteer applies to an event
+// ================= APPLY TO EVENT =================
 exports.applyToEvent = async (req, res) => {
   try {
-    const { event_id } = req.body;
+    const eventId = req.params.id;
     const volunteerId = req.user.id;
 
+    // Prevent double apply
     const existing = await pool.query(
       "SELECT id FROM applications WHERE event_id = $1 AND volunteer_id = $2",
-      [event_id, volunteerId]
+      [eventId, volunteerId]
     );
 
     if (existing.rows.length > 0) {
-      return res.status(400).json({ error: "Already applied" });
+      return res.status(409).json({ error: "Already applied" });
     }
 
-    await pool.query(
-      `INSERT INTO applications (event_id, volunteer_id, status)
-       VALUES ($1, $2, 'pending')`,
-      [event_id, volunteerId]
+    // Apply
+    const result = await pool.query(
+      `
+      INSERT INTO applications (event_id, volunteer_id, status)
+      VALUES ($1, $2, 'pending')
+      RETURNING id, status, applied_at
+      `,
+      [eventId, volunteerId]
     );
 
-    res.status(201).json({ message: "Applied successfully" });
+    res.status(201).json({
+      success: true,
+      application_id: result.rows[0].id,
+      status: result.rows[0].status,
+      applied_at: result.rows[0].applied_at
+    });
   } catch (err) {
     console.error("APPLY ERROR:", err);
-    res.status(500).json({ error: "Application failed" });
+    res.status(500).json({ error: "Failed to apply" });
   }
 };
 
-// Volunteer views their applications
-exports.getMyApplications = async (req, res) => {
+// ================= APPLICATION STATUS =================
+exports.getApplicationStatus = async (req, res) => {
   try {
+    const eventId = req.params.id;
     const volunteerId = req.user.id;
 
     const result = await pool.query(
-      `SELECT a.*, e.title, e.location, e.event_date
-       FROM applications a
-       JOIN events e ON a.event_id = e.id
-       WHERE a.volunteer_id = $1
-       ORDER BY a.applied_at DESC`,
-      [volunteerId]
+      `
+      SELECT status
+      FROM applications
+      WHERE event_id = $1 AND volunteer_id = $2
+      `,
+      [eventId, volunteerId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.json({ applied: false });
+    }
+
+    res.json({
+      applied: true,
+      status: result.rows[0].status
+    });
+  } catch (err) {
+    console.error("STATUS ERROR:", err);
+    res.status(500).json({ error: "Failed to get status" });
+  }
+};
+
+// ================= EVENT APPLICATIONS (ORGANISER) =================
+exports.getEventApplications = async (req, res) => {
+  try {
+    const eventId = req.params.id;
+
+    const result = await pool.query(
+      `
+      SELECT 
+        a.id,
+        a.status,
+        a.applied_at,
+        u.id AS volunteer_id,
+        u.name,
+        u.city
+      FROM applications a
+      JOIN users u ON u.id = a.volunteer_id
+      WHERE a.event_id = $1
+      ORDER BY a.applied_at DESC
+      `,
+      [eventId]
     );
 
     res.json(result.rows);
   } catch (err) {
     console.error("GET APPLICATIONS ERROR:", err);
     res.status(500).json({ error: "Failed to fetch applications" });
+  }
+};
+
+// ================= MY APPLICATIONS (VOLUNTEER) =================
+exports.getMyApplications = async (req, res) => {
+  try {
+    const volunteerId = req.user.id;
+
+    const result = await pool.query(
+      `
+      SELECT 
+        a.id,
+        a.status,
+        a.applied_at,
+        e.id AS event_id,
+        e.title,
+        e.location,
+        e.event_date
+      FROM applications a
+      JOIN events e ON e.id = a.event_id
+      WHERE a.volunteer_id = $1
+      ORDER BY a.applied_at DESC
+      `,
+      [volunteerId]
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("MY APPLICATIONS ERROR:", err);
+    res.status(500).json({ error: "Failed to fetch my applications" });
   }
 };

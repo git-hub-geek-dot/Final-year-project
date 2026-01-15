@@ -5,4 +5,7 @@ class RegisterVolunteerScreen extends RegisterBaseScreen {
 
   @override
   String get role => "volunteer";
+
+  @override
+  bool get showVolunteerFields => true;
 }

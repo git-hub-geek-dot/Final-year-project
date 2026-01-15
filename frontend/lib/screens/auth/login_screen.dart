@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../../services/token_service.dart';
-
 import '../../config/api_config.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/gradient_button.dart';
@@ -38,58 +37,52 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => loading = true);
 
     try {
-      print("LOGIN STARTED");
-
-      final response = await http
-          .post(
-            Uri.parse("${ApiConfig.baseUrl}/login"),
-            headers: {"Content-Type": "application/json"},
-            body: jsonEncode({
-              "email": emailController.text.trim(),
-              "password": passwordController.text.trim(),
-            }),
-          )
-          .timeout(const Duration(seconds: 5));
-
-      print("STATUS: ${response.statusCode}");
-      print("BODY: ${response.body}");
+      final response = await http.post(
+        Uri.parse("${ApiConfig.baseUrl}/login"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "email": emailController.text.trim(),
+          "password": passwordController.text.trim(),
+        }),
+      );
 
       if (response.statusCode == 200) {
-  final data = jsonDecode(response.body);
+        final data = jsonDecode(response.body);
 
-  final String token = data["token"];
-  final String role = data["user"]["role"];
+        final String token = data["token"];
+        final String role = data["user"]["role"];
+        final String userId = data["user"]["id"].toString();
 
-  // ✅ SAVE TOKEN (IMPORTANT)
-  await TokenService.saveToken(token);
+        // ✅ Save auth data in ONE place (TokenService)
+        await TokenService.saveAuthData(
+          token: token,
+          userId: userId,
+        );
 
-  if (!mounted) return;
+        if (!mounted) return;
 
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text("Login successful")),
-  );
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Login successful")),
+        );
 
-  if (role == "admin") {
-  Navigator.pushReplacementNamed(context, "/admin-home");
-} else if (role == "organiser") {
-  Navigator.pushReplacementNamed(context, "/organiser-home");
-} else if (role == "volunteer") {
-  Navigator.pushReplacementNamed(context, "/volunteer-home");
-} else {
-  showError("Unknown role: $role");
-}
-
-}
- else {
-        showError(response.body);
+        // ✅ Role-based navigation
+        if (role == "admin") {
+          Navigator.pushReplacementNamed(context, "/admin-home");
+        } else if (role == "organiser") {
+          Navigator.pushReplacementNamed(context, "/organiser-home");
+        } else if (role == "volunteer") {
+          Navigator.pushReplacementNamed(context, "/volunteer-home");
+        } else {
+          showError("Unknown role: $role");
+        }
+      } else {
+        final err = jsonDecode(response.body);
+        showError(err["message"] ?? "Login failed");
       }
     } catch (e) {
-      print("LOGIN ERROR: $e");
-      showError(e.toString());
+      showError("Network error. Please try again.");
     } finally {
-      if (mounted) {
-        setState(() => loading = false);
-      }
+      if (mounted) setState(() => loading = false);
     }
   }
 
@@ -144,10 +137,8 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // TEMP: replace asset to avoid crash
                   const Icon(Icons.volunteer_activism, size: 60),
                   const SizedBox(height: 12),
-
                   const Text(
                     "Login",
                     style: TextStyle(
@@ -191,10 +182,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 12),
 
                   TextButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, "/register");
-                    },
-                    child: const Text("Don't have an account? Register"),
+                    onPressed: () =>
+                        Navigator.pushNamed(context, "/register"),
+                    child: const Text(
+                      "Don't have an account? Register",
+                    ),
                   ),
                 ],
               ),

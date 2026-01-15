@@ -20,6 +20,9 @@ app.use("/api/admin", require("./routes/adminRoutes"));
 app.use("/api", require("./routes/upload"));
 app.use("/api", require("./routes/userRoutes"));
 
+// ✅ ADD THIS LINE (IMPORTANT)
+app.use("/api", require("./routes/accountRoutes"));
+
 app.get("/", (req, res) => {
   res.json({ message: "API running" });
 });

@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../config/api_config.dart'; // ✅ ADD THIS
 import '../../services/token_service.dart';
-import 'leaderboard_screen.dart';
 import 'account_settings_screen.dart';
 import 'help_support_screen.dart';
 import 'about_volunteerx_screen.dart';
@@ -13,30 +13,30 @@ import 'edit_profile_screen.dart';
 class OrganiserProfileScreen extends StatelessWidget {
   const OrganiserProfileScreen({super.key});
 
-  /// 🔥 DELETE ACCOUNT FUNCTION
-  Future<void> handleDeleteAccount(BuildContext context) async {
+  /// ✅ DEACTIVATE ACCOUNT FUNCTION (Soft delete)
+  Future<void> handleDeactivateAccount(BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
+
+    // ✅ Get token
     final token = prefs.getString('token');
-    final userId = prefs.getString('userId');
 
-    // 🔍 DEBUG (remove later)
-    debugPrint("DELETE TOKEN: $token");
-    debugPrint("DELETE USER ID: $userId");
+    debugPrint("DEACTIVATE TOKEN: $token");
+    debugPrint("DEACTIVATE URL: ${ApiConfig.baseUrl}/account/deactivate");
 
-    if (token == null || userId == null) {
+    if (token == null || token.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Authentication error")),
+        const SnackBar(content: Text("Token not found. Please login again.")),
       );
       return;
     }
 
-    // ⚠️ Confirmation dialog
+    // ✅ confirmation
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Delete Account"),
+        title: const Text("Deactivate Account"),
         content: const Text(
-          "Are you sure you want to permanently delete your account?",
+          "Are you sure you want to deactivate your account?\n\nYour data will remain saved, but you will not be able to login again.",
         ),
         actions: [
           TextButton(
@@ -46,7 +46,7 @@ class OrganiserProfileScreen extends StatelessWidget {
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: const Text(
-              "Delete",
+              "Deactivate",
               style: TextStyle(color: Colors.red),
             ),
           ),
@@ -56,7 +56,7 @@ class OrganiserProfileScreen extends StatelessWidget {
 
     if (confirm != true) return;
 
-    // ⏳ LOADING
+    // ✅ loader
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -64,37 +64,54 @@ class OrganiserProfileScreen extends StatelessWidget {
     );
 
     try {
-      final response = await http.delete(
-        // ✅ ANDROID EMULATOR FIX
-        Uri.parse('http://10.0.2.2:4000/api/users/$userId'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
+      // ✅ FIX: use ApiConfig (works on Web + Android)
+      final response = await http
+          .put(
+            Uri.parse("${ApiConfig.baseUrl}/account/deactivate"),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          )
+          .timeout(const Duration(seconds: 5)); // ✅ fast fail
 
       Navigator.pop(context); // close loader
 
-      final data = jsonDecode(response.body);
-      debugPrint("DELETE RESPONSE: $data");
+      debugPrint("DEACTIVATE STATUS: ${response.statusCode}");
+      debugPrint("DEACTIVATE BODY: ${response.body}");
 
-      if (data['success'] == true) {
+      if (response.statusCode == 200) {
+        // ✅ clear session
         await prefs.clear();
+        await TokenService.clearToken();
 
+        if (!context.mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Account deactivated ✅")),
+        );
+
+        // ✅ redirect to login screen
         Navigator.pushNamedAndRemoveUntil(
           context,
           '/',
           (route) => false,
         );
       } else {
+        String msg = "Deactivate failed";
+        try {
+          final data = jsonDecode(response.body);
+          msg = data["message"] ?? data["error"] ?? msg;
+        } catch (_) {}
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['message'] ?? "Delete failed")),
+          SnackBar(content: Text(msg)),
         );
       }
     } catch (e) {
       Navigator.pop(context); // close loader
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Server error")),
+        SnackBar(content: Text("Server error: $e")),
       );
     }
   }
@@ -153,7 +170,6 @@ class OrganiserProfileScreen extends StatelessWidget {
                     style: TextStyle(color: Colors.white70),
                   ),
                   const SizedBox(height: 12),
-
                   InkWell(
                     onTap: () {
                       Navigator.push(
@@ -242,7 +258,7 @@ class OrganiserProfileScreen extends StatelessWidget {
                     icon: Icons.delete_forever,
                     text: "Delete Account",
                     isDelete: true,
-                    onTap: () => handleDeleteAccount(context),
+                    onTap: () => handleDeactivateAccount(context),
                   ),
                 ],
               ),
@@ -267,6 +283,9 @@ Widget _profileOption({
     onTap: () async {
       if (isLogout) {
         await TokenService.clearToken();
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.clear();
+
         Navigator.pushNamedAndRemoveUntil(
           context,
           '/',
@@ -301,9 +320,7 @@ Widget _profileOption({
               text,
               style: TextStyle(
                 fontWeight: FontWeight.w600,
-                color: (isLogout || isDelete)
-                    ? Colors.red
-                    : Colors.black,
+                color: (isLogout || isDelete) ? Colors.red : Colors.black,
               ),
             ),
           ),

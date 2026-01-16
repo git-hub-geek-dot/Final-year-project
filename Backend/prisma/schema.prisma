@@ -33,6 +33,12 @@ enum EventType {
   unpaid
 }
 
+enum VerificationStatus {
+  pending
+  approved
+  rejected
+}
+
 //// MODELS
 
 model Application {
@@ -132,16 +138,41 @@ model UserBadge {
   @@map("user_badges")
 }
 
+model VerificationRequest {
+  id                Int                 @id @default(autoincrement())
+  userId            Int                 @map("user_id")
+  role              UserRole
+  idType            String              @map("id_type")
+  idNumber          String              @map("id_number")
+  idDocumentUrl     String?             @map("id_document_url")
+  selfieUrl         String?             @map("selfie_url")
+
+  organisationName  String?             @map("organisation_name")
+  eventProofUrl     String?             @map("event_proof_url")
+  websiteLink       String?             @map("website_link")
+
+  status            VerificationStatus  @default(pending)
+  adminRemark       String?             @map("admin_remark")
+
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+
+  user              User                @relation(fields: [userId], references: [id])
+
+  @@map("verification_requests")
+}
+
 model User {
   id          Int         @id @default(autoincrement())
   name        String
   email       String      @unique
   password    String?
   role        UserRole?
-  status      UserStatus  @default(active)   // 🔥 SOFT DELETE FIELD (NON-NULL)
+  status      UserStatus  @default(active)
   contact     String?     @map("contact_number")
   city        String?
   govtId      String?     @map("government_id")
+  isVerified  Boolean     @default(false) // ✅ added (safe)
   createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamp(6)
 
   applications Application[]
@@ -149,6 +180,7 @@ model User {
   ratingsGiven  Rating[] @relation("RatingRater")
   ratingsTaken  Rating[] @relation("RatingRatee")
   userBadges    UserBadge[]
+  verificationRequests VerificationRequest[]
 
   @@map("users")
 }

@@ -3,25 +3,96 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../config/api_config.dart'; // ✅ ADD THIS
+import '../../config/api_config.dart';
 import '../../services/token_service.dart';
+ import '../../services/verification_service.dart';
 import 'account_settings_screen.dart';
 import 'help_support_screen.dart';
 import 'about_volunteerx_screen.dart';
 import 'edit_profile_screen.dart';
+import 'get_verified_screen.dart';
 
-class OrganiserProfileScreen extends StatelessWidget {
+class OrganiserProfileScreen extends StatefulWidget {
   const OrganiserProfileScreen({super.key});
+
+  @override
+  State<OrganiserProfileScreen> createState() =>
+      _OrganiserProfileScreenState();
+}
+
+class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
+  bool loading = true;
+  String? errorMessage;
+
+  String? name;
+  String? email;
+  String? city;
+  String? role;
+  String? verificationStatus;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchProfile();
+    loadVerificationStatus();
+  }
+
+  Future<void> loadVerificationStatus() async {
+    final status = await VerificationService.getStatus();
+    setState(() {
+      verificationStatus = status;
+    });
+  }
+
+  Future<void> fetchProfile() async {
+    try {
+      setState(() {
+        loading = true;
+        errorMessage = null;
+      });
+
+      final token = await TokenService.getToken();
+      if (token == null || token.isEmpty) {
+        setState(() {
+          loading = false;
+          errorMessage = "Token not found. Please login again.";
+        });
+        return;
+      }
+
+      final url = Uri.parse("${ApiConfig.baseUrl}/profile");
+      final response = await http.get(
+        url,
+        headers: {"Authorization": "Bearer $token", "Content-Type": "application/json"},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          name = data["name"];
+          email = data["email"];
+          city = data["city"];
+          role = data["role"];
+          loading = false;
+        });
+      } else {
+        setState(() {
+          loading = false;
+          errorMessage = "Error ${response.statusCode}: ${response.body}";
+        });
+      }
+    } catch (e) {
+      setState(() {
+        loading = false;
+        errorMessage = "Error: $e";
+      });
+    }
+  }
 
   /// ✅ DEACTIVATE ACCOUNT FUNCTION (Soft delete)
   Future<void> handleDeactivateAccount(BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
-
-    // ✅ Get token
     final token = prefs.getString('token');
-
-    debugPrint("DEACTIVATE TOKEN: $token");
-    debugPrint("DEACTIVATE URL: ${ApiConfig.baseUrl}/account/deactivate");
 
     if (token == null || token.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -30,7 +101,6 @@ class OrganiserProfileScreen extends StatelessWidget {
       return;
     }
 
-    // ✅ confirmation
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -56,7 +126,6 @@ class OrganiserProfileScreen extends StatelessWidget {
 
     if (confirm != true) return;
 
-    // ✅ loader
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -64,7 +133,6 @@ class OrganiserProfileScreen extends StatelessWidget {
     );
 
     try {
-      // ✅ FIX: use ApiConfig (works on Web + Android)
       final response = await http
           .put(
             Uri.parse("${ApiConfig.baseUrl}/account/deactivate"),
@@ -73,15 +141,11 @@ class OrganiserProfileScreen extends StatelessWidget {
               'Authorization': 'Bearer $token',
             },
           )
-          .timeout(const Duration(seconds: 5)); // ✅ fast fail
+          .timeout(const Duration(seconds: 5));
 
-      Navigator.pop(context); // close loader
-
-      debugPrint("DEACTIVATE STATUS: ${response.statusCode}");
-      debugPrint("DEACTIVATE BODY: ${response.body}");
+      Navigator.pop(context);
 
       if (response.statusCode == 200) {
-        // ✅ clear session
         await prefs.clear();
         await TokenService.clearToken();
 
@@ -91,7 +155,6 @@ class OrganiserProfileScreen extends StatelessWidget {
           const SnackBar(content: Text("Account deactivated ✅")),
         );
 
-        // ✅ redirect to login screen
         Navigator.pushNamedAndRemoveUntil(
           context,
           '/',
@@ -109,7 +172,7 @@ class OrganiserProfileScreen extends StatelessWidget {
         );
       }
     } catch (e) {
-      Navigator.pop(context); // close loader
+      Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Server error: $e")),
       );
@@ -119,8 +182,21 @@ class OrganiserProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SingleChildScrollView(
-        child: Column(
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : errorMessage != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      errorMessage!,
+                      style: const TextStyle(color: Colors.red),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                )
+              : SingleChildScrollView(
+                  child: Column(
           children: [
             // 🔷 HEADER
             Container(
@@ -156,28 +232,45 @@ class OrganiserProfileScreen extends StatelessWidget {
                     child: Icon(Icons.person, size: 40),
                   ),
                   const SizedBox(height: 10),
-                  const Text(
-                    "Ankit Verma",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        name ?? "",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (verificationStatus == "approved") ...[
+                        const SizedBox(width: 6),
+                        const Icon(
+                          Icons.verified,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 4),
-                  const Text(
-                    "Bengaluru, India",
-                    style: TextStyle(color: Colors.white70),
+                  Text(
+                    city == null || city!.isEmpty ? "City not set" : "$city, India",
+                    style: const TextStyle(color: Colors.white70),
                   ),
                   const SizedBox(height: 12),
-                  InkWell(
-                    onTap: () {
-                      Navigator.push(
+                    InkWell(
+                    onTap: () async {
+                      final updated = await Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (_) => const EditProfileScreen(),
                         ),
                       );
+
+                      if (updated == true) {
+                        fetchProfile();
+                      }
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -220,6 +313,27 @@ class OrganiserProfileScreen extends StatelessWidget {
                         ),
                       );
                     },
+                  ),
+                  _profileOption(
+                    context: context,
+                    icon: Icons.verified,
+                    text: verificationStatus == "pending"
+                        ? "Verification Under Review"
+                        : verificationStatus == "approved"
+                            ? "Verified"
+                            : "Get Verified",
+                    onTap: verificationStatus == "pending" ||
+                            verificationStatus == "approved"
+                        ? null
+                        : () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    const OrganiserGetVerifiedScreen(),
+                              ),
+                            );
+                          },
                   ),
                   _profileOption(
                     context: context,

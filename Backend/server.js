@@ -11,22 +11,27 @@ app.use(express.json());
 // Serve uploaded images
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// Routes
+// ================= ROUTES =================
 app.use("/api", require("./routes/authRoutes"));
 app.use("/api", require("./routes/eventRoutes"));
 app.use("/api", require("./routes/applicationRoutes"));
 app.use("/api", require("./routes/ratingRoutes"));
-app.use("/api/admin", require("./routes/adminRoutes"));
 app.use("/api", require("./routes/upload"));
 app.use("/api", require("./routes/userRoutes"));
-
-// ✅ ADD THIS LINE (IMPORTANT)
 app.use("/api", require("./routes/accountRoutes"));
 
+// 🔥 ADMIN ROUTES (already correct)
+app.use("/api/admin", require("./routes/adminRoutes"));
+
+// 🔥 VERIFICATION ROUTES (FIXED)
+app.use("/api/verification", require("./routes/verificationRoutes"));
+
+// ================= HEALTH CHECK =================
 app.get("/", (req, res) => {
   res.json({ message: "API running" });
 });
 
+// ================= SERVER =================
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

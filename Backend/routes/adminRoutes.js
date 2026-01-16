@@ -4,8 +4,10 @@ const router = express.Router();
 const authenticateToken = require("../middleware/auth");
 const adminOnly = require("../middleware/admin");
 const adminController = require("../controllers/adminController");
+// note: DB access delegated to adminController (uses pool)
 
-// USERS
+
+// ================= USERS =================
 router.get(
   "/users",
   authenticateToken,
@@ -20,7 +22,7 @@ router.post(
   adminController.updateUserStatus
 );
 
-// EVENTS
+// ================= EVENTS =================
 router.get(
   "/events",
   authenticateToken,
@@ -28,20 +30,12 @@ router.get(
   adminController.getEvents
 );
 
-// APPLICATIONS
+// ================= APPLICATIONS =================
 router.get(
   "/applications",
   authenticateToken,
   adminOnly,
   adminController.getApplications
-);
-
-// STATS
-router.get(
-  "/stats",
-  authenticateToken,
-  adminOnly,
-  adminController.getStats
 );
 
 router.delete(
@@ -51,6 +45,15 @@ router.delete(
   adminController.cancelApplication
 );
 
+// ================= STATS =================
+router.get(
+  "/stats",
+  authenticateToken,
+  adminOnly,
+  adminController.getStats
+);
+
+// ================= EVENTS DELETE =================
 router.delete(
   "/events/:id",
   authenticateToken,
@@ -58,6 +61,7 @@ router.delete(
   adminController.deleteEvent
 );
 
+// ================= LEADERBOARD =================
 router.get(
   "/leaderboard/volunteers",
   authenticateToken,
@@ -72,6 +76,7 @@ router.get(
   adminController.getOrganiserLeaderboard
 );
 
+// ================= BADGES =================
 router.post(
   "/badges/evaluate",
   authenticateToken,
@@ -79,8 +84,19 @@ router.post(
   adminController.evaluateBadges
 );
 
-router.get("/badges", authenticateToken, adminOnly, adminController.getBadges);
-router.post("/badges", authenticateToken, adminOnly, adminController.createBadge);
+router.get(
+  "/badges",
+  authenticateToken,
+  adminOnly,
+  adminController.getBadges
+);
+
+router.post(
+  "/badges",
+  authenticateToken,
+  adminOnly,
+  adminController.createBadge
+);
 
 router.get(
   "/badges/users",
@@ -89,7 +105,32 @@ router.get(
   adminController.getUserBadges
 );
 
+// =================================================
+// ========== VERIFICATION (NEW - SAFE) =============
+// =================================================
 
+// 🔍 Get all verification requests
+router.get(
+  "/verification-requests",
+  authenticateToken,
+  adminOnly,
+  adminController.getVerificationRequests
+);
 
+// ✅ Approve verification
+router.post(
+  "/verification/approve",
+  authenticateToken,
+  adminOnly,
+  adminController.approveVerification
+);
+
+// ❌ Reject verification
+router.post(
+  "/verification/reject",
+  authenticateToken,
+  adminOnly,
+  adminController.rejectVerification
+);
 
 module.exports = router;

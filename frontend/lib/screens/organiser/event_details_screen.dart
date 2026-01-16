@@ -1,8 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart'; // kIsWeb
+import 'package:flutter/foundation.dart'; 
 import 'review_application_screen.dart';
-import 'create_event_screen.dart';
 import 'edit_event_screen.dart';
 
 class EventDetailsScreen extends StatelessWidget {

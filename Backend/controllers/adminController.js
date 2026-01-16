@@ -297,6 +297,114 @@ const getUserBadges = async (req, res) => {
   }
 };
 
+// ================= VERIFICATION REQUESTS (ADMIN) =================
+const getVerificationRequests = async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT vr.*, u.id AS user_id, u.name AS user_name, u.email AS user_email, u.role AS user_role, u."isVerified" AS "isVerified"
+      FROM verification_requests vr
+      JOIN users u ON vr.user_id = u.id
+      ORDER BY vr.created_at DESC
+    `);
+
+    // Map rows to include a nested user object similar to previous API shape
+    const mapped = result.rows.map((r) => ({
+      id: r.id,
+      userId: r.user_id,
+      role: r.role,
+      idType: r.id_type,
+      idNumber: r.id_number,
+      idDocumentUrl: r.id_document_url,
+      selfieUrl: r.selfie_url,
+      organisationName: r.organisation_name,
+      eventProofUrl: r.event_proof_url,
+      websiteLink: r.website_link,
+      status: r.status,
+      adminRemark: r.admin_remark,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+      user: {
+        id: r.user_id,
+        name: r.user_name,
+        email: r.user_email,
+        role: r.user_role,
+        isVerified: r.isVerified,
+      },
+    }));
+
+    res.json(mapped);
+  } catch (err) {
+    console.error("GET VERIFICATION REQUESTS ERROR:", err);
+    res.status(500).json({ error: "Failed to fetch verification requests" });
+  }
+};
+
+const approveVerification = async (req, res) => {
+  const { requestId } = req.body;
+
+  if (!requestId) {
+    return res.status(400).json({ error: "requestId is required" });
+  }
+
+  const client = await pool.connect();
+  try {
+    // Check request exists
+    const check = await client.query(
+      "SELECT user_id FROM verification_requests WHERE id = $1",
+      [requestId]
+    );
+
+    if (check.rows.length === 0) {
+      return res.status(404).json({ error: "Request not found" });
+    }
+
+    const userId = check.rows[0].user_id;
+
+    await client.query("BEGIN");
+    await client.query(
+      "UPDATE verification_requests SET status = 'approved', updated_at = NOW() WHERE id = $1",
+      [requestId]
+    );
+    await client.query(
+      'UPDATE users SET "isVerified" = TRUE WHERE id = $1',
+      [userId]
+    );
+    await client.query("COMMIT");
+
+    res.json({ message: "User verified successfully" });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("APPROVE VERIFICATION ERROR:", err);
+    res.status(500).json({ error: "Failed to approve verification" });
+  } finally {
+    client.release();
+  }
+};
+
+const rejectVerification = async (req, res) => {
+  try {
+    const { requestId, remark } = req.body;
+
+    if (!requestId) {
+      return res.status(400).json({ error: "requestId is required" });
+    }
+
+    const result = await pool.query(
+      "UPDATE verification_requests SET status = 'rejected', admin_remark = $1, updated_at = NOW() WHERE id = $2 RETURNING id",
+      [remark || null, requestId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Request not found" });
+    }
+
+    res.json({ message: "Verification rejected" });
+  } catch (err) {
+    console.error("REJECT VERIFICATION ERROR:", err);
+    res.status(500).json({ error: "Failed to reject verification" });
+  }
+};
+
 
 
 
@@ -316,4 +424,7 @@ module.exports = {
   getBadges,
   createBadge,
   getUserBadges,
+  getVerificationRequests,
+  approveVerification,
+  rejectVerification,
 };

@@ -108,13 +108,12 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
           SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
             child: Column(
-  children: [
-    _eventBanner(),
-    const SizedBox(height: 16),
-    _eventHeaderCard(),
-
+              children: [
+                _eventBanner(),
                 const SizedBox(height: 16),
-                _aboutCard(),
+                _eventHeaderCard(),
+                const SizedBox(height: 16),
+                _descriptionCard(),
                 const SizedBox(height: 16),
                 _responsibilitiesCard(),
                 const SizedBox(height: 16),
@@ -132,41 +131,40 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
       ),
     );
   }
-Widget _eventBanner() {
-  final imageUrl = widget.event["banner_url"];
 
-  if (imageUrl == null || imageUrl.isEmpty) {
-    return const SizedBox.shrink();
+  // ================= BANNER =================
+  Widget _eventBanner() {
+    final imageUrl = widget.event["banner_url"];
+
+    if (imageUrl == null || imageUrl.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: Image.network(
+        imageUrl,
+        height: 220,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Container(
+            height: 220,
+            color: Colors.grey.shade200,
+            child: const Center(child: CircularProgressIndicator()),
+          );
+        },
+        errorBuilder: (_, __, ___) {
+          return Container(
+            height: 220,
+            color: Colors.grey.shade300,
+            child: const Icon(Icons.image, size: 48),
+          );
+        },
+      ),
+    );
   }
-
-  return ClipRRect(
-    borderRadius: const BorderRadius.only(
-      bottomLeft: Radius.circular(24),
-      bottomRight: Radius.circular(24),
-    ),
-    child: Image.network(
-      imageUrl,
-      height: 220,
-      width: double.infinity,
-      fit: BoxFit.cover,
-      loadingBuilder: (context, child, loadingProgress) {
-        if (loadingProgress == null) return child;
-        return Container(
-          height: 220,
-          color: Colors.grey.shade200,
-          child: const Center(child: CircularProgressIndicator()),
-        );
-      },
-      errorBuilder: (_, __, ___) {
-        return Container(
-          height: 220,
-          color: Colors.grey.shade300,
-          child: const Icon(Icons.image, size: 48),
-        );
-      },
-    ),
-  );
-}
 
   // ================= HEADER =================
   Widget _eventHeaderCard() {
@@ -175,32 +173,39 @@ Widget _eventBanner() {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-  widget.event["title"] ?? "",
-  style: const TextStyle(
-    fontSize: 24,
-    fontWeight: FontWeight.w700,
-    letterSpacing: 0.3,
-  ),
-),
-const SizedBox(height: 6),
-Text(
-  widget.event["description"] ?? "",
-  style: TextStyle(
-    color: Colors.grey.shade600,
-    height: 1.4,
-  ),
+            widget.event["title"] ?? "",
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          _iconRow(Icons.location_on, widget.event["location"] ?? "N/A"),
+
+          // Date
+_iconRow(
+  Icons.calendar_today,
+  widget.event["event_date"]?.toString().split("T")[0] ?? "N/A",
 ),
 
-          const SizedBox(height: 16),
-          _iconRow(Icons.location_on, widget.event["location"] ?? "N/A"),
+// Time (below date)
+_iconRow(
+  Icons.access_time,
+  "${widget.event["start_time"] ?? "N/A"} - ${widget.event["end_time"] ?? "N/A"}",
+),
+
+
           _iconRow(
-            Icons.calendar_today,
-            widget.event["event_date"]?.toString().split("T")[0] ?? "",
+            Icons.hourglass_bottom,
+            "Apply before: ${widget.event["application_deadline"]?.toString().split("T")[0] ?? "N/A"}",
           ),
+
           _iconRow(
             Icons.people,
             "Volunteers Needed: ${widget.event["volunteers_required"] ?? "N/A"}",
           ),
+
           if (applicationStatus != null) ...[
             const SizedBox(height: 16),
             _statusPill(
@@ -213,20 +218,24 @@ Text(
     );
   }
 
-  // ================= ABOUT =================
-  Widget _aboutCard() {
+  // ================= DESCRIPTION =================
+  Widget _descriptionCard() {
     return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            "About this Event",
+            "Description",
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Text(
             widget.event["description"] ??
                 "No description provided by organiser.",
+            style: const TextStyle(
+              height: 1.5,
+              fontSize: 14.5,
+            ),
           ),
         ],
       ),
@@ -261,7 +270,7 @@ Text(
           context,
           MaterialPageRoute(
             builder: (_) => const ViewOrganiserProfileScreen(
-              organiserId: 1, // TODO: dynamic later
+              organiserId: 1,
             ),
           ),
         );
@@ -340,57 +349,50 @@ Text(
 
   // ================= HELPERS =================
   Widget _card({required Widget child}) {
-  return Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(18),
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(22),
-      gradient: LinearGradient(
-        colors: [
-          Colors.white,
-          const Color(0xFFF7FAFF),
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.06),
-          blurRadius: 18,
-          offset: const Offset(0, 8),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        gradient: const LinearGradient(
+          colors: [Colors.white, Color(0xFFF7FAFF)],
         ),
-      ],
-    ),
-    child: child,
-  );
-}
-
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
 
   Widget _iconRow(IconData icon, String text) {
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 10),
-    child: Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: Colors.green.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(8),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: Colors.green.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 16, color: Colors.green),
           ),
-          child: Icon(icon, size: 16, color: Colors.green),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(fontWeight: FontWeight.w500),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
           ),
-        ),
-      ],
-    ),
-  );
-}
-
+        ],
+      ),
+    );
+  }
 
   Widget _checkItem(String text) {
     return Padding(
@@ -406,31 +408,27 @@ Text(
   }
 
   Widget _statusPill(String text, Color color) {
-  return Container(
-    height: 52,
-    width: double.infinity,
-    decoration: BoxDecoration(
-      gradient: LinearGradient(
-        colors: [
-          color.withOpacity(0.15),
-          color.withOpacity(0.25),
-        ],
+    return Container(
+      height: 52,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [color.withOpacity(0.15), color.withOpacity(0.25)],
+        ),
+        borderRadius: BorderRadius.circular(30),
       ),
-      borderRadius: BorderRadius.circular(30),
-    ),
-    child: Center(
-      child: Text(
-        text,
-        style: TextStyle(
-          color: color,
-          fontWeight: FontWeight.w600,
-          fontSize: 15,
+      child: Center(
+        child: Text(
+          text,
+          style: TextStyle(
+            color: color,
+            fontWeight: FontWeight.w600,
+            fontSize: 15,
+          ),
         ),
       ),
-    ),
-  );
-}
-
+    );
+  }
 
   Color _statusColor(String status) {
     switch (status) {
@@ -465,77 +463,78 @@ Text(
 
   // ================= TERMS =================
   void _showTerms(BuildContext context) {
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
-    builder: (_) {
-      bool agreed = false;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) {
+        bool agreed = false;
 
-      return StatefulBuilder(
-        builder: (context, setState) {
-          return Padding(
-            padding: EdgeInsets.fromLTRB(
-              16,
-              16,
-              16,
-              MediaQuery.of(context).viewInsets.bottom + 16,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Center(
-                  child: Text(
-                    "Volunteer Terms & Conditions",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                MediaQuery.of(context).viewInsets.bottom + 16,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Center(
+                    child: Text(
+                      "Volunteer Terms & Conditions",
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-
-                const Text("• Participation is voluntary and does not constitute employment."),
-                const SizedBox(height: 8),
-                const Text("• Volunteers must follow organiser instructions and maintain respectful conduct."),
-                const SizedBox(height: 8),
-                const Text("• Volunteers are responsible for their own safety during the event."),
-                const SizedBox(height: 8),
-                const Text("• Accurate profile and contact information must be maintained at all times."),
-                const SizedBox(height: 8),
-                const Text(
-                  "• VolunteerX is not responsible for any payments, donations, reimbursements, or financial matters related to events; all such transactions are solely between the volunteer and the organiser.",
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-
-                const SizedBox(height: 16),
-
-                CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
-                  value: agreed,
-                  onChanged: (v) => setState(() => agreed = v!),
-                  title: const Text("I agree to the Terms & Conditions"),
-                ),
-
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: agreed
-                        ? () {
-                            Navigator.pop(context);
-                            _applyToEvent();
-                          }
-                        : null,
-                    child: const Text("Confirm & Apply"),
+                  const SizedBox(height: 16),
+                  const Text(
+                      "• Participation is voluntary and does not constitute employment."),
+                  const SizedBox(height: 8),
+                  const Text(
+                      "• Volunteers must follow organiser instructions and maintain respectful conduct."),
+                  const SizedBox(height: 8),
+                  const Text(
+                      "• Volunteers are responsible for their own safety during the event."),
+                  const SizedBox(height: 8),
+                  const Text(
+                      "• Accurate profile and contact information must be maintained at all times."),
+                  const SizedBox(height: 8),
+                  const Text(
+                    "• VolunteerX is not responsible for any payments, donations, reimbursements, or financial matters related to events; all such transactions are solely between the volunteer and the organiser.",
+                    style: TextStyle(fontWeight: FontWeight.w600),
                   ),
-                ),
-              ],
-            ),
-          );
-        },
-      );
-    },
-  );
+                  const SizedBox(height: 16),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: agreed,
+                    onChanged: (v) => setState(() => agreed = v!),
+                    title: const Text("I agree to the Terms & Conditions"),
+                  ),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: agreed
+                          ? () {
+                              Navigator.pop(context);
+                              _applyToEvent();
+                            }
+                          : null,
+                      child: const Text("Confirm & Apply"),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 }

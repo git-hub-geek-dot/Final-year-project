@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/widgets/app_background.dart';
 import '../../services/admin_service.dart';
 
 class AdminStatsScreen extends StatelessWidget {
@@ -6,31 +7,41 @@ class AdminStatsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<Map<String, dynamic>>(
-      future: AdminService.getStats(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Stats'),
+      ),
+      body: AppBackground(
+        child: FutureBuilder<Map<String, dynamic>>(
+          future: AdminService.getStats(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-        if (snapshot.hasError) {
-          return const Center(child: Text("Failed to load stats"));
-        }
+            if (snapshot.hasError) {
+              return const Center(child: Text("Failed to load stats"));
+            }
 
-        final s = snapshot.data!;
+            final s = snapshot.data!;
 
-        return GridView.count(
-          crossAxisCount: 2,
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          children: [
-            statCard("Users", s["totalUsers"]),
-            statCard("Events", s["totalEvents"]),
-            statCard("Active Events", s["activeEvents"]),
-            statCard("Applications", s["totalApplications"]),
-          ],
-        );
-      },
+            return Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: GridView.count(
+                crossAxisCount: 2,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                children: [
+                  statCard("Users", s["totalUsers"]),
+                  statCard("Events", s["totalEvents"]),
+                  statCard("Active Events", s["activeEvents"]),
+                  statCard("Applications", s["totalApplications"]),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 

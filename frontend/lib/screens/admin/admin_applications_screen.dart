@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/admin_service.dart';
+import 'package:frontend/widgets/app_background.dart';
 
 class AdminApplicationsScreen extends StatefulWidget {
   const AdminApplicationsScreen({super.key});
@@ -39,125 +40,133 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<dynamic>>(
-      future: appsFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Applications'),
+      ),
+      body: AppBackground(
+        child: FutureBuilder<List<dynamic>>(
+          future: appsFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-        if (snapshot.hasError) {
-          return const Center(child: Text("Failed to load applications"));
-        }
+            if (snapshot.hasError) {
+              return const Center(child: Text("Failed to load applications"));
+            }
 
-        final apps = snapshot.data!;
+            final apps = snapshot.data!;
 
-        final filtered = apps.where((a) {
-          return statusFilter == "all" || a["status"] == statusFilter;
-        }).toList();
+            final filtered = apps.where((a) {
+              return statusFilter == "all" || a["status"] == statusFilter;
+            }).toList();
 
-        return Column(
-          children: [
-            // 🔽 Status filter
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: DropdownButton<String>(
-                value: statusFilter,
-                items: const [
-                  DropdownMenuItem(
-                      value: "all", child: Text("All Applications")),
-                  DropdownMenuItem(
-                      value: "pending", child: Text("Pending")),
-                  DropdownMenuItem(
-                      value: "approved", child: Text("Approved")),
-                  DropdownMenuItem(
-                      value: "cancelled", child: Text("Cancelled")),
-                ],
-                onChanged: (v) => setState(() => statusFilter = v!),
-              ),
-            ),
+            return Column(
+              children: [
+                // 🔽 Status filter
+                Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: DropdownButton<String>(
+                    value: statusFilter,
+                    items: const [
+                      DropdownMenuItem(
+                          value: "all", child: Text("All Applications")),
+                      DropdownMenuItem(
+                          value: "pending", child: Text("Pending")),
+                      DropdownMenuItem(
+                          value: "approved", child: Text("Approved")),
+                      DropdownMenuItem(
+                          value: "cancelled", child: Text("Cancelled")),
+                    ],
+                    onChanged: (v) => setState(() => statusFilter = v!),
+                  ),
+                ),
 
-            Expanded(
-              child: filtered.isEmpty
-                  ? const Center(child: Text("No applications found"))
-                  : ListView.builder(
-                      itemCount: filtered.length,
-                      itemBuilder: (context, i) {
-                        final app = filtered[i];
-                        final isCancelled = app["status"] == "cancelled";
+                Expanded(
+                  child: filtered.isEmpty
+                      ? const Center(child: Text("No applications found"))
+                      : ListView.builder(
+                          itemCount: filtered.length,
+                          itemBuilder: (context, i) {
+                            final app = filtered[i];
+                            final isCancelled = app["status"] == "cancelled";
 
-                        return Card(
-                          child: ListTile(
-                            title: Text(app["event_title"]),
-                            subtitle: Text(
-                              "${app["volunteer_name"]} • ${app["status"]}",
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                // Status badge
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: statusColor(app["status"]),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    app["status"],
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                    ),
-                                  ),
+                            return Card(
+                              child: ListTile(
+                                title: Text(app["event_title"]),
+                                subtitle: Text(
+                                  "${app["volunteer_name"]} • ${app["status"]}",
                                 ),
-
-                                // ❌ Cancel button (only if not cancelled)
-                                if (!isCancelled)
-                                  IconButton(
-                                    icon: const Icon(Icons.cancel,
-                                        color: Colors.red),
-                                    onPressed: () async {
-                                      final confirm =
-                                          await showDialog<bool>(
-                                        context: context,
-                                        builder: (ctx) => AlertDialog(
-                                          title:
-                                              const Text("Cancel Application"),
-                                          content: const Text(
-                                              "Are you sure you want to cancel this application?"),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () =>
-                                                  Navigator.pop(ctx, false),
-                                              child: const Text("No"),
-                                            ),
-                                            TextButton(
-                                              onPressed: () =>
-                                                  Navigator.pop(ctx, true),
-                                              child: const Text("Yes"),
-                                            ),
-                                          ],
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    // Status badge
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: statusColor(app["status"]),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        app["status"],
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
                                         ),
-                                      );
+                                      ),
+                                    ),
 
-                                      if (confirm == true) {
-                                        await AdminService.cancelApplication(
-                                            app["id"]);
-                                        refresh();
-                                      }
-                                    },
-                                  ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        );
-      },
+                                    // ❌ Cancel button (only if not cancelled)
+                                    if (!isCancelled)
+                                      IconButton(
+                                        icon: const Icon(Icons.cancel,
+                                            color: Colors.red),
+                                        onPressed: () async {
+                                          final confirm =
+                                              await showDialog<bool>(
+                                            context: context,
+                                            builder: (ctx) => AlertDialog(
+                                              title: const Text(
+                                                  "Cancel Application"),
+                                              content: const Text(
+                                                  "Are you sure you want to cancel this application?"),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () =>
+                                                      Navigator.pop(ctx, false),
+                                                  child: const Text("No"),
+                                                ),
+                                                TextButton(
+                                                  onPressed: () =>
+                                                      Navigator.pop(ctx, true),
+                                                  child: const Text("Yes"),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+
+                                          if (confirm == true) {
+                                            await AdminService
+                                                .cancelApplication(
+                                                    app["id"]);
+                                            refresh();
+                                          }
+                                        },
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
     );
   }
 }

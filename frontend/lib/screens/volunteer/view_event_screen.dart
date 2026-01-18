@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../../config/api_config.dart';
 import '../../services/token_service.dart';
 import 'view_organiser_profile_screen.dart';
 
@@ -33,10 +34,12 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
 
       final response = await http.get(
         Uri.parse(
-          "http://10.0.2.2:4000/api/events/${widget.event["id"]}/application-status",
+          "${ApiConfig.baseUrl}/events/${widget.event["id"]}/application-status",
         ),
         headers: {"Authorization": "Bearer $token"},
       );
+
+      if (!mounted) return;
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -46,10 +49,15 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
           isLoadingStatus = false;
         });
       } else {
-        isLoadingStatus = false;
+        setState(() {
+          isLoadingStatus = false;
+        });
       }
     } catch (_) {
-      isLoadingStatus = false;
+      if (!mounted) return;
+      setState(() {
+        isLoadingStatus = false;
+      });
     }
   }
 
@@ -62,13 +70,14 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
 
       final response = await http.post(
         Uri.parse(
-          "http://10.0.2.2:4000/api/events/${widget.event["id"]}/apply",
+          "${ApiConfig.baseUrl}/events/${widget.event["id"]}/apply",
         ),
         headers: {
           "Authorization": "Bearer $token",
           "Content-Type": "application/json",
         },
       );
+      if (!mounted) return;
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body);
@@ -78,9 +87,12 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
         });
       } else {
         _snack("Unable to apply");
-        isApplying = false;
+        setState(() {
+          isApplying = false;
+        });
       }
     } catch (_) {
+      if (!mounted) return;
       _snack("Network error");
       setState(() => isApplying = false);
     }

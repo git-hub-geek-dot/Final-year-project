@@ -105,6 +105,13 @@ router.get(
   adminController.getUserBadges
 );
 
+router.delete(
+  "/badges/:id",
+  authenticateToken,
+  adminOnly,
+  adminController.deleteBadge
+);
+
 // =================================================
 // ========== VERIFICATION (NEW - SAFE) =============
 // =================================================

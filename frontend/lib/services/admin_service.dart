@@ -183,6 +183,19 @@ class AdminService {
     );
   }
 
+  static Future<void> deleteBadge(int badgeId) async {
+    final token = await TokenService.getToken();
+    final response = await http.delete(
+      Uri.parse("${ApiConfig.baseUrl}/admin/badges/$badgeId"),
+      headers: {
+        "Authorization": "Bearer $token",
+      },
+    );
+    if (response.statusCode != 200) {
+      throw Exception("Failed to delete badge");
+    }
+  }
+
   static Future<List<dynamic>> getUserBadges() async {
     final token = await TokenService.getToken();
     final res = await http.get(

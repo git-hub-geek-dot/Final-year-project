@@ -410,6 +410,35 @@ const rejectVerification = async (req, res) => {
 
 
 
+const deleteBadge = async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const badgeId = req.params.id;
+
+    await client.query("BEGIN");
+
+    // First, delete related user_badges entries
+    await client.query("DELETE FROM user_badges WHERE badge_id = $1", [badgeId]);
+    
+    // Then, delete the badge itself
+    const result = await client.query("DELETE FROM badges WHERE id = $1", [badgeId]);
+
+    if (result.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Badge not found" });
+    }
+
+    await client.query("COMMIT");
+    res.json({ message: "Badge deleted successfully" });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("DELETE BADGE ERROR:", err);
+    res.status(500).json({ error: "Failed to delete badge" });
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   getUsers,
   getEvents,
@@ -423,6 +452,7 @@ module.exports = {
   evaluateBadges,
   getBadges,
   createBadge,
+  deleteBadge,
   getUserBadges,
   getVerificationRequests,
   approveVerification,

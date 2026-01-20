@@ -35,6 +35,18 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
     }
   }
 
+  List get filtered {
+    if (showActive) {
+      return applications
+          .where((a) => (a["status"] ?? "pending") == "pending")
+          .toList();
+    } else {
+      return applications
+          .where((a) => (a["status"] ?? "") != "pending")
+          .toList();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -95,18 +107,19 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
           Expanded(
             child: loading
                 ? const Center(child: CircularProgressIndicator())
-                : applications.isEmpty
+                : filtered.isEmpty
                     ? const Center(child: Text("No applications yet"))
                     : ListView.builder(
                         padding:
                             const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: applications.length,
+                        itemCount: filtered.length,
                         itemBuilder: (context, i) {
-                          final a = applications[i];
+                          final a = filtered[i];
                           return ApplicationCard(
                             name: a["name"] ?? "Unknown",
                             location: a["city"] ?? "-",
                             applicationId: a["id"],
+                            onRefresh: loadApplications,
                           );
                         },
                       ),
@@ -143,12 +156,14 @@ class ApplicationCard extends StatelessWidget {
   final String name;
   final String location;
   final int applicationId;
+  final VoidCallback onRefresh;
 
   const ApplicationCard({
     super.key,
     required this.name,
     required this.location,
     required this.applicationId,
+    required this.onRefresh,
   });
 
   @override
@@ -193,14 +208,18 @@ class ApplicationCard extends StatelessWidget {
           ),
 
           InkWell(
-            onTap: () {
-              Navigator.push(
+            onTap: () async {
+              final updated = await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (_) =>
                       ViewApplicationScreen(applicationId: applicationId),
                 ),
               );
+
+              if (updated == true) {
+                onRefresh(); // 🔄 reload after approve/reject
+              }
             },
             child: actionButton(
               text: "View Application",

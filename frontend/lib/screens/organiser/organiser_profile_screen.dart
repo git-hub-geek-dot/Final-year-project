@@ -5,12 +5,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../config/api_config.dart';
 import '../../services/token_service.dart';
- import '../../services/verification_service.dart';
+import '../../services/verification_service.dart';
 import 'account_settings_screen.dart';
 import 'help_support_screen.dart';
 import 'about_volunteerx_screen.dart';
 import 'edit_profile_screen.dart';
 import 'get_verified_screen.dart';
+import 'leaderboard_screen.dart';
 
 class OrganiserProfileScreen extends StatefulWidget {
   const OrganiserProfileScreen({super.key});
@@ -63,7 +64,10 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
       final url = Uri.parse("${ApiConfig.baseUrl}/profile");
       final response = await http.get(
         url,
-        headers: {"Authorization": "Bearer $token", "Content-Type": "application/json"},
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json"
+        },
       );
 
       if (response.statusCode == 200) {
@@ -89,7 +93,6 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
     }
   }
 
-  /// ✅ DEACTIVATE ACCOUNT FUNCTION (Soft delete)
   Future<void> handleDeactivateAccount(BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
@@ -133,15 +136,13 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
     );
 
     try {
-      final response = await http
-          .put(
-            Uri.parse("${ApiConfig.baseUrl}/account/deactivate"),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-            },
-          )
-          .timeout(const Duration(seconds: 5));
+      final response = await http.put(
+        Uri.parse("${ApiConfig.baseUrl}/account/deactivate"),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
 
       Navigator.pop(context);
 
@@ -197,194 +198,229 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
                 )
               : SingleChildScrollView(
                   child: Column(
-          children: [
-            // 🔷 HEADER
-            Container(
-              padding: const EdgeInsets.fromLTRB(20, 50, 20, 24),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
-                ),
-                borderRadius: BorderRadius.vertical(
-                  bottom: Radius.circular(40),
-                ),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: const [
-                      Text(
-                        "Volunteerx",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Icon(Icons.notifications, color: Colors.white),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  const CircleAvatar(
-                    radius: 38,
-                    backgroundColor: Colors.white,
-                    child: Icon(Icons.person, size: 40),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        name ?? "",
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                      // 🔷 HEADER
+                      Container(
+                        padding: const EdgeInsets.fromLTRB(20, 50, 20, 24),
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
+                          ),
+                          borderRadius: BorderRadius.vertical(
+                            bottom: Radius.circular(40),
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
+                              children: const [
+                                Text(
+                                  "Volunteerx",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Icon(Icons.notifications,
+                                    color: Colors.white),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                            const CircleAvatar(
+                              radius: 38,
+                              backgroundColor: Colors.white,
+                              child: Icon(Icons.person, size: 40),
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  name ?? "",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                if (verificationStatus == "approved") ...[
+                                  const SizedBox(width: 6),
+                                  const Icon(
+                                    Icons.verified,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              city == null || city!.isEmpty
+                                  ? "City not set"
+                                  : "$city, India",
+                              style:
+                                  const TextStyle(color: Colors.white70),
+                            ),
+                            const SizedBox(height: 12),
+                            InkWell(
+                              onTap: () async {
+                                final updated = await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const EditProfileScreen(),
+                                  ),
+                                );
+
+                                if (updated == true) {
+                                  fetchProfile();
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: const Text(
+                                  "Edit Profile",
+                                  style: TextStyle(
+                                    color: Color(0xFF22C55E),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      if (verificationStatus == "approved") ...[
-                        const SizedBox(width: 6),
-                        const Icon(
-                          Icons.verified,
-                          color: Colors.white,
-                          size: 18,
+
+                      const SizedBox(height: 20),
+
+                      // 📋 OPTIONS
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Column(
+                          children: [
+                            _profileOption(
+                              context: context,
+                              icon: Icons.manage_accounts,
+                              text: "Account Settings",
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const AccountSettingsScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                            _profileOption(
+                              context: context,
+                              icon: Icons.verified,
+                              text: verificationStatus == "pending"
+                                  ? "Verification Under Review"
+                                  : verificationStatus == "approved"
+                                      ? "Verified"
+                                      : "Get Verified",
+                              onTap: verificationStatus == "pending" ||
+                                      verificationStatus == "approved"
+                                  ? null
+                                  : () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              const OrganiserGetVerifiedScreen(),
+                                        ),
+                                      );
+                                    },
+                            ),
+                            _profileOption(
+                              context: context,
+                              icon: Icons.help_outline,
+                              text: "Help & Support",
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const HelpSupportScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                            _profileOption(
+                              context: context,
+                              icon: Icons.info_outline,
+                              text: "About Volunteerx",
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const AboutVolunteerxScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                            _profileOption(
+                              context: context,
+                              icon: Icons.logout,
+                              text: "Logout",
+                              isLogout: true,
+                            ),
+                            _profileOption(
+                              context: context,
+                              icon: Icons.delete_forever,
+                              text: "Delete Account",
+                              isDelete: true,
+                              onTap: () =>
+                                  handleDeactivateAccount(context),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    city == null || city!.isEmpty ? "City not set" : "$city, India",
-                    style: const TextStyle(color: Colors.white70),
-                  ),
-                  const SizedBox(height: 12),
-                    InkWell(
-                    onTap: () async {
-                      final updated = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const EditProfileScreen(),
-                        ),
-                      );
+                ),
 
-                      if (updated == true) {
-                        fetchProfile();
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Text(
-                        "Edit Profile",
-                        style: TextStyle(
-                          color: Color(0xFF22C55E),
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: 2,
+        selectedItemColor: const Color(0xFF22C55E),
+        unselectedItemColor: Colors.grey,
+        onTap: (index) {
+          if (index == 0) {
+            Navigator.pushReplacementNamed(context, '/organiser-home');
+          } else if (index == 1) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const LeaderboardScreen(),
               ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // 📋 OPTIONS
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                children: [
-                  _profileOption(
-                    context: context,
-                    icon: Icons.manage_accounts,
-                    text: "Account Settings",
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const AccountSettingsScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  _profileOption(
-                    context: context,
-                    icon: Icons.verified,
-                    text: verificationStatus == "pending"
-                        ? "Verification Under Review"
-                        : verificationStatus == "approved"
-                            ? "Verified"
-                            : "Get Verified",
-                    onTap: verificationStatus == "pending" ||
-                            verificationStatus == "approved"
-                        ? null
-                        : () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    const OrganiserGetVerifiedScreen(),
-                              ),
-                            );
-                          },
-                  ),
-                  _profileOption(
-                    context: context,
-                    icon: Icons.help_outline,
-                    text: "Help & Support",
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const HelpSupportScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  _profileOption(
-                    context: context,
-                    icon: Icons.info_outline,
-                    text: "About Volunteerx",
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const AboutVolunteerxScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  _profileOption(
-                    context: context,
-                    icon: Icons.logout,
-                    text: "Logout",
-                    isLogout: true,
-                  ),
-                  _profileOption(
-                    context: context,
-                    icon: Icons.delete_forever,
-                    text: "Delete Account",
-                    isDelete: true,
-                    onTap: () => handleDeactivateAccount(context),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+            );
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(
+              icon: Icon(Icons.home), label: "Home"),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.leaderboard), label: "Leaderboard"),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.person), label: "Profile"),
+        ],
       ),
     );
   }
 }
 
-/// 🔹 PROFILE OPTION TILE
 Widget _profileOption({
   required BuildContext context,
   required IconData icon,
@@ -434,7 +470,9 @@ Widget _profileOption({
               text,
               style: TextStyle(
                 fontWeight: FontWeight.w600,
-                color: (isLogout || isDelete) ? Colors.red : Colors.black,
+                color: (isLogout || isDelete)
+                    ? Colors.red
+                    : Colors.black,
               ),
             ),
           ),

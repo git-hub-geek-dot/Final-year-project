@@ -22,11 +22,9 @@ class RoleSelectionScreen extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Logo (safe fallback)
-                const Icon(
-                  Icons.volunteer_activism,
-                  size: 60,
-                  color: Colors.green,
+                SizedBox(
+                  height: 120,
+                  child: Image.asset('assets/images/volunteerx_logo.png'),
                 ),
 
                 const SizedBox(height: 16),

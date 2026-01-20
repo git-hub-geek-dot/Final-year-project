@@ -137,7 +137,10 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.volunteer_activism, size: 60),
+                  SizedBox(
+                    height: 120,
+                    child: Image.asset('assets/images/volunteerx_logo.png'),
+                  ),
                   const SizedBox(height: 12),
                   const Text(
                     "Login",

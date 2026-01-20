@@ -308,17 +308,4 @@ class _OrganiserGetVerifiedScreenState
       ),
     );
   }
-
-  Widget _uploadTile({required IconData icon, required String title}) {
-    return Card(
-      child: ListTile(
-        leading: Icon(icon),
-        title: Text(title),
-        trailing: const Icon(Icons.add),
-        onTap: () {
-          // image picker later
-        },
-      ),
-    );
-  }
 }

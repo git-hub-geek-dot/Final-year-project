@@ -168,12 +168,15 @@ class AdminService {
       Uri.parse("${ApiConfig.baseUrl}/admin/badges"),
       headers: {"Authorization": "Bearer $token"},
     );
+    if (res.statusCode != 200) {
+      throw Exception("Failed to load badges");
+    }
     return jsonDecode(res.body);
   }
 
   static Future<void> createBadge(Map<String, dynamic> body) async {
     final token = await TokenService.getToken();
-    await http.post(
+    final response = await http.post(
       Uri.parse("${ApiConfig.baseUrl}/admin/badges"),
       headers: {
         "Authorization": "Bearer $token",
@@ -181,6 +184,9 @@ class AdminService {
       },
       body: jsonEncode(body),
     );
+    if (response.statusCode != 200) {
+      throw Exception("Failed to create badge");
+    }
   }
 
   static Future<void> deleteBadge(int badgeId) async {
@@ -202,6 +208,9 @@ class AdminService {
       Uri.parse("${ApiConfig.baseUrl}/admin/badges/users"),
       headers: {"Authorization": "Bearer $token"},
     );
+    if (res.statusCode != 200) {
+      throw Exception("Failed to load user badges");
+    }
     return jsonDecode(res.body);
   }
 

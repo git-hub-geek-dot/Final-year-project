@@ -13,7 +13,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   late Future<List<dynamic>> usersFuture;
 
   String search = "";
-  String statusFilter = "all"; // all | active | blocked
+  String statusFilter = "all"; // all | active | inactive | banned
   String roleFilter = "all";   // all | volunteer | organiser | admin
 
   @override
@@ -90,7 +90,9 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                           DropdownMenuItem(
                               value: "active", child: Text("Active")),
                           DropdownMenuItem(
-                              value: "blocked", child: Text("Blocked")),
+                            value: "inactive", child: Text("Inactive")),
+                          DropdownMenuItem(
+                            value: "banned", child: Text("Banned")),
                         ],
                         onChanged: (v) =>
                             setState(() => statusFilter = v!),
@@ -125,7 +127,6 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                           itemCount: filtered.length,
                           itemBuilder: (context, i) {
                             final u = filtered[i];
-                            final isBlocked = u["status"] == "banned";
                             final isAdmin = u["role"] == "admin";
 
                             return Card(
@@ -134,25 +135,38 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                 subtitle: Text(
                                   "${u["email"]} • ${u["role"]} • ${u["status"]}",
                                 ),
-                                trailing: TextButton(
-                                  onPressed: isAdmin
-                                      ? null
-                                      : () async {
+                                trailing: isAdmin
+                                    ? const Text("Admin")
+                                    : PopupMenuButton<String>(
+                                        onSelected: (value) async {
                                           await AdminService.updateUserStatus(
                                             u["id"],
-                                            isBlocked ? "active" : "banned",
+                                            value,
                                           );
                                           refresh();
                                         },
-                                  child: Text(
-                                    isBlocked ? "UNBLOCK" : "BLOCK",
-                                    style: TextStyle(
-                                      color: isBlocked
-                                          ? Colors.green
-                                          : Colors.red,
-                                    ),
-                                  ),
-                                ),
+                                        itemBuilder: (context) => const [
+                                          PopupMenuItem(
+                                            value: "active",
+                                            child: Text("Set Active"),
+                                          ),
+                                          PopupMenuItem(
+                                            value: "inactive",
+                                            child: Text("Set Inactive"),
+                                          ),
+                                          PopupMenuItem(
+                                            value: "banned",
+                                            child: Text("Set Banned"),
+                                          ),
+                                        ],
+                                        child: Chip(
+                                          label: Text(
+                                            (u["status"] ?? "active")
+                                                .toString()
+                                                .toUpperCase(),
+                                          ),
+                                        ),
+                                      ),
                               ),
                             );
                           },

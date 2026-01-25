@@ -158,15 +158,17 @@ exports.getAllEvents = async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT
-        *,
+        e.*,
+        u.name AS organiser_name,
         CASE
           WHEN NOW() < (event_date + start_time) THEN 'upcoming'
           WHEN NOW() BETWEEN (event_date + start_time)
                           AND (event_date + end_time) THEN 'ongoing'
           ELSE 'completed'
         END AS computed_status
-      FROM events
-      WHERE status = 'open'
+      FROM events e
+      JOIN users u ON e.organiser_id = u.id
+      WHERE e.status = 'open'
       ORDER BY event_date ASC
     `);
 

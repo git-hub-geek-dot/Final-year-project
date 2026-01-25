@@ -116,6 +116,23 @@ class EventService {
     }
   }
 
+  /// ================= ALL EVENTS (PUBLIC) =================
+  static Future<List<dynamic>> fetchAllEvents() async {
+    final response = await http.get(
+      Uri.parse("${ApiConfig.baseUrl}/events"),
+      headers: {
+        "Content-Type": "application/json",
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      print("FETCH ALL EVENTS ERROR → ${response.body}");
+      throw Exception("Failed to fetch all events");
+    }
+  }
+
   /// ================= APPLICATIONS =================
   static Future<List<dynamic>> fetchApplications(int eventId) async {
     final token = await TokenService.getToken();

@@ -11,11 +11,12 @@ class LeaderboardScreen extends StatefulWidget {
 class _LeaderboardScreenState extends State<LeaderboardScreen>
     with SingleTickerProviderStateMixin {
   bool isWeekly = true;
+  int _selectedTab = 1;
 
   late AnimationController _confettiController;
 
-  /// ✅ PROPERLY TYPED DATA (FIXES YOUR ERROR)
-  final List<Map<String, dynamic>> weeklyData = [
+  /// ✅ VOLUNTEER DATA
+  final List<Map<String, dynamic>> volunteerWeeklyData = [
     {"rank": 1, "name": "Amit Sharma", "events": 42},
     {"rank": 2, "name": "Neha Verma", "events": 36},
     {"rank": 3, "name": "Rahul Mehta", "events": 31},
@@ -23,12 +24,29 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     {"rank": 5, "name": "Sanjay Rao", "events": 22},
   ];
 
-  final List<Map<String, dynamic>> monthlyData = [
+  final List<Map<String, dynamic>> volunteerMonthlyData = [
     {"rank": 1, "name": "Neha Verma", "events": 120},
     {"rank": 2, "name": "Amit Sharma", "events": 115},
     {"rank": 3, "name": "You", "events": 98},
     {"rank": 4, "name": "Rahul Mehta", "events": 91},
     {"rank": 5, "name": "Sanjay Rao", "events": 84},
+  ];
+
+  /// ✅ ORGANISER DATA
+  final List<Map<String, dynamic>> organiserWeeklyData = [
+    {"rank": 1, "name": "Ankit Verma", "events": 18},
+    {"rank": 2, "name": "Rahul Sharma", "events": 16},
+    {"rank": 3, "name": "Neha Gupta", "events": 15},
+    {"rank": 4, "name": "Amit Patel", "events": 12},
+    {"rank": 5, "name": "Sneha Iyer", "events": 11},
+  ];
+
+  final List<Map<String, dynamic>> organiserMonthlyData = [
+    {"rank": 1, "name": "Rahul Sharma", "events": 54},
+    {"rank": 2, "name": "Ankit Verma", "events": 49},
+    {"rank": 3, "name": "Neha Gupta", "events": 47},
+    {"rank": 4, "name": "Amit Patel", "events": 41},
+    {"rank": 5, "name": "Sneha Iyer", "events": 38},
   ];
 
   @override
@@ -48,7 +66,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
   @override
   Widget build(BuildContext context) {
-    final data = isWeekly ? weeklyData : monthlyData;
+    final data = _getLeaderboardData();
 
     final yourRank =
         data.firstWhere((e) => e["name"] == "You", orElse: () => {});
@@ -61,6 +79,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       ),
       body: Column(
         children: [
+          const SizedBox(height: 12),
+
+          /// 🔁 ORGANISER / VOLUNTEER TOGGLE
+          _roleToggleBar(),
+
           const SizedBox(height: 12),
 
           /// 🔁 WEEK / MONTH TOGGLE
@@ -104,6 +127,57 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   }
 
   /// ================= TOGGLE =================
+  List<Map<String, dynamic>> _getLeaderboardData() {
+    if (_selectedTab == 0) {
+      return isWeekly ? organiserWeeklyData : organiserMonthlyData;
+    }
+    return isWeekly ? volunteerWeeklyData : volunteerMonthlyData;
+  }
+
+  Widget _roleToggleBar() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(30),
+      ),
+      child: Row(
+        children: [
+          _roleToggleButton("Organisers", _selectedTab == 0, () {
+            setState(() => _selectedTab = 0);
+          }),
+          _roleToggleButton("Volunteers", _selectedTab == 1, () {
+            setState(() => _selectedTab = 1);
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _roleToggleButton(String text, bool active, VoidCallback onTap) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: active ? const Color(0xFF2E6BE6) : Colors.transparent,
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Text(
+            text,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: active ? Colors.white : Colors.black54,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _toggleBar() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),

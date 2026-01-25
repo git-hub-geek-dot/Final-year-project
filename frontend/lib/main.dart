@@ -5,6 +5,8 @@ import 'screens/auth/login_screen.dart';
 import 'screens/auth/role_selection_screen.dart';
 import 'screens/auth/register_volunteer_screen.dart';
 import 'screens/auth/register_organiser_screen.dart';
+import 'screens/auth/forgot_password_screen.dart';
+import 'screens/auth/reset_password_screen.dart';
 
 
 
@@ -39,6 +41,10 @@ class MyApp extends StatelessWidget {
             const RegisterVolunteerScreen(),
         '/register-organiser': (context) =>
             const RegisterOrganiserScreen(),
+        '/forgot-password': (context) =>
+          const ForgotPasswordScreen(),
+        '/reset-password': (context) =>
+          const ResetPasswordScreen(),
 
         // 🏠 ROLE HOMES
         '/volunteer-home': (context) =>

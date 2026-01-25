@@ -28,6 +28,7 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
   final govIdController = TextEditingController();
 
   bool loading = false;
+  bool _obscurePassword = true;
   String? errorMessage;
 
   @override
@@ -98,10 +99,17 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
           MaterialPageRoute(builder: (_) => const LoginScreen()),
         );
       } else {
-        showError(response.body);
+        String msg = "Registration failed";
+        try {
+          final data = jsonDecode(response.body);
+          msg = data["message"] ?? msg;
+        } catch (_) {
+          msg = response.body;
+        }
+        showError(msg);
       }
     } catch (e) {
-      showError(e.toString());
+      showError("Network error. Please try again.");
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -116,6 +124,8 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
     required String hint,
     required TextEditingController controller,
     bool obscure = false,
+    VoidCallback? onToggleObscure,
+    bool? isObscured,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -124,6 +134,16 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
         obscureText: obscure,
         decoration: InputDecoration(
           prefixIcon: Icon(icon),
+          suffixIcon: onToggleObscure == null
+              ? null
+              : IconButton(
+                  onPressed: onToggleObscure,
+                  icon: Icon(
+                    (isObscured ?? true)
+                        ? Icons.visibility_off
+                        : Icons.visibility,
+                  ),
+                ),
           hintText: hint,
           filled: true,
           fillColor: Colors.white,
@@ -180,7 +200,11 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
                     icon: Icons.lock,
                     hint: "Password",
                     controller: passwordController,
-                    obscure: true,
+                    obscure: _obscurePassword,
+                    isObscured: _obscurePassword,
+                    onToggleObscure: () {
+                      setState(() => _obscurePassword = !_obscurePassword);
+                    },
                   ),
 
                   if (widget.showVolunteerFields) ...[
@@ -219,9 +243,15 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
 
                   loading
                       ? const CircularProgressIndicator()
-                      : GradientButton(
-                          text: "Register",
-                          onTap: register,
+                      : AbsorbPointer(
+                          absorbing: loading,
+                          child: Opacity(
+                            opacity: loading ? 0.6 : 1,
+                            child: GradientButton(
+                              text: "Register",
+                              onTap: register,
+                            ),
+                          ),
                         ),
                 ],
               ),

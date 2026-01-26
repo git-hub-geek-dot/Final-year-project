@@ -1,6 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import '../../config/api_config.dart';
 
-class ViewOrganiserProfileScreen extends StatelessWidget {
+class ViewOrganiserProfileScreen extends StatefulWidget {
   final int organiserId;
 
   const ViewOrganiserProfileScreen({
@@ -9,7 +12,59 @@ class ViewOrganiserProfileScreen extends StatelessWidget {
   });
 
   @override
+  State<ViewOrganiserProfileScreen> createState() =>
+      _ViewOrganiserProfileScreenState();
+}
+
+class _ViewOrganiserProfileScreenState extends State<ViewOrganiserProfileScreen> {
+  bool isLoading = true;
+  String? errorMessage;
+  Map<String, dynamic>? profile;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchProfile();
+  }
+
+  Future<void> _fetchProfile() async {
+    try {
+      final response = await http.get(
+        Uri.parse("${ApiConfig.baseUrl}/organisers/${widget.organiserId}"),
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        setState(() {
+          profile = jsonDecode(response.body);
+          isLoading = false;
+        });
+      } else {
+        setState(() {
+          errorMessage = "Failed to load organiser profile";
+          isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        errorMessage = "Network error";
+        isLoading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final name = profile?["name"] ?? "Organiser";
+    final city = profile?["city"] ?? "-";
+    final email = profile?["email"] ?? "-";
+    final contact = profile?["contact_number"] ?? "-";
+    final eventsCount = profile?["events_count"]?.toString() ?? "0";
+    final volunteersEngaged =
+        profile?["volunteers_engaged"]?.toString() ?? "0";
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
@@ -28,15 +83,27 @@ class ViewOrganiserProfileScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            _header(),
+            if (isLoading)
+              const Padding(
+                padding: EdgeInsets.only(top: 24),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            if (!isLoading && errorMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 24),
+                child: Text(errorMessage!),
+              ),
+            if (!isLoading && errorMessage == null) ...[
+              _header(name),
             const SizedBox(height: 16),
-            _about(),
+            _about(city),
             const SizedBox(height: 16),
-            _stats(),
+            _stats(volunteersEngaged, eventsCount),
             const SizedBox(height: 16),
             _reviews(),
             const SizedBox(height: 16),
-            _connectCard(),
+            _connectCard(email, contact),
+            ],
             
           ],
         ),
@@ -45,43 +112,43 @@ class ViewOrganiserProfileScreen extends StatelessWidget {
   }
 
   // ================= HEADER =================
-  Widget _header() {
+  Widget _header(String name) {
     return _card(
       child: Column(
-        children: const [
-          CircleAvatar(
+        children: [
+          const CircleAvatar(
             radius: 42,
             backgroundColor: Colors.green,
             child: Icon(Icons.eco, size: 42, color: Colors.white),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Text(
-            "Green Earth Foundation",
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            name,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
-          SizedBox(height: 4),
-          Text("⭐ 4.6 rating", style: TextStyle(color: Colors.grey)),
+          const SizedBox(height: 4),
+          const Text("⭐ N/A rating", style: TextStyle(color: Colors.grey)),
         ],
       ),
     );
   }
 
   // ================= ABOUT =================
-  Widget _about() {
+  Widget _about(String city) {
     return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          Text(
+        children: [
+          const Text(
             "About Organisation",
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Text(
-            "Green Earth Foundation is a non-profit organisation focused on "
-            "environmental protection through clean-up drives, tree plantations, "
-            "and sustainability awareness programs.",
-            style: TextStyle(height: 1.5),
+            city == "-"
+                ? "No description provided by organiser."
+                : "Based in $city.",
+            style: const TextStyle(height: 1.5),
           ),
         ],
       ),
@@ -89,20 +156,20 @@ class ViewOrganiserProfileScreen extends StatelessWidget {
   }
 
   // ================= STATS =================
-  Widget _stats() {
+  Widget _stats(String volunteersEngaged, String eventsCount) {
     return _card(
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: const [
-          _Stat("120+", "Volunteers"),
-          _Stat("35", "Events"),
-          _Stat("4.6", "Rating"),
+        children: [
+          _Stat(volunteersEngaged, "Volunteers"),
+          _Stat(eventsCount, "Events"),
+          const _Stat("N/A", "Rating"),
         ],
       ),
     );
   }
 
-  Widget _connectCard() {
+  Widget _connectCard(String email, String contact) {
   return _card(
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -137,12 +204,23 @@ class ViewOrganiserProfileScreen extends StatelessWidget {
         const SizedBox(height: 12),
 
         Row(
-          children: const [
-            Icon(Icons.email, size: 18, color: Colors.grey),
-            SizedBox(width: 8),
+          children: [
+            const Icon(Icons.email, size: 18, color: Colors.grey),
+            const SizedBox(width: 8),
             Text(
-              "contact@greenearth.org",
-              style: TextStyle(fontSize: 14),
+              email,
+              style: const TextStyle(fontSize: 14),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            const Icon(Icons.phone, size: 18, color: Colors.grey),
+            const SizedBox(width: 8),
+            Text(
+              contact,
+              style: const TextStyle(fontSize: 14),
             ),
           ],
         ),

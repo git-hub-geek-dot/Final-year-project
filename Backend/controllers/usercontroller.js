@@ -48,4 +48,51 @@ const deleteUser = async (req, res) => {
   }
 };
 
-module.exports = { deleteUser };
+const getOrganiserProfile = async (req, res) => {
+  try {
+    const organiserId = Number(req.params.id);
+
+    if (!organiserId || isNaN(organiserId)) {
+      return res.status(400).json({ error: "Invalid organiser ID" });
+    }
+
+    const result = await pool.query(
+      `
+      SELECT
+        u.id,
+        u.name,
+        u.email,
+        u.city,
+        u.contact_number,
+        COALESCE(ev.events_count, 0) AS events_count,
+        COALESCE(ve.volunteers_engaged, 0) AS volunteers_engaged
+      FROM users u
+      LEFT JOIN (
+        SELECT organiser_id, COUNT(*)::int AS events_count
+        FROM events
+        WHERE status != 'deleted'
+        GROUP BY organiser_id
+      ) ev ON ev.organiser_id = u.id
+      LEFT JOIN (
+        SELECT e.organiser_id, COUNT(DISTINCT a.volunteer_id)::int AS volunteers_engaged
+        FROM events e
+        JOIN applications a ON a.event_id = e.id AND a.status = 'accepted'
+        GROUP BY e.organiser_id
+      ) ve ON ve.organiser_id = u.id
+      WHERE u.id = $1 AND u.role = 'organiser'
+      `,
+      [organiserId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Organiser not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Get organiser profile error:", error);
+    res.status(500).json({ error: "Failed to fetch organiser profile" });
+  }
+};
+
+module.exports = { deleteUser, getOrganiserProfile };

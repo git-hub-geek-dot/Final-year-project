@@ -32,12 +32,14 @@ exports.createEvent = async (req, res) => {
       description,
       location,
       event_date,
+      end_date,
       volunteers_required,
       application_deadline,
       event_type,
       payment_per_day,
       banner_url,
       categories,
+      responsibilities,
       start_time,
       end_time,
     } = req.body;
@@ -46,9 +48,12 @@ exports.createEvent = async (req, res) => {
       !title ||
       !location ||
       !event_date ||
+      !end_date ||
       !volunteers_required ||
       !application_deadline ||
-      !event_type
+      !event_type ||
+      !start_time ||
+      !end_time
     ) {
       return res.status(400).json({
         error: "Missing required event fields",
@@ -69,6 +74,7 @@ exports.createEvent = async (req, res) => {
         description,
         location,
         event_date,
+        end_date,
         volunteers_required,
         application_deadline,
         event_type,
@@ -77,7 +83,7 @@ exports.createEvent = async (req, res) => {
         start_time,
         end_time
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
       RETURNING *
       `,
       [
@@ -86,6 +92,7 @@ exports.createEvent = async (req, res) => {
         description ?? null,
         location,
         event_date,
+        end_date,
         volunteers_required,
         application_deadline,
         event_type,
@@ -98,15 +105,63 @@ exports.createEvent = async (req, res) => {
 
     const createdEvent = eventResult.rows[0];
 
-    if (Array.isArray(categories) && categories.length > 0) {
-      const values = categories.map((_, i) => `($1, $${i + 2})`).join(",");
+    const cleanedResponsibilities = Array.isArray(responsibilities)
+      ? responsibilities
+          .map((item) => (typeof item === "string" ? item.trim() : ""))
+          .filter(Boolean)
+      : [];
+
+    if (cleanedResponsibilities.length > 0) {
+      const values = cleanedResponsibilities
+        .map((_, i) => `($1, $${i + 2})`)
+        .join(",");
+
       await pool.query(
         `
-        INSERT INTO event_categories (event_id, category_id)
+        INSERT INTO event_responsibilities (event_id, responsibility)
         VALUES ${values}
         `,
-        [createdEvent.id, ...categories]
+        [createdEvent.id, ...cleanedResponsibilities]
       );
+    }
+
+    if (Array.isArray(categories) && categories.length > 0) {
+      const numericIds = [];
+      const names = [];
+
+      for (const item of categories) {
+        if (typeof item === "number" && Number.isInteger(item)) {
+          numericIds.push(item);
+        } else if (typeof item === "string" && item.trim().length > 0) {
+          names.push(item.trim());
+        }
+      }
+
+      if (names.length > 0) {
+        const nameResult = await pool.query(
+          `
+          SELECT id FROM categories
+          WHERE name = ANY($1)
+          `,
+          [names]
+        );
+        for (const row of nameResult.rows) {
+          numericIds.push(row.id);
+        }
+      }
+
+      const uniqueIds = [...new Set(numericIds)];
+
+      if (uniqueIds.length > 0) {
+        const values = uniqueIds.map((_, i) => `($1, $${i + 2})`).join(",");
+        await pool.query(
+          `
+          INSERT INTO event_categories (event_id, category_id)
+          VALUES ${values}
+          `,
+          [createdEvent.id, ...uniqueIds]
+        );
+      }
     }
 
     res.status(201).json({
@@ -127,18 +182,24 @@ exports.getMyEvents = async (req, res) => {
     const result = await pool.query(
       `
       SELECT
-        *,
+        e.*,
+        COALESCE(
+          array_agg(er.responsibility) FILTER (WHERE er.responsibility IS NOT NULL),
+          '{}'
+        ) AS responsibilities,
        CASE
   WHEN status = 'deleted' THEN 'deleted_by_admin'
-  WHEN NOW() < (event_date + start_time) THEN 'upcoming'
-  WHEN NOW() BETWEEN (event_date + start_time)
-                  AND (event_date + end_time) THEN 'ongoing'
+  WHEN NOW() < (event_date + COALESCE(start_time, TIME '00:00:00')) THEN 'upcoming'
+  WHEN NOW() BETWEEN (event_date + COALESCE(start_time, TIME '00:00:00'))
+                  AND (COALESCE(end_date, event_date) + COALESCE(end_time, TIME '23:59:59')) THEN 'ongoing'
   ELSE 'completed'
 END AS computed_status
 
-      FROM events
+      FROM events e
+      LEFT JOIN event_responsibilities er ON er.event_id = e.id
       WHERE organiser_id = $1
         AND status IN ('open', 'closed', 'completed', 'deleted')
+      GROUP BY e.id
       ORDER BY event_date DESC
       `,
       [req.user.id]
@@ -160,15 +221,21 @@ exports.getAllEvents = async (req, res) => {
       SELECT
         e.*,
         u.name AS organiser_name,
+        COALESCE(
+          array_agg(er.responsibility) FILTER (WHERE er.responsibility IS NOT NULL),
+          '{}'
+        ) AS responsibilities,
         CASE
-          WHEN NOW() < (event_date + start_time) THEN 'upcoming'
-          WHEN NOW() BETWEEN (event_date + start_time)
-                          AND (event_date + end_time) THEN 'ongoing'
+          WHEN NOW() < (event_date + COALESCE(start_time, TIME '00:00:00')) THEN 'upcoming'
+          WHEN NOW() BETWEEN (event_date + COALESCE(start_time, TIME '00:00:00'))
+                          AND (COALESCE(end_date, event_date) + COALESCE(end_time, TIME '23:59:59')) THEN 'ongoing'
           ELSE 'completed'
         END AS computed_status
       FROM events e
       JOIN users u ON e.organiser_id = u.id
+      LEFT JOIN event_responsibilities er ON er.event_id = e.id
       WHERE e.status = 'open'
+      GROUP BY e.id, u.name
       ORDER BY event_date ASC
     `);
 
@@ -192,11 +259,14 @@ exports.updateEvent = async (req, res) => {
       description,
       location,
       event_date,
+      end_date,
       application_deadline,
       volunteers_required,
       event_type,
       payment_per_day,
       banner_url,
+      start_time,
+      end_time,
     } = req.body;
 
     const result = await pool.query(
@@ -207,12 +277,15 @@ exports.updateEvent = async (req, res) => {
         description = $2,
         location = $3,
         event_date = $4,
-        application_deadline = $5,
-        volunteers_required = $6,
-        event_type = $7,
-        payment_per_day = $8,
-        banner_url = $9
-      WHERE id = $10 AND organiser_id = $11
+        end_date = $5,
+        application_deadline = $6,
+        volunteers_required = $7,
+        event_type = $8,
+        payment_per_day = $9,
+        banner_url = $10,
+        start_time = $11,
+        end_time = $12
+      WHERE id = $13 AND organiser_id = $14
       RETURNING *
       `,
       [
@@ -220,11 +293,14 @@ exports.updateEvent = async (req, res) => {
         description,
         location,
         event_date,
+        end_date,
         application_deadline,
         volunteers_required,
         event_type,
         payment_per_day,
         banner_url,
+        start_time,
+        end_time,
         eventId,
         organiserId,
       ]

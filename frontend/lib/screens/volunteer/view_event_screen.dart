@@ -247,6 +247,11 @@ Text(
 
   // ================= RESPONSIBILITIES =================
   Widget _responsibilitiesCard() {
+    final items = (widget.event["responsibilities"] as List?)
+            ?.whereType<String>()
+            .toList() ??
+        [];
+
     return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -256,9 +261,10 @@ Text(
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          _checkItem("Assist in cleanup activities"),
-          _checkItem("Segregate recyclable and non-recyclable waste"),
-          _checkItem("Follow safety and cleanliness guidelines"),
+          if (items.isEmpty)
+            const Text("No responsibilities provided by organiser."),
+          if (items.isNotEmpty)
+            ...items.map(_checkItem),
         ],
       ),
     );
@@ -266,40 +272,49 @@ Text(
 
   // ================= ORGANISER =================
   Widget _organiserCard() {
+    final organiserId = widget.event["organiser_id"];
+    final organiserName = widget.event["organiser_name"] ?? "Organiser";
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () {
+        if (organiserId == null) {
+          _snack("Organiser profile not available");
+          return;
+        }
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => const ViewOrganiserProfileScreen(
-              organiserId: 1, // TODO: dynamic later
+            builder: (_) => ViewOrganiserProfileScreen(
+              organiserId: organiserId,
             ),
           ),
         );
       },
       child: _card(
         child: Row(
-          children: const [
-            CircleAvatar(
+          children: [
+            const CircleAvatar(
               radius: 22,
               backgroundColor: Colors.green,
               child: Icon(Icons.eco, color: Colors.white),
             ),
-            SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Green Earth Foundation",
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  "⭐ 4.6 rating | 120+ volunteers engaged",
-                  style: TextStyle(color: Colors.grey),
-                ),
-              ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    organiserName,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    "View organiser profile",
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

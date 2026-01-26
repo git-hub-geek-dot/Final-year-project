@@ -1,7 +1,12 @@
-const { PrismaClient } = require('../node_modules/.prisma/client');
+const { PrismaClient } = require('@prisma/client');
+const { PrismaPg } = require('@prisma/adapter-pg');
+const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 
-const prisma = new PrismaClient();
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const adapter = new PrismaPg(pool);
+
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
   // ================== CATEGORIES ==================
@@ -28,7 +33,7 @@ async function main() {
   ];
 
   for (const name of categories) {
-    await prisma.categories.upsert({
+    await prisma.category.upsert({
       where: { name },
       update: {},
       create: { name },
@@ -38,7 +43,7 @@ async function main() {
   // ================== ADMIN USER ==================
   const hashedPassword = await bcrypt.hash('a', 10);
 
-  await prisma.users.upsert({
+  await prisma.user.upsert({
     where: { email: 'a@test.com' },
     update: {},
     create: {

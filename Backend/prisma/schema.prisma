@@ -1,6 +1,7 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../node_modules/.prisma/client"
+  provider = "prisma-client-js"
+  output   = "../node_modules/@prisma/client/.prisma/client"
+  engineType = "library"
 }
 
 datasource db {
@@ -92,6 +93,7 @@ model Event {
   description          String?
   location             String?
   eventDate            DateTime?        @map("event_date") @db.Date
+  endDate              DateTime?        @map("end_date") @db.Date
   status               EventStatus      @default(open)
   volunteersRequired   Int              @default(0) @map("volunteers_required")
   applicationDeadline  DateTime?        @map("application_deadline") @db.Date
@@ -104,10 +106,23 @@ model Event {
   organiser             User?            @relation(fields: [organiserId], references: [id])
   applications          Application[]
   eventCategories       EventCategory[]
+  responsibilities      EventResponsibility[]
   ratings               Rating[]
 
   @@index([status], map: "idx_events_status")
   @@map("events")
+}
+
+model EventResponsibility {
+  id               Int      @id @default(autoincrement())
+  eventId          Int      @map("event_id")
+  responsibility   String   @map("responsibility") @db.VarChar(255)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  event            Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId], map: "idx_event_responsibilities_event_id")
+  @@map("event_responsibilities")
 }
 
 model Rating {

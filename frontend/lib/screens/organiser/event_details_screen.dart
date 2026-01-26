@@ -64,6 +64,15 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
         (event["computed_status"] ?? event["status"] ?? "upcoming")
             .toString()
             .toUpperCase();
+    final eventDateText = _fmtDate(event["event_date"]);
+    final endDateText = _fmtDate(event["end_date"]);
+    final deadlineText = _fmtDate(event["application_deadline"]);
+    final startTimeText = _fmtTime(event["start_time"]);
+    final endTimeText = _fmtTime(event["end_time"]);
+    final responsibilities = (event["responsibilities"] as List?)
+        ?.whereType<String>()
+        .toList() ??
+      [];
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FB),
@@ -117,7 +126,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                       _statusChip(status),
                       const SizedBox(width: 10),
                       Text(
-                        event["event_date"].toString().split("T")[0],
+                        eventDateText,
                         style: const TextStyle(color: Colors.grey),
                       ),
                     ],
@@ -222,10 +231,40 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                   const SizedBox(height: 12),
                   _infoRow(Icons.location_on, event["location"]),
                   _infoRow(Icons.category, event["event_type"]),
-                  _infoRow(Icons.calendar_today,
-                      event["event_date"].toString().split("T")[0]),
+                  _infoRow(Icons.calendar_today, "Start: $eventDateText"),
+                  _infoRow(Icons.event, "End: $endDateText"),
+                  _infoRow(Icons.access_time,
+                      "Time: $startTimeText - $endTimeText"),
                   _infoRow(Icons.timer,
-                      "Application Deadline: ${event["application_deadline"]}"),
+                      "Application Deadline: $deadlineText"),
+                ],
+              ),
+            ),
+
+            _card(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("Responsibilities",
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  if (responsibilities.isEmpty)
+                    const Text("No responsibilities added"),
+                  if (responsibilities.isNotEmpty)
+                    ...responsibilities.map(
+                      (item) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.check_circle,
+                                color: Colors.green, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(item)),
+                          ],
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -293,6 +332,20 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
         ],
       ),
     );
+  }
+
+  static String _fmtDate(dynamic value) {
+    if (value == null) return "-";
+    final text = value.toString();
+    if (text.isEmpty) return "-";
+    return text.split("T")[0];
+  }
+
+  static String _fmtTime(dynamic value) {
+    if (value == null) return "-";
+    final text = value.toString();
+    if (text.isEmpty) return "-";
+    return text.split(".")[0];
   }
 }
 

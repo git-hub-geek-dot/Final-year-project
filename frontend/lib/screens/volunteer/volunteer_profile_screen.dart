@@ -32,7 +32,8 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
   String? email;
   String? city;
   String? role;
-  String? verificationStatus; 
+  String? verificationStatus;
+  String? profilePictureUrl; 
 
 @override
 void initState() {
@@ -87,6 +88,7 @@ Future<void> loadVerificationStatus() async {
           email = data["email"];
           city = data["city"];
           role = data["role"];
+          profilePictureUrl = data["profile_picture_url"];
           loading = false;
         });
       } else {
@@ -158,10 +160,17 @@ Future<void> loadVerificationStatus() async {
                         ),
                         child: Column(
                           children: [
-                            const CircleAvatar(
+                            CircleAvatar(
                               radius: 42,
                               backgroundColor: Colors.white,
-                              child: Icon(Icons.person, size: 42),
+                              backgroundImage: (profilePictureUrl != null &&
+                                      profilePictureUrl!.isNotEmpty)
+                                  ? NetworkImage(profilePictureUrl!) as ImageProvider
+                                  : null,
+                              child: (profilePictureUrl == null ||
+                                      profilePictureUrl!.isEmpty)
+                                  ? const Icon(Icons.person, size: 42)
+                                  : null,
                             ),
                             const SizedBox(height: 12),
                             Row(

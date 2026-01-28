@@ -188,6 +188,7 @@ model User {
   city        String?
   govtId      String?     @map("government_id")
   isVerified  Boolean     @default(false) // ✅ added (safe)
+  profilePictureUrl String? @map("profile_picture_url") // ✅ added (safe)
   createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamp(6)
 
   applications Application[]

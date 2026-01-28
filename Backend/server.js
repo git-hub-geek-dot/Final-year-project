@@ -16,9 +16,9 @@ app.use("/api", require("./routes/authRoutes"));
 app.use("/api", require("./routes/eventRoutes"));
 app.use("/api", require("./routes/applicationRoutes"));
 app.use("/api", require("./routes/ratingRoutes"));
-app.use("/api", require("./routes/upload"));
 app.use("/api", require("./routes/userRoutes"));
 app.use("/api", require("./routes/accountRoutes"));
+app.use("/api", require("./routes/profileRoutes"));
 
 // 🔥 ADMIN ROUTES (already correct)
 app.use("/api/admin", require("./routes/adminRoutes"));

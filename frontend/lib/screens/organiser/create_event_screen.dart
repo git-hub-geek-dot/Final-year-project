@@ -18,6 +18,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   final locationController = TextEditingController();
   final volunteersController = TextEditingController();
   final paymentController = TextEditingController();
+  final responsibilityController = TextEditingController();
 
   final ImagePicker _picker = ImagePicker();
   XFile? bannerImage;
@@ -54,11 +55,15 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   ];
 
   final List<String> selectedCategories = [];
+  final List<String> responsibilities = [];
 
   // ---------------- HELPERS ----------------
 
   String _fmtDate(DateTime d) =>
       "${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
+
+    String _fmtTime(TimeOfDay t) =>
+      "${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:00";
 
   void _toast(String msg) {
     ScaffoldMessenger.of(context)
@@ -100,6 +105,15 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   Future<void> pickBannerImage() async {
     final image = await _picker.pickImage(source: ImageSource.gallery);
     if (image != null) setState(() => bannerImage = image);
+  }
+
+  void _addResponsibility() {
+    final text = responsibilityController.text.trim();
+    if (text.isEmpty) return;
+    setState(() {
+      responsibilities.add(text);
+      responsibilityController.clear();
+    });
   }
 
   // ---------------- SUBMIT ----------------
@@ -161,6 +175,7 @@ final success = await EventService.createEvent(
   description: descriptionController.text.trim(),
   location: locationController.text.trim(),
   eventDate: _fmtDate(eventStartDate!),
+  endDate: _fmtDate(eventEndDate!),
   applicationDeadline: _fmtDate(applicationDeadline!),
   volunteersRequired: int.parse(volunteersController.text),
   eventType: eventType,
@@ -170,7 +185,10 @@ final success = await EventService.createEvent(
   // ✅ Save REAL URL returned by backend
   bannerUrl: bannerUrl,
 
-  categories: selectedCategories.map((_) => 1).toList(),
+  categories: selectedCategories,
+  responsibilities: responsibilities,
+  startTime: _fmtTime(eventStartTime!),
+  endTime: _fmtTime(eventEndTime!),
 );
 
 
@@ -280,6 +298,48 @@ final success = await EventService.createEvent(
             if (eventType == "paid")
               _input("Payment per day (₹)", paymentController,
                   keyboardType: TextInputType.number),
+          ]),
+
+          _sectionCard("Responsibilities", [
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: responsibilityController,
+                    decoration: InputDecoration(
+                      hintText: "Add responsibility",
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onSubmitted: (_) => _addResponsibility(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: _addResponsibility,
+                  icon: const Icon(Icons.add_circle, color: Colors.green),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (responsibilities.isEmpty)
+              const Text("No responsibilities added"),
+            if (responsibilities.isNotEmpty)
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: responsibilities
+                    .map(
+                      (item) => Chip(
+                        label: Text(item),
+                        onDeleted: () {
+                          setState(() => responsibilities.remove(item));
+                        },
+                      ),
+                    )
+                    .toList(),
+              ),
           ]),
 
           _sectionCard("Categories", [
@@ -406,5 +466,16 @@ final success = await EventService.createEvent(
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    titleController.dispose();
+    descriptionController.dispose();
+    locationController.dispose();
+    volunteersController.dispose();
+    paymentController.dispose();
+    responsibilityController.dispose();
+    super.dispose();
   }
 }

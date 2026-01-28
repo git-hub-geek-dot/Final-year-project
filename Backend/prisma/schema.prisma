@@ -1,6 +1,7 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../node_modules/.prisma/client"
+  provider = "prisma-client-js"
+  output   = "../node_modules/@prisma/client/.prisma/client"
+  engineType = "library"
 }
 
 datasource db {
@@ -31,6 +32,12 @@ enum EventStatus {
 enum EventType {
   paid
   unpaid
+}
+
+enum VerificationStatus {
+  pending
+  approved
+  rejected
 }
 
 //// MODELS
@@ -86,6 +93,7 @@ model Event {
   description          String?
   location             String?
   eventDate            DateTime?        @map("event_date") @db.Date
+  endDate              DateTime?        @map("end_date") @db.Date
   status               EventStatus      @default(open)
   volunteersRequired   Int              @default(0) @map("volunteers_required")
   applicationDeadline  DateTime?        @map("application_deadline") @db.Date
@@ -98,10 +106,23 @@ model Event {
   organiser             User?            @relation(fields: [organiserId], references: [id])
   applications          Application[]
   eventCategories       EventCategory[]
+  responsibilities      EventResponsibility[]
   ratings               Rating[]
 
   @@index([status], map: "idx_events_status")
   @@map("events")
+}
+
+model EventResponsibility {
+  id               Int      @id @default(autoincrement())
+  eventId          Int      @map("event_id")
+  responsibility   String   @map("responsibility") @db.VarChar(255)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  event            Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId], map: "idx_event_responsibilities_event_id")
+  @@map("event_responsibilities")
 }
 
 model Rating {
@@ -132,17 +153,45 @@ model UserBadge {
   @@map("user_badges")
 }
 
+model VerificationRequest {
+  id                Int                 @id @default(autoincrement())
+  userId            Int                 @map("user_id")
+  role              UserRole
+  idType            String              @map("id_type")
+  idNumber          String              @map("id_number")
+  idDocumentUrl     String?             @map("id_document_url")
+  selfieUrl         String?             @map("selfie_url")
+
+  organisationName  String?             @map("organisation_name")
+  eventProofUrl     String?             @map("event_proof_url")
+  websiteLink       String?             @map("website_link")
+
+  status            VerificationStatus  @default(pending)
+  adminRemark       String?             @map("admin_remark")
+
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+
+  user              User                @relation(fields: [userId], references: [id])
+
+  @@map("verification_requests")
+}
+
 model User {
   id          Int         @id @default(autoincrement())
   name        String
   email       String      @unique
   password    String?
   role        UserRole?
-  status      UserStatus  @default(active)   // 🔥 SOFT DELETE FIELD (NON-NULL)
+  status      UserStatus  @default(active)
   contact     String?     @map("contact_number")
   city        String?
   govtId      String?     @map("government_id")
+<<<<<<< HEAD
   profilePictureUrl String? @map("profile_picture_url")
+=======
+  isVerified  Boolean     @default(false) // ✅ added (safe)
+>>>>>>> 06e37bfcd58b7a8cd746d5f3ef0e239616c2b0f2
   createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamp(6)
 
   applications Application[]
@@ -150,6 +199,7 @@ model User {
   ratingsGiven  Rating[] @relation("RatingRater")
   ratingsTaken  Rating[] @relation("RatingRatee")
   userBadges    UserBadge[]
+  verificationRequests VerificationRequest[]
 
   @@map("users")
 }

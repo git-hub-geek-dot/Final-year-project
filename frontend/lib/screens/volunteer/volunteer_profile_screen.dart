@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'package:frontend/config/api_config.dart';
 import '../../services/token_service.dart';
+import '../../services/verification_service.dart';
 import '../auth/login_screen.dart';
 
 import 'edit_profile_screen.dart';
@@ -11,6 +14,7 @@ import 'my_badges_screen.dart';
 import 'payment_history_screen.dart';
 import 'invite_friends_screen.dart';
 import 'help_support_screen.dart';
+import 'get_verified_screen.dart';
 
 class VolunteerProfileScreen extends StatefulWidget {
   const VolunteerProfileScreen({super.key});
@@ -28,13 +32,28 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
   String? email;
   String? city;
   String? role;
+<<<<<<< HEAD
   String? profilePictureUrl;
+=======
+  String? verificationStatus; 
+>>>>>>> 06e37bfcd58b7a8cd746d5f3ef0e239616c2b0f2
 
-  @override
-  void initState() {
-    super.initState();
-    fetchProfile();
-  }
+@override
+void initState() {
+  super.initState();
+  fetchProfile();
+  loadVerificationStatus();
+}
+
+
+
+
+Future<void> loadVerificationStatus() async {
+  final status = await VerificationService.getStatus();
+  setState(() {
+    verificationStatus = status;
+  });
+}
 
   /// ================= FETCH PROFILE FROM API =================
   Future<void> fetchProfile() async {
@@ -54,9 +73,7 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
         return;
       }
 
-      /// 🔴 THIS IS THE IMPORTANT BASEURL LINE
       final url = Uri.parse("${ApiConfig.baseUrl}/profile");
-
 
       final response = await http.get(
         url,
@@ -65,9 +82,6 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
           "Content-Type": "application/json",
         },
       );
-
-      print("PROFILE STATUS => ${response.statusCode}");
-      print("PROFILE BODY => ${response.body}");
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -100,6 +114,9 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
   /// ================= LOGOUT =================
   Future<void> logout() async {
     await TokenService.clearToken();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+
     if (!mounted) return;
 
     Navigator.pushAndRemoveUntil(
@@ -159,13 +176,26 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
                                   : null,
                             ),
                             const SizedBox(height: 12),
-                            Text(
-                              name ?? "",
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  name ?? "",
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                if (verificationStatus == "approved") ...[
+                                  const SizedBox(width: 6),
+                                  const Icon(
+                                    Icons.verified,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
+                                ],
+                              ],
                             ),
                             const SizedBox(height: 4),
                             Text(
@@ -189,7 +219,7 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
                                 );
 
                                 if (updated == true) {
-                                  fetchProfile(); // 🔁 refresh
+                                  fetchProfile();
                                 }
                               },
                               child: Container(
@@ -232,6 +262,29 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
                                 );
                               },
                             ),
+
+                            /// ✅ GET VERIFIED (SAFE LOGIC)
+                            _tile(
+                              Icons.verified,
+                              verificationStatus == "pending"
+                                  ? "Verification Under Review"
+                                  : verificationStatus == "approved"
+                                      ? "Verified"
+                                      : "Get Verified",
+                              verificationStatus == "pending" ||
+                                      verificationStatus == "approved"
+                                  ? () {}
+                                  : () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              const VolunteerGetVerifiedScreen(),
+                                        ),
+                                      );
+                                    },
+                            ),
+
                             _tile(
                               Icons.star,
                               "My Badges",
@@ -285,8 +338,12 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
                               },
                             ),
                             const SizedBox(height: 20),
-                            _tile(Icons.logout, "Logout", logout,
-                                color: Colors.red),
+                            _tile(
+                              Icons.logout,
+                              "Logout",
+                              logout,
+                              color: Colors.red,
+                            ),
                           ],
                         ),
                       ),
@@ -297,8 +354,12 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
     );
   }
 
-  Widget _tile(IconData icon, String title, VoidCallback onTap,
-      {Color? color}) {
+  Widget _tile(
+    IconData icon,
+    String title,
+    VoidCallback onTap, {
+    Color? color,
+  }) {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/event_service.dart';
+import '../../services/token_service.dart';
 import 'create_event_screen.dart';
 import 'leaderboard_screen.dart';
 import 'review_application_screen.dart';
@@ -15,17 +16,20 @@ class OrganiserHomeScreen extends StatefulWidget {
 class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
   bool loading = true;
   List events = [];
+  String? userId;
 
   @override
   void initState() {
     super.initState();
-    loadMyEvents();
+    loadEvents();
   }
 
-  Future<void> loadMyEvents() async {
+  Future<void> loadEvents() async {
     try {
-      final data = await EventService.fetchMyEvents();
+      final id = await TokenService.getUserId();
+      final data = await EventService.fetchAllEvents();
       setState(() {
+        userId = id;
         events = data;
         loading = false;
       });
@@ -93,7 +97,7 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
                   context,
                   MaterialPageRoute(
                       builder: (_) => const CreateEventScreen()),
-                ).then((_) => loadMyEvents());
+                ).then((_) => loadEvents());
               },
               child: Container(
                 height: 60,
@@ -194,9 +198,19 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
                 const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
         ),
-        ...list.map((event) => eventCard(context, event, loadMyEvents)),
+        ...list.map((event) => eventCard(
+              context,
+              event,
+              loadEvents,
+              _isMyEvent(event),
+            )),
       ],
     );
+  }
+
+  bool _isMyEvent(Map event) {
+    if (userId == null) return false;
+    return event["organiser_id"].toString() == userId;
   }
 }
 
@@ -204,6 +218,7 @@ Widget eventCard(
   BuildContext context,
   Map event,
   VoidCallback onRefresh,
+  bool isMine,
 ) {
   return InkWell(
     onTap: () {
@@ -222,13 +237,44 @@ Widget eventCard(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
+        border: Border.all(
+          color: isMine ? const Color(0xFF22C55E) : Colors.grey.shade300,
+          width: isMine ? 2 : 1,
+        ),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            if (isMine)
+              Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Text(
+                  "My Event",
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF16A34A),
+                  ),
+                ),
+              ),
+            if (!isMine && event["organiser_name"] != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  "Organiser: ${event["organiser_name"]}",
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.black54,
+                  ),
+                ),
+              ),
             Text(event["title"] ?? "Untitled",
                 style: const TextStyle(
                     fontSize: 16, fontWeight: FontWeight.bold)),
@@ -236,34 +282,35 @@ Widget eventCard(
             Text("📍 ${event["location"] ?? ""}"),
             Text("📅 ${event["event_date"].toString().split("T")[0]}"),
           ]),
-          InkWell(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      ReviewApplicationsScreen(eventId: event["id"]),
+          if (isMine)
+            InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        ReviewApplicationsScreen(eventId: event["id"]),
+                  ),
+                );
+              },
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
+                  ),
+                  borderRadius: BorderRadius.circular(20),
                 ),
-              );
-            },
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
+                child: const Text(
+                  "Review Applications",
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold),
                 ),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Text(
-                "Review Applications",
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold),
               ),
             ),
-          ),
         ],
       ),
     ),

@@ -19,6 +19,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final passwordController = TextEditingController();
 
   bool loading = false;
+  bool _obscurePassword = true;
   String? errorMessage;
 
   @override
@@ -98,6 +99,8 @@ class _LoginScreenState extends State<LoginScreen> {
     required String hint,
     required TextEditingController controller,
     bool obscure = false,
+    VoidCallback? onToggleObscure,
+    bool? isObscured,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -106,6 +109,16 @@ class _LoginScreenState extends State<LoginScreen> {
         obscureText: obscure,
         decoration: InputDecoration(
           prefixIcon: Icon(icon),
+          suffixIcon: onToggleObscure == null
+              ? null
+              : IconButton(
+                  onPressed: onToggleObscure,
+                  icon: Icon(
+                    (isObscured ?? true)
+                        ? Icons.visibility_off
+                        : Icons.visibility,
+                  ),
+                ),
           hintText: hint,
           filled: true,
           fillColor: Colors.white,
@@ -137,7 +150,10 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.volunteer_activism, size: 60),
+                  SizedBox(
+                    height: 120,
+                    child: Image.asset('assets/images/volunteerx_logo.png'),
+                  ),
                   const SizedBox(height: 12),
                   const Text(
                     "Login",
@@ -157,7 +173,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     icon: Icons.lock,
                     hint: "Password",
                     controller: passwordController,
-                    obscure: true,
+                    obscure: _obscurePassword,
+                    isObscured: _obscurePassword,
+                    onToggleObscure: () {
+                      setState(() => _obscurePassword = !_obscurePassword);
+                    },
                   ),
 
                   if (errorMessage != null)
@@ -174,16 +194,34 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   loading
                       ? const CircularProgressIndicator()
-                      : GradientButton(
-                          text: "Login",
-                          onTap: login,
+                      : AbsorbPointer(
+                          absorbing: loading,
+                          child: Opacity(
+                            opacity: loading ? 0.6 : 1,
+                            child: GradientButton(
+                              text: "Login",
+                              onTap: login,
+                            ),
+                          ),
                         ),
 
                   const SizedBox(height: 12),
 
                   TextButton(
-                    onPressed: () =>
-                        Navigator.pushNamed(context, "/register"),
+                    onPressed: loading
+                        ? null
+                        : () =>
+                            Navigator.pushNamed(context, "/forgot-password"),
+                    child: const Text("Forgot password?"),
+                  ),
+
+                  const SizedBox(height: 4),
+
+                  TextButton(
+                    onPressed: loading
+                        ? null
+                        : () =>
+                            Navigator.pushNamed(context, "/register"),
                     child: const Text(
                       "Don't have an account? Register",
                     ),

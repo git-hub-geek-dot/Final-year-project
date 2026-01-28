@@ -1,6 +1,7 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const pool = require("../config/db");
+const transporter = require("../config/email");
 
 // ================= REGISTER =================
 exports.register = async (req, res) => {
@@ -117,9 +118,12 @@ exports.login = async (req, res) => {
 
     // Block inactive / banned users
     if (user.status !== "active") {
+      const isBanned = user.status === "banned";
       return res.status(403).json({
         success: false,
-        message: "Account is deactivated. Please contact support.",
+        message: isBanned
+            ? "Account is banned. Please contact support."
+            : "Account is inactive. Please contact support.",
       });
     }
 
@@ -260,6 +264,7 @@ exports.deactivateAccount = async (req, res) => {
   }
 };
 
+<<<<<<< HEAD
 // ================= DELETE PROFILE PICTURE =================
 exports.deleteProfilePicture = async (req, res) => {
   try {
@@ -290,5 +295,155 @@ exports.deleteProfilePicture = async (req, res) => {
   } catch (err) {
     console.error("DELETE PROFILE PICTURE ERROR:", err);
     return res.status(500).json({ error: "Internal server error" });
+=======
+// ================= FORGOT PASSWORD =================
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    const result = await pool.query(
+      "SELECT id, name, email FROM users WHERE email = $1",
+      [email]
+    );
+
+    // Always respond success to avoid email enumeration
+    if (result.rows.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "If the email exists, a reset link has been sent.",
+      });
+    }
+
+    const user = result.rows[0];
+    const resetSecret =
+      process.env.RESET_PASSWORD_SECRET || process.env.JWT_SECRET;
+
+    const token = jwt.sign(
+      { id: user.id, email: user.email },
+      resetSecret,
+      { expiresIn: "15m" }
+    );
+
+    const resetUrlBase = process.env.RESET_PASSWORD_URL || "";
+    const resetUrl = resetUrlBase
+      ? `${resetUrlBase}?token=${encodeURIComponent(token)}`
+      : null;
+
+    if (!process.env.SMTP_HOST) {
+      return res.status(500).json({
+        success: false,
+        message: "Email service not configured",
+      });
+    }
+
+    const fromAddress =
+      process.env.EMAIL_FROM || process.env.SMTP_USER || "no-reply@volunteerx";
+
+    const text =
+      `Hi ${user.name || ""},\n\n` +
+      "We received a request to reset your password.\n" +
+      "Use the token below in the app to reset your password.\n\n" +
+      `Reset Token: ${token}\n\n` +
+      (resetUrl ? `Or open this link: ${resetUrl}\n\n` : "") +
+      "This token expires in 15 minutes. If you did not request this, ignore this email.";
+
+    const html = `
+      <p>Hi ${user.name || ""},</p>
+      <p>We received a request to reset your password.</p>
+      <p><strong>Reset Token:</strong> ${token}</p>
+      ${resetUrl ? `<p><a href="${resetUrl}">Reset Password</a></p>` : ""}
+      <p>This token expires in 15 minutes. If you did not request this, ignore this email.</p>
+    `;
+
+    await transporter.sendMail({
+      from: fromAddress,
+      to: user.email,
+      subject: "Password Reset - VolunteerX",
+      text,
+      html,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "If the email exists, a reset link has been sent.",
+    });
+  } catch (err) {
+    console.error("FORGOT PASSWORD ERROR:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+// ================= RESET PASSWORD =================
+exports.resetPassword = async (req, res) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Token and new password are required",
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters",
+      });
+    }
+
+    const resetSecret =
+      process.env.RESET_PASSWORD_SECRET || process.env.JWT_SECRET;
+
+    let payload;
+    try {
+      payload = jwt.verify(token, resetSecret);
+    } catch (err) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired token",
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const result = await pool.query(
+      `
+      UPDATE users
+      SET password = $1
+      WHERE id = $2
+      RETURNING id, email
+      `,
+      [hashedPassword, payload.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Password reset successful",
+    });
+  } catch (err) {
+    console.error("RESET PASSWORD ERROR:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+>>>>>>> 06e37bfcd58b7a8cd746d5f3ef0e239616c2b0f2
   }
 };

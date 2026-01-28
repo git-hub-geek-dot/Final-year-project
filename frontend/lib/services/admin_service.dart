@@ -4,7 +4,7 @@ import 'token_service.dart';
 import '../config/api_config.dart';
 
 class AdminService {
-  // Fetch all events
+  // ================= EVENTS =================
   static Future<List<dynamic>> getAllEvents() async {
     final token = await TokenService.getToken();
 
@@ -23,7 +23,6 @@ class AdminService {
     return jsonDecode(response.body);
   }
 
-  // Delete event
   static Future<void> deleteEvent(int eventId) async {
     final token = await TokenService.getToken();
 
@@ -39,162 +38,244 @@ class AdminService {
     }
   }
 
-  // Fetch all users
-static Future<List<dynamic>> getAllUsers() async {
-  final token = await TokenService.getToken();
+  // ================= USERS =================
+  static Future<List<dynamic>> getAllUsers() async {
+    final token = await TokenService.getToken();
 
-  final res = await http.get(
-    Uri.parse("${ApiConfig.baseUrl}/admin/users"),
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": "Bearer $token",
-    },
-  );
+    final res = await http.get(
+      Uri.parse("${ApiConfig.baseUrl}/admin/users"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
+    );
 
-  if (res.statusCode != 200) {
-    throw Exception("Failed to load users");
+    if (res.statusCode != 200) {
+      throw Exception("Failed to load users");
+    }
+
+    return jsonDecode(res.body);
   }
 
-  return jsonDecode(res.body);
-}
+  static Future<void> updateUserStatus(int userId, String status) async {
+    final token = await TokenService.getToken();
 
-// Block / Unblock user
-static Future<void> updateUserStatus(int userId, String status) async {
-  final token = await TokenService.getToken();
+    final res = await http.post(
+      Uri.parse("${ApiConfig.baseUrl}/admin/users/$userId/status"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
+      body: jsonEncode({"status": status}),
+    );
 
-  final res = await http.post(
-    Uri.parse("${ApiConfig.baseUrl}/admin/users/$userId/status"),
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": "Bearer $token",
-    },
-    body: jsonEncode({"status": status}),
-  );
-
-  if (res.statusCode != 200) {
-    throw Exception("Failed to update status");
-  }
-}
-
-// Fetch all applications
-static Future<List<dynamic>> getAllApplications() async {
-  final token = await TokenService.getToken();
-
-  final res = await http.get(
-    Uri.parse("${ApiConfig.baseUrl}/admin/applications"),
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": "Bearer $token",
-    },
-  );
-
-  if (res.statusCode != 200) {
-    throw Exception("Failed to load applications");
+    if (res.statusCode != 200) {
+      throw Exception("Failed to update status");
+    }
   }
 
-  return jsonDecode(res.body);
-}
+  // ================= APPLICATIONS =================
+  static Future<List<dynamic>> getAllApplications() async {
+    final token = await TokenService.getToken();
 
-// Cancel application
-static Future<void> cancelApplication(int appId) async {
-  final token = await TokenService.getToken();
+    final res = await http.get(
+      Uri.parse("${ApiConfig.baseUrl}/admin/applications"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
+    );
 
-  final res = await http.delete(
-    Uri.parse("${ApiConfig.baseUrl}/admin/applications/$appId"),
-    headers: {
-      "Authorization": "Bearer $token",
-    },
-  );
+    if (res.statusCode != 200) {
+      throw Exception("Failed to load applications");
+    }
 
-  if (res.statusCode != 200) {
-    throw Exception("Failed to cancel application");
-  }
-}
-
-static Future<Map<String, dynamic>> getStats() async {
-  final token = await TokenService.getToken();
-
-  final res = await http.get(
-    Uri.parse("${ApiConfig.baseUrl}/admin/stats"),
-    headers: {
-      "Authorization": "Bearer $token",
-    },
-  );
-
-  if (res.statusCode != 200) {
-    throw Exception("Failed to load stats");
+    return jsonDecode(res.body);
   }
 
-  return jsonDecode(res.body);
-}
+  static Future<void> cancelApplication(int appId) async {
+    final token = await TokenService.getToken();
 
-// Volunteer leaderboard
-static Future<List<dynamic>> getVolunteerLeaderboard() async {
-  final token = await TokenService.getToken();
+    final res = await http.delete(
+      Uri.parse("${ApiConfig.baseUrl}/admin/applications/$appId"),
+      headers: {
+        "Authorization": "Bearer $token",
+      },
+    );
 
-  final res = await http.get(
-    Uri.parse("${ApiConfig.baseUrl}/admin/leaderboard/volunteers"),
-    headers: {
-      "Authorization": "Bearer $token",
-    },
-  );
-
-  if (res.statusCode != 200) {
-    throw Exception("Failed to load volunteer leaderboard");
+    if (res.statusCode != 200) {
+      throw Exception("Failed to cancel application");
+    }
   }
 
-  return jsonDecode(res.body);
-}
+  // ================= STATS =================
+  static Future<Map<String, dynamic>> getStats() async {
+    final token = await TokenService.getToken();
 
-// Organiser leaderboard
-static Future<List<dynamic>> getOrganiserLeaderboard() async {
-  final token = await TokenService.getToken();
+    final res = await http.get(
+      Uri.parse("${ApiConfig.baseUrl}/admin/stats"),
+      headers: {
+        "Authorization": "Bearer $token",
+      },
+    );
 
-  final res = await http.get(
-    Uri.parse("${ApiConfig.baseUrl}/admin/leaderboard/organisers"),
-    headers: {
-      "Authorization": "Bearer $token",
-    },
-  );
+    if (res.statusCode != 200) {
+      throw Exception("Failed to load stats");
+    }
 
-  if (res.statusCode != 200) {
-    throw Exception("Failed to load organiser leaderboard");
+    return jsonDecode(res.body);
   }
 
-  return jsonDecode(res.body);
-}
+  // ================= LEADERBOARD =================
+  static Future<List<dynamic>> getVolunteerLeaderboard() async {
+    final token = await TokenService.getToken();
 
-static Future<List<dynamic>> getBadges() async {
-  final token = await TokenService.getToken();
-  final res = await http.get(
-    Uri.parse("${ApiConfig.baseUrl}/admin/badges"),
-    headers: {"Authorization": "Bearer $token"},
-  );
-  return jsonDecode(res.body);
-}
+    final res = await http.get(
+      Uri.parse("${ApiConfig.baseUrl}/admin/leaderboard/volunteers"),
+      headers: {
+        "Authorization": "Bearer $token",
+      },
+    );
 
-static Future<void> createBadge(Map<String, dynamic> body) async {
-  final token = await TokenService.getToken();
-  await http.post(
-    Uri.parse("${ApiConfig.baseUrl}/admin/badges"),
-    headers: {
-      "Authorization": "Bearer $token",
-      "Content-Type": "application/json",
-    },
-    body: jsonEncode(body),
-  );
-}
+    if (res.statusCode != 200) {
+      throw Exception("Failed to load volunteer leaderboard");
+    }
 
-static Future<List<dynamic>> getUserBadges() async {
-  final token = await TokenService.getToken();
-  final res = await http.get(
-    Uri.parse("${ApiConfig.baseUrl}/admin/badges/users"),
-    headers: {"Authorization": "Bearer $token"},
-  );
-  return jsonDecode(res.body);
-}
+    return jsonDecode(res.body);
+  }
 
+  static Future<List<dynamic>> getOrganiserLeaderboard() async {
+    final token = await TokenService.getToken();
 
+    final res = await http.get(
+      Uri.parse("${ApiConfig.baseUrl}/admin/leaderboard/organisers"),
+      headers: {
+        "Authorization": "Bearer $token",
+      },
+    );
 
+    if (res.statusCode != 200) {
+      throw Exception("Failed to load organiser leaderboard");
+    }
 
+    return jsonDecode(res.body);
+  }
+
+  // ================= BADGES =================
+  static Future<List<dynamic>> getBadges() async {
+    final token = await TokenService.getToken();
+    final res = await http.get(
+      Uri.parse("${ApiConfig.baseUrl}/admin/badges"),
+      headers: {"Authorization": "Bearer $token"},
+    );
+    if (res.statusCode != 200) {
+      throw Exception("Failed to load badges");
+    }
+    return jsonDecode(res.body);
+  }
+
+  static Future<void> createBadge(Map<String, dynamic> body) async {
+    final token = await TokenService.getToken();
+    final response = await http.post(
+      Uri.parse("${ApiConfig.baseUrl}/admin/badges"),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode(body),
+    );
+    if (response.statusCode != 200) {
+      throw Exception("Failed to create badge");
+    }
+  }
+
+  static Future<void> deleteBadge(int badgeId) async {
+    final token = await TokenService.getToken();
+    final response = await http.delete(
+      Uri.parse("${ApiConfig.baseUrl}/admin/badges/$badgeId"),
+      headers: {
+        "Authorization": "Bearer $token",
+      },
+    );
+    if (response.statusCode != 200) {
+      throw Exception("Failed to delete badge");
+    }
+  }
+
+  static Future<List<dynamic>> getUserBadges() async {
+    final token = await TokenService.getToken();
+    final res = await http.get(
+      Uri.parse("${ApiConfig.baseUrl}/admin/badges/users"),
+      headers: {"Authorization": "Bearer $token"},
+    );
+    if (res.statusCode != 200) {
+      throw Exception("Failed to load user badges");
+    }
+    return jsonDecode(res.body);
+  }
+
+  // =================================================
+  // ========== VERIFICATION (NEW - SAFE) =============
+  // =================================================
+
+  // Fetch all verification requests
+  static Future<List<dynamic>> getVerificationRequests() async {
+    final token = await TokenService.getToken();
+
+    final res = await http.get(
+      Uri.parse("${ApiConfig.baseUrl}/admin/verification-requests"),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+    );
+
+    if (res.statusCode != 200) {
+      throw Exception("Failed to load verification requests");
+    }
+
+    return jsonDecode(res.body);
+  }
+
+  // Approve verification
+  static Future<void> approveVerification(int requestId) async {
+    final token = await TokenService.getToken();
+
+    final res = await http.post(
+      Uri.parse("${ApiConfig.baseUrl}/admin/verification/approve"),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({"requestId": requestId}),
+    );
+
+    if (res.statusCode != 200) {
+      throw Exception("Failed to approve verification");
+    }
+  }
+
+  // Reject verification
+  static Future<void> rejectVerification(
+    int requestId,
+    String remark,
+  ) async {
+    final token = await TokenService.getToken();
+
+    final res = await http.post(
+      Uri.parse("${ApiConfig.baseUrl}/admin/verification/reject"),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({
+        "requestId": requestId,
+        "remark": remark,
+      }),
+    );
+
+    if (res.statusCode != 200) {
+      throw Exception("Failed to reject verification");
+    }
+  }
 }

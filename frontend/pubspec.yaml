@@ -11,10 +11,7 @@ dependencies:
   flutter:
     sdk: flutter
   image_picker: ^1.0.7
-  
-
-
-
+  camera: ^0.10.5+5
   cupertino_icons: ^1.0.8
   http: ^1.2.0
   shared_preferences: ^2.2.2

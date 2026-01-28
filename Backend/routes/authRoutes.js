@@ -8,6 +8,7 @@ router.post("/register", authController.register);
 router.post("/login", authController.login);
 
 router.put("/profile/update", authMiddleware, authController.updateProfile);
+router.delete("/profile/picture", authMiddleware, authController.deleteProfilePicture);
 router.get("/profile", authMiddleware, authController.getProfile);
 
 // ✅ Only this one route (Deactivate Account)

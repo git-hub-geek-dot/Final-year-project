@@ -28,6 +28,7 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
   String? email;
   String? city;
   String? role;
+  String? profilePictureUrl;
 
   @override
   void initState() {
@@ -76,8 +77,11 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
           email = data["email"];
           city = data["city"];
           role = data["role"];
+          profilePictureUrl = data["profile_picture_url"];
           loading = false;
         });
+        print("✅ Profile loaded successfully");
+        print("Profile picture URL: $profilePictureUrl");
       } else {
         setState(() {
           loading = false;
@@ -144,10 +148,15 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
                         ),
                         child: Column(
                           children: [
-                            const CircleAvatar(
+                            CircleAvatar(
                               radius: 42,
                               backgroundColor: Colors.white,
-                              child: Icon(Icons.person, size: 42),
+                              backgroundImage: profilePictureUrl != null && profilePictureUrl!.isNotEmpty
+                                  ? NetworkImage(profilePictureUrl!)
+                                  : null,
+                              child: profilePictureUrl == null || profilePictureUrl!.isEmpty
+                                  ? const Icon(Icons.person, size: 42)
+                                  : null,
                             ),
                             const SizedBox(height: 12),
                             Text(

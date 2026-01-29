@@ -3,10 +3,28 @@ const pool = require("../config/db");
 // ================= GET ALL USERS =================
 const getUsers = async (req, res) => {
   try {
+    const page = Math.max(parseInt(req.query.page || "1", 10), 1);
+    const limit = Math.max(parseInt(req.query.limit || "20", 10), 1);
+    const offset = (page - 1) * limit;
+
+    const countResult = await pool.query("SELECT COUNT(*) FROM users");
+    const total = parseInt(countResult.rows[0].count, 10);
+    const totalPages = Math.max(Math.ceil(total / limit), 1);
+
     const users = await pool.query(
-      "SELECT id, name, email, role, status, created_at FROM users ORDER BY id DESC"
+      `SELECT id, name, email, role, status, created_at, profile_picture_url, city, contact_number, "isVerified"
+       FROM users
+       ORDER BY id DESC
+       LIMIT $1 OFFSET $2`,
+      [limit, offset]
     );
-    res.json(users.rows);
+
+    res.json({
+      items: users.rows,
+      page,
+      totalPages,
+      total,
+    });
   } catch (err) {
     console.error("GET USERS ERROR:", err);
     res.status(500).json({ error: "Failed to fetch users" });
@@ -16,13 +34,29 @@ const getUsers = async (req, res) => {
 // ================= GET ALL EVENTS =================
 const getEvents = async (req, res) => {
   try {
+    const page = Math.max(parseInt(req.query.page || "1", 10), 1);
+    const limit = Math.max(parseInt(req.query.limit || "20", 10), 1);
+    const offset = (page - 1) * limit;
+
+    const countResult = await pool.query("SELECT COUNT(*) FROM events");
+    const total = parseInt(countResult.rows[0].count, 10);
+    const totalPages = Math.max(Math.ceil(total / limit), 1);
+
     const events = await pool.query(
       `SELECT e.*, u.name AS organizer_name
        FROM events e
        JOIN users u ON e.organiser_id = u.id
-       ORDER BY e.id DESC`
+       ORDER BY e.id DESC
+       LIMIT $1 OFFSET $2`,
+      [limit, offset]
     );
-    res.json(events.rows);
+
+    res.json({
+      items: events.rows,
+      page,
+      totalPages,
+      total,
+    });
   } catch (err) {
     console.error("GET EVENTS ERROR:", err);
     res.status(500).json({ error: "Failed to fetch events" });
@@ -32,20 +66,41 @@ const getEvents = async (req, res) => {
 // ================= GET ALL APPLICATIONS =================
 const getApplications = async (req, res) => {
   try {
+    const page = Math.max(parseInt(req.query.page || "1", 10), 1);
+    const limit = Math.max(parseInt(req.query.limit || "20", 10), 1);
+    const offset = (page - 1) * limit;
+
+    const countResult = await pool.query("SELECT COUNT(*) FROM applications");
+    const total = parseInt(countResult.rows[0].count, 10);
+    const totalPages = Math.max(Math.ceil(total / limit), 1);
+
     const apps = await pool.query(
       `SELECT 
          a.id,
          a.status,
+         a.applied_at,
          u.name AS volunteer_name,
          u.email AS volunteer_email,
-         e.title AS event_title
+         u.city AS volunteer_city,
+         e.title AS event_title,
+         e.event_date,
+         e.created_at AS event_created_at,
+         o.name AS organiser_name
        FROM applications a
        JOIN users u ON a.volunteer_id = u.id
        JOIN events e ON a.event_id = e.id
-       ORDER BY a.applied_at DESC`
+       JOIN users o ON e.organiser_id = o.id
+       ORDER BY a.applied_at DESC
+       LIMIT $1 OFFSET $2`,
+      [limit, offset]
     );
 
-    res.json(apps.rows);
+    res.json({
+      items: apps.rows,
+      page,
+      totalPages,
+      total,
+    });
   } catch (err) {
     console.error("GET APPLICATIONS ERROR:", err);
     res.status(500).json({ error: "Failed to fetch applications" });

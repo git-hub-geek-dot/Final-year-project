@@ -4,6 +4,8 @@ import 'package:http/http.dart' as http;
 import '../../config/api_config.dart';
 import '../../services/token_service.dart';
 import 'view_organiser_profile_screen.dart';
+import 'package:share_plus/share_plus.dart';
+
 
 class ViewEventScreen extends StatefulWidget {
   final Map<String, dynamic> event;
@@ -104,17 +106,26 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
-        title: const Text("Event Details"),
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF2E6BE6), Color(0xFF2ECC71)],
-            ),
-          ),
-        ),
-      ),
+  title: const Text("Event Details"),
+  actions: [
+    IconButton(
+      icon: const Icon(Icons.share),
+      onPressed: () {
+        final text = """
+${widget.event["title"]}
+Location: ${widget.event["location"]}
+Date: ${widget.event["event_date"].toString().split("T")[0]}
+
+
+Join on VolunteerX
+""";
+
+        Share.share(text);
+      },
+    ),
+  ],
+),
+
       body: Stack(
         children: [
           SingleChildScrollView(

@@ -136,23 +136,25 @@ String searchQuery = "";
 
 
 
-  return Column(
+return RefreshIndicator(
+  onRefresh: fetchEvents,
+  child: Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      // 🔍 Search + Filter (UNCHANGED)
+
+      // 🔍 Search + Filter
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
         child: Row(
           children: [
             Expanded(
               child: TextField(
-                
-                  onChanged: (value) {
-                setState(() {
-                searchQuery = value.toLowerCase();
-                      });
-                        },
-                        decoration: InputDecoration(
+                onChanged: (value) {
+                  setState(() {
+                    searchQuery = value.toLowerCase();
+                  });
+                },
+                decoration: InputDecoration(
                   hintText: "Search volunteer jobs",
                   prefixIcon: const Icon(Icons.search),
                   filled: true,
@@ -193,7 +195,7 @@ String searchQuery = "";
         ),
       ),
 
-      // 🟦 CATEGORY CHIPS (UNCHANGED)
+      // 🟦 CATEGORY CHIPS
       SizedBox(
         height: 46,
         child: ListView.builder(
@@ -217,12 +219,6 @@ String searchQuery = "";
                       ? const Color(0xFF2E6BE6)
                       : Colors.white,
                   borderRadius: BorderRadius.circular(22),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
-                      blurRadius: 6,
-                    ),
-                  ],
                 ),
                 child: Text(
                   category,
@@ -249,7 +245,7 @@ String searchQuery = "";
 
       const SizedBox(height: 12),
 
-      // 📋 EVENTS LIST (✅ FIXED)
+      // 📋 EVENTS LIST
       Expanded(
         child: filteredEvents.isEmpty
             ? const Center(child: Text("No events found"))
@@ -276,15 +272,15 @@ String searchQuery = "";
                               .split("T")[0] ??
                           "",
                       slotsLeft: event["volunteers_required"] ?? 0,
-
                     ),
                   );
                 },
               ),
       ),
     ],
-  );
-}
+  ),
+);
+  }
 
 
   // ================= FILTER BOTTOM SHEET (UNCHANGED) =================

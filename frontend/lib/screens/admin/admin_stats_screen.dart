@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/widgets/app_background.dart';
+import 'package:frontend/widgets/error_state.dart';
 import 'admin_users_screen.dart';
 import 'admin_events_screen.dart';
 import 'admin_applications_screen.dart';
@@ -66,7 +67,10 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
             }
 
             if (snapshot.hasError || !snapshot.hasData) {
-              return const Center(child: Text("Failed to load stats"));
+              return ErrorState(
+                message: "Failed to load stats",
+                onRetry: _refresh,
+              );
             }
 
             final s = snapshot.data!;
@@ -206,4 +210,5 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
     }
     return "Last updated: ${value.toLocal()}".split(".")[0];
   }
+
 }

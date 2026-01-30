@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/admin_service.dart';
 import 'package:frontend/widgets/app_background.dart';
+import 'package:frontend/widgets/error_state.dart';
 
 class AdminApplicationsScreen extends StatefulWidget {
   const AdminApplicationsScreen({super.key});
@@ -16,8 +17,11 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
   bool loadingMore = false;
   int page = 1;
   int totalPages = 1;
+  String? errorMessage;
   String statusFilter = "all";
   String search = "";
+  String sortField = "applied_at"; // applied_at | event_date | status | volunteer_name
+  bool sortAsc = false;
 
   @override
   void initState() {
@@ -33,6 +37,7 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
         page = 1;
         totalPages = 1;
         apps.clear();
+        errorMessage = null;
       });
     } else {
       setState(() => loadingMore = true);
@@ -47,11 +52,15 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
         loading = false;
         loadingMore = false;
         page += 1;
+        errorMessage = null;
       });
     } catch (_) {
       setState(() {
         loading = false;
         loadingMore = false;
+        if (reset) {
+          errorMessage = "Failed to load applications";
+        }
       });
     }
   }
@@ -59,7 +68,6 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
   Color statusColor(String status) {
     switch (status) {
       case "accepted":
-      case "approved":
         return Colors.green;
       case "rejected":
       case "cancelled":
@@ -79,9 +87,14 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
       body: AppBackground(
         child: loading
             ? const Center(child: CircularProgressIndicator())
+          : errorMessage != null
+            ? ErrorState(
+              message: errorMessage!,
+              onRetry: () => _fetchApplications(reset: true),
+              )
             : Builder(
                 builder: (context) {
-                  final filtered = apps.where((a) {
+                    final filtered = apps.where((a) {
               final matchStatus =
                   statusFilter == "all" || a["status"] == statusFilter;
 
@@ -102,7 +115,8 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
                   organiserName.contains(searchText);
 
               return matchStatus && matchSearch;
-            }).toList();
+            }).toList()
+                    ..sort((a, b) => _compareApps(a, b));
 
                   return Column(
                     children: [
@@ -121,23 +135,49 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
                       // 🔽 Status filter
                       Padding(
                         padding: const EdgeInsets.all(8),
-                        child: DropdownButton<String>(
-                          value: statusFilter,
-                          items: const [
-                            DropdownMenuItem(
-                                value: "all", child: Text("All Applications")),
-                            DropdownMenuItem(
-                                value: "pending", child: Text("Pending")),
-                            DropdownMenuItem(
-                                value: "accepted", child: Text("Accepted")),
-                            DropdownMenuItem(
-                                value: "rejected", child: Text("Rejected")),
-                            DropdownMenuItem(
-                                value: "approved", child: Text("Approved")),
-                            DropdownMenuItem(
-                                value: "cancelled", child: Text("Cancelled")),
+                        child: Row(
+                          children: [
+                            DropdownButton<String>(
+                              value: statusFilter,
+                              items: const [
+                                DropdownMenuItem(
+                                    value: "all", child: Text("All Applications")),
+                                DropdownMenuItem(
+                                    value: "pending", child: Text("Pending")),
+                                DropdownMenuItem(
+                                    value: "accepted", child: Text("Accepted")),
+                                DropdownMenuItem(
+                                    value: "rejected", child: Text("Rejected")),
+                                DropdownMenuItem(
+                                    value: "cancelled", child: Text("Cancelled")),
+                              ],
+                              onChanged: (v) => setState(() => statusFilter = v!),
+                            ),
+                            const SizedBox(width: 16),
+                            DropdownButton<String>(
+                              value: sortField,
+                              items: const [
+                                DropdownMenuItem(
+                                    value: "applied_at", child: Text("Applied")),
+                                DropdownMenuItem(
+                                    value: "event_date", child: Text("Event Date")),
+                                DropdownMenuItem(
+                                    value: "status", child: Text("Status")),
+                                DropdownMenuItem(
+                                    value: "volunteer_name", child: Text("Volunteer")),
+                              ],
+                              onChanged: (v) => setState(() => sortField = v!),
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                sortAsc
+                                    ? Icons.arrow_upward
+                                    : Icons.arrow_downward,
+                              ),
+                              onPressed: () =>
+                                  setState(() => sortAsc = !sortAsc),
+                            ),
                           ],
-                          onChanged: (v) => setState(() => statusFilter = v!),
                         ),
                       ),
 
@@ -333,4 +373,34 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
     if (text.isEmpty) return "-";
     return text.replaceAll("T", " ").split(".")[0];
   }
+
+  int _compareApps(Map a, Map b) {
+    int result;
+    switch (sortField) {
+      case "volunteer_name":
+        result = (a["volunteer_name"] ?? "").toString().toLowerCase().compareTo(
+            (b["volunteer_name"] ?? "").toString().toLowerCase());
+        break;
+      case "status":
+        result = (a["status"] ?? "").toString().compareTo(
+            (b["status"] ?? "").toString());
+        break;
+      case "event_date":
+        final aDate = DateTime.tryParse((a["event_date"] ?? "").toString());
+        final bDate = DateTime.tryParse((b["event_date"] ?? "").toString());
+        result = (aDate ?? DateTime(1970))
+            .compareTo(bDate ?? DateTime(1970));
+        break;
+      case "applied_at":
+      default:
+        final aDate = DateTime.tryParse((a["applied_at"] ?? "").toString());
+        final bDate = DateTime.tryParse((b["applied_at"] ?? "").toString());
+        result = (aDate ?? DateTime(1970))
+            .compareTo(bDate ?? DateTime(1970));
+        break;
+    }
+
+    return sortAsc ? result : -result;
+  }
+
 }

@@ -6,6 +6,18 @@ import '../../services/token_service.dart';
 import 'view_organiser_profile_screen.dart';
 import 'package:share_plus/share_plus.dart';
 
+String formatTime(String? time) {
+  if (time == null) return "";
+  final parts = time.split(":");
+  int hour = int.parse(parts[0]);
+  final minute = parts[1];
+  final suffix = hour >= 12 ? "PM" : "AM";
+  hour = hour % 12;
+  if (hour == 0) hour = 12;
+  return "$hour:$minute $suffix";
+}
+
+
 
 class ViewEventScreen extends StatefulWidget {
   final Map<String, dynamic> event;
@@ -215,15 +227,20 @@ Text(
 ),
 
           const SizedBox(height: 16),
-          _iconRow(Icons.location_on, widget.event["location"] ?? "N/A"),
-          _iconRow(
-            Icons.calendar_today,
-            widget.event["event_date"]?.toString().split("T")[0] ?? "",
-          ),
-          _iconRow(
-            Icons.people,
-            "Volunteers Needed: ${widget.event["volunteers_required"] ?? "N/A"}",
-          ),
+         _iconRow(Icons.location_on, widget.event["location"] ?? "N/A"),
+_iconRow(
+  Icons.calendar_today,
+  widget.event["event_date"]?.toString().split("T")[0] ?? "",
+),
+_iconRow(
+  Icons.access_time,
+  "${formatTime(widget.event['start_time'])} - ${formatTime(widget.event['end_time'])}",
+),
+_iconRow(
+  Icons.people,
+  "Volunteers Needed: ${widget.event["volunteers_required"]}",
+),
+
           if (applicationStatus != null) ...[
             const SizedBox(height: 16),
             _statusPill(

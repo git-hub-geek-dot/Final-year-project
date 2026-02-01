@@ -2,20 +2,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class TokenService {
   static const String _tokenKey = 'token';
-  static const String _userIdKey = 'userId';
+  static const String _userIdKey = 'user_id';
 
   /// ✅ Save JWT + User ID after login
   static Future<void> saveAuthData({
     required String token,
-    required String userId,
+    required int userId,
   }) async {
     final prefs = await SharedPreferences.getInstance();
 
-    // Ensure token is clean (no whitespace / line breaks)
+    // Clean token (safety)
     final cleanToken = token.replaceAll(RegExp(r'\s+'), '');
 
     await prefs.setString(_tokenKey, cleanToken);
-    await prefs.setString(_userIdKey, userId);
+    await prefs.setInt(_userIdKey, userId); // ✅ STORE AS INT
   }
 
   /// ✅ Get JWT for authenticated requests
@@ -24,10 +24,10 @@ class TokenService {
     return prefs.getString(_tokenKey);
   }
 
-  /// ✅ Get logged-in user ID
-  static Future<String?> getUserId() async {
+  /// ✅ Get logged-in user ID (INT)
+  static Future<int?> getUserId() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_userIdKey);
+    return prefs.getInt(_userIdKey); // ✅ RETURN INT
   }
 
   /// ✅ Clear ALL auth data (logout)

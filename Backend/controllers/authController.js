@@ -188,7 +188,7 @@ exports.getProfile = async (req, res) => {
 exports.updateProfile = async (req, res) => {
   try {
     const userId = req.user?.id;
-    const { name, city, contact_number } = req.body;
+    const { name, city, contact_number, profile_picture_url } = req.body;
 
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
@@ -203,11 +203,12 @@ exports.updateProfile = async (req, res) => {
       UPDATE users
       SET name = $1,
           city = $2,
-          contact_number = $3
-      WHERE id = $4
-      RETURNING id, name, email, role, city, contact_number
+          contact_number = $3,
+          profile_picture_url = $4
+      WHERE id = $5
+      RETURNING id, name, email, role, city, contact_number, profile_picture_url
       `,
-      [name, city ?? null, contact_number ?? null, userId]
+      [name, city ?? null, contact_number ?? null, profile_picture_url || null, userId]
     );
 
     return res.status(200).json({

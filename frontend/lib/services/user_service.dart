@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:frontend/config/api_config.dart';
@@ -26,11 +25,13 @@ class UserService {
       if (imageFile is XFile) {
         // XFile from image_picker
         final bytes = await imageFile.readAsBytes();
+        final fileName =
+            imageFile.name.isNotEmpty ? imageFile.name : 'photo.jpg';
         request.files.add(
           http.MultipartFile.fromBytes(
             'image',
             bytes,
-            filename: imageFile.name ?? 'photo.jpg',
+            filename: fileName,
           ),
         );
       } else if (imageFile is File) {
@@ -81,40 +82,6 @@ class UserService {
     } catch (e) {
       print("Error uploading profile picture: $e");
       return null;
-    }
-  }
-
-  /// Save profile picture URL to the database (legacy method - not needed now)
-  static Future<bool> _saveProfilePictureUrl(
-    String token,
-    String pictureUrl,
-  ) async {
-    try {
-      final url = Uri.parse("${ApiConfig.baseUrl}/profile/picture");
-
-      final response = await http.put(
-        url,
-        headers: {
-          "Authorization": "Bearer $token",
-          "Content-Type": "application/json",
-        },
-        body: jsonEncode({
-          "profile_picture_url": pictureUrl,
-        }),
-      );
-
-      print("Save profile picture response: ${response.statusCode}");
-      print("Response body: ${response.body}");
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return true;
-      } else {
-        print("Failed to save profile picture. Status: ${response.statusCode}, Body: ${response.body}");
-        return false;
-      }
-    } catch (e) {
-      print("Error saving profile picture URL: $e");
-      return false;
     }
   }
 

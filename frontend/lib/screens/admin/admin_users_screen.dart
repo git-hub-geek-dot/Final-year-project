@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/widgets/app_background.dart';
+import 'package:frontend/widgets/error_state.dart';
 import '../../services/admin_service.dart';
 
 class AdminUsersScreen extends StatefulWidget {
@@ -15,10 +16,13 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   bool loadingMore = false;
   int page = 1;
   int totalPages = 1;
+  String? errorMessage;
 
   String search = "";
   String statusFilter = "all"; // all | active | inactive | banned
   String roleFilter = "all";   // all | volunteer | organiser | admin
+  String sortField = "created_at"; // name | created_at | status
+  bool sortAsc = false;
 
   @override
   void initState() {
@@ -34,6 +38,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         page = 1;
         totalPages = 1;
         users.clear();
+        errorMessage = null;
       });
     } else {
       setState(() => loadingMore = true);
@@ -48,11 +53,15 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         loading = false;
         loadingMore = false;
         page += 1;
+        errorMessage = null;
       });
     } catch (_) {
       setState(() {
         loading = false;
         loadingMore = false;
+        if (reset) {
+          errorMessage = "Failed to load users";
+        }
       });
     }
   }
@@ -66,9 +75,14 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       body: AppBackground(
         child: loading
             ? const Center(child: CircularProgressIndicator())
+          : errorMessage != null
+            ? ErrorState(
+              message: errorMessage!,
+              onRetry: () => _fetchUsers(reset: true),
+              )
             : Builder(
                 builder: (context) {
-                  final filtered = users.where((u) {
+                    final filtered = users.where((u) {
               final matchSearch =
                   u["name"].toLowerCase().contains(search) ||
                   u["email"].toLowerCase().contains(search);
@@ -80,7 +94,8 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   roleFilter == "all" || u["role"] == roleFilter;
 
               return matchSearch && matchStatus && matchRole;
-            }).toList();
+            }).toList()
+                    ..sort((a, b) => _compareUsers(a, b));
 
                   return Column(
                     children: [
@@ -132,6 +147,29 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                               ],
                               onChanged: (v) =>
                                   setState(() => roleFilter = v!),
+                            ),
+                            const SizedBox(width: 16),
+                            DropdownButton<String>(
+                              value: sortField,
+                              items: const [
+                                DropdownMenuItem(
+                                    value: "created_at", child: Text("Newest")),
+                                DropdownMenuItem(
+                                    value: "name", child: Text("Name")),
+                                DropdownMenuItem(
+                                    value: "status", child: Text("Status")),
+                              ],
+                              onChanged: (v) =>
+                                  setState(() => sortField = v!),
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                sortAsc
+                                    ? Icons.arrow_upward
+                                    : Icons.arrow_downward,
+                              ),
+                              onPressed: () =>
+                                  setState(() => sortAsc = !sortAsc),
                             ),
                           ],
                         ),
@@ -304,4 +342,28 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       ),
     );
   }
+
+  int _compareUsers(Map a, Map b) {
+    int result;
+    switch (sortField) {
+      case "name":
+        result = (a["name"] ?? "").toString().toLowerCase().compareTo(
+            (b["name"] ?? "").toString().toLowerCase());
+        break;
+      case "status":
+        result = (a["status"] ?? "").toString().compareTo(
+            (b["status"] ?? "").toString());
+        break;
+      case "created_at":
+      default:
+        final aDate = DateTime.tryParse((a["created_at"] ?? "").toString());
+        final bDate = DateTime.tryParse((b["created_at"] ?? "").toString());
+        result = (aDate ?? DateTime(1970))
+            .compareTo(bDate ?? DateTime(1970));
+        break;
+    }
+
+    return sortAsc ? result : -result;
+  }
+
 }

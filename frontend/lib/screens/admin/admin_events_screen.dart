@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/widgets/app_background.dart';
+import 'package:frontend/widgets/error_state.dart';
 import '../../services/admin_service.dart';
 
 class AdminEventsScreen extends StatefulWidget {
@@ -15,7 +16,10 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
   bool loadingMore = false;
   int page = 1;
   int totalPages = 1;
+  String? errorMessage;
   String search = "";
+  String sortField = "event_date"; // title | status | event_date
+  bool sortAsc = true;
 
   @override
   void initState() {
@@ -31,6 +35,7 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
         page = 1;
         totalPages = 1;
         events.clear();
+        errorMessage = null;
       });
     } else {
       setState(() => loadingMore = true);
@@ -45,11 +50,15 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
         loading = false;
         loadingMore = false;
         page += 1;
+        errorMessage = null;
       });
     } catch (_) {
       setState(() {
         loading = false;
         loadingMore = false;
+        if (reset) {
+          errorMessage = "Failed to load events";
+        }
       });
     }
   }
@@ -63,6 +72,11 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
       body: AppBackground(
         child: loading
             ? const Center(child: CircularProgressIndicator())
+          : errorMessage != null
+            ? ErrorState(
+              message: errorMessage!,
+              onRetry: () => _fetchEvents(reset: true),
+              )
             : Builder(
                 builder: (context) {
                   final filtered = events.where((e) {
@@ -70,7 +84,8 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
                         .toString()
                         .toLowerCase()
                         .contains(search.toLowerCase());
-                  }).toList();
+                  }).toList()
+                    ..sort((a, b) => _compareEvents(a, b));
 
                   return Column(
                     children: [
@@ -83,6 +98,36 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
                             prefixIcon: Icon(Icons.search),
                           ),
                           onChanged: (v) => setState(() => search = v),
+                        ),
+                      ),
+
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Row(
+                          children: [
+                            DropdownButton<String>(
+                              value: sortField,
+                              items: const [
+                                DropdownMenuItem(
+                                    value: "event_date", child: Text("Event Date")),
+                                DropdownMenuItem(
+                                    value: "title", child: Text("Title")),
+                                DropdownMenuItem(
+                                    value: "status", child: Text("Status")),
+                              ],
+                              onChanged: (v) =>
+                                  setState(() => sortField = v!),
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                sortAsc
+                                    ? Icons.arrow_upward
+                                    : Icons.arrow_downward,
+                              ),
+                              onPressed: () =>
+                                  setState(() => sortAsc = !sortAsc),
+                            ),
+                          ],
                         ),
                       ),
 
@@ -166,4 +211,28 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
       ),
     );
   }
+
+  int _compareEvents(Map a, Map b) {
+    int result;
+    switch (sortField) {
+      case "title":
+        result = (a["title"] ?? "").toString().toLowerCase().compareTo(
+            (b["title"] ?? "").toString().toLowerCase());
+        break;
+      case "status":
+        result = (a["status"] ?? "").toString().compareTo(
+            (b["status"] ?? "").toString());
+        break;
+      case "event_date":
+      default:
+        final aDate = DateTime.tryParse((a["event_date"] ?? "").toString());
+        final bDate = DateTime.tryParse((b["event_date"] ?? "").toString());
+        result = (aDate ?? DateTime(1970))
+            .compareTo(bDate ?? DateTime(1970));
+        break;
+    }
+
+    return sortAsc ? result : -result;
+  }
+
 }

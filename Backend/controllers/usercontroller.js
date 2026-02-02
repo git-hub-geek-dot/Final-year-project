@@ -1,11 +1,11 @@
 const pool = require("../config/db");
 
+// ================= DELETE USER =================
 const deleteUser = async (req, res) => {
   try {
     const userIdFromParams = Number(req.params.id);
-    const userIdFromToken = req.user.id; // 🔐 FROM JWT
+    const userIdFromToken = req.user.id;
 
-    // ❌ Invalid ID
     if (!userIdFromParams || isNaN(userIdFromParams)) {
       return res.status(400).json({
         success: false,
@@ -13,15 +13,12 @@ const deleteUser = async (req, res) => {
       });
     }
 
-    // 🔐 SECURITY CHECK
     if (userIdFromParams !== userIdFromToken) {
       return res.status(403).json({
         success: false,
         message: "You are not allowed to delete this account",
       });
     }
-
-    console.log("SECURE DELETE USER:", userIdFromParams);
 
     const result = await pool.query(
       "UPDATE users SET status = $1 WHERE id = $2",
@@ -48,6 +45,7 @@ const deleteUser = async (req, res) => {
   }
 };
 
+// ================= GET ORGANISER PROFILE =================
 const getOrganiserProfile = async (req, res) => {
   try {
     const organiserId = Number(req.params.id);
@@ -59,27 +57,14 @@ const getOrganiserProfile = async (req, res) => {
     const result = await pool.query(
       `
       SELECT
-        u.id,
-        u.name,
-        u.email,
-        u.city,
-        u.contact_number,
-        COALESCE(ev.events_count, 0) AS events_count,
-        COALESCE(ve.volunteers_engaged, 0) AS volunteers_engaged
-      FROM users u
-      LEFT JOIN (
-        SELECT organiser_id, COUNT(*)::int AS events_count
-        FROM events
-        WHERE status != 'deleted'
-        GROUP BY organiser_id
-      ) ev ON ev.organiser_id = u.id
-      LEFT JOIN (
-        SELECT e.organiser_id, COUNT(DISTINCT a.volunteer_id)::int AS volunteers_engaged
-        FROM events e
-        JOIN applications a ON a.event_id = e.id AND a.status = 'accepted'
-        GROUP BY e.organiser_id
-      ) ve ON ve.organiser_id = u.id
-      WHERE u.id = $1 AND u.role = 'organiser'
+        id,
+        name,
+        email,
+        city,
+        contact_number,
+        government_id
+      FROM users
+      WHERE id = $1 AND role = 'organiser'
       `,
       [organiserId]
     );
@@ -95,4 +80,79 @@ const getOrganiserProfile = async (req, res) => {
   }
 };
 
-module.exports = { deleteUser, getOrganiserProfile };
+// ================= UPDATE USER PROFILE =================
+const updateUser = async (req, res) => {
+  try {
+    const userIdFromParams = Number(req.params.id);
+    const userIdFromToken = req.user.id;
+
+    if (!userIdFromParams || isNaN(userIdFromParams)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID",
+      });
+    }
+
+    if (userIdFromParams !== userIdFromToken) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized",
+      });
+    }
+
+    const {
+      name,
+      email,
+      city,
+      contact_number,
+      government_id,
+    } = req.body;
+
+    const result = await pool.query(
+      `
+      UPDATE users
+      SET
+        name = $1,
+        email = $2,
+        city = $3,
+        contact_number = $4,
+        government_id = $5
+      WHERE id = $6
+      RETURNING id, name, email, city, contact_number, government_id
+      `,
+      [
+        name,
+        email,
+        city,
+        contact_number,
+        government_id || null,
+        userIdFromParams,
+      ]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      user: result.rows[0],
+    });
+  } catch (error) {
+    console.error("Update user error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Profile update failed",
+    });
+  }
+};
+
+module.exports = {
+  deleteUser,
+  getOrganiserProfile,
+  updateUser,
+};

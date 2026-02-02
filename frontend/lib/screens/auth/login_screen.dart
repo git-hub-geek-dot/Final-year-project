@@ -52,7 +52,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
         final String token = data["token"];
         final String role = data["user"]["role"];
-        final String userId = data["user"]["id"].toString();
+        final int userId = data["user"]["id"];
 
         // ✅ Save auth data in ONE place (TokenService)
         await TokenService.saveAuthData(

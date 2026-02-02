@@ -1,8 +1,13 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:frontend/config/api_config.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:frontend/services/user_service.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -19,6 +24,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   bool isLoading = false;
   bool loadingProfile = true;
+  
+  XFile? _profileImage; // Use XFile instead of File for web compatibility
+  Uint8List? _profileImageBytes; // Store bytes for web preview
+  String? _profileImageUrl;
+  bool isUploadingImage = false;
 
   @override
   void initState() {
@@ -56,6 +66,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           cityController.text = user["city"] ?? "";
           contactController.text =
               user["contact_number"]?.toString() ?? "";
+          _profileImageUrl = user["profile_picture_url"];
           loadingProfile = false;
         });
       } else {
@@ -63,6 +74,162 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       }
     } catch (e) {
       loadingProfile = false;
+    }
+  }
+
+  // ================= BUILD PROFILE IMAGE PROVIDER =================
+  ImageProvider? _buildProfileImageProvider() {
+    if (_profileImage != null) {
+      if (kIsWeb && _profileImageBytes != null) {
+        // On web, use MemoryImage with the bytes for immediate preview
+        return MemoryImage(_profileImageBytes!);
+      } else if (!kIsWeb) {
+        // On mobile, use FileImage
+        return FileImage(File(_profileImage!.path));
+      }
+    }
+    
+    // Show uploaded image if available
+    if (_profileImageUrl != null && _profileImageUrl!.isNotEmpty) {
+      return NetworkImage(_profileImageUrl!);
+    }
+    
+    return null;
+  }
+
+  // ================= PICK IMAGE FROM GALLERY =================
+  Future<void> _pickImageFromGallery() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+      );
+
+      if (pickedFile != null) {
+        // Read bytes for preview
+        final bytes = await pickedFile.readAsBytes();
+        
+        setState(() {
+          _profileImage = pickedFile;
+          _profileImageBytes = bytes; // Store bytes for web preview
+        });
+
+        // Upload the image
+        await _uploadProfileImage();
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error picking image: $e")),
+      );
+    }
+  }
+
+  // ================= UPLOAD PROFILE IMAGE =================
+  Future<void> _uploadProfileImage() async {
+    if (_profileImage == null) return;
+
+    setState(() => isUploadingImage = true);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString("token");
+
+      if (token == null || token.isEmpty) {
+        setState(() => isUploadingImage = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Token not found. Please login again.")),
+        );
+        return;
+      }
+
+      // Upload image and get URL
+      final imageUrl = await UserService.uploadProfilePicture(token, _profileImage!);
+
+      if (imageUrl != null) {
+        setState(() {
+          _profileImageUrl = imageUrl;
+          isUploadingImage = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Profile picture updated ✅")),
+        );
+      } else {
+        setState(() => isUploadingImage = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to upload image")),
+        );
+      }
+    } catch (e) {
+      setState(() => isUploadingImage = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
+    }
+  }
+
+  Future<void> _removeProfilePicture() async {
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Remove Profile Picture"),
+        content: const Text("Are you sure you want to remove your profile picture?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Remove", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    ) ?? false;
+
+    if (!confirmed) return;
+
+    setState(() => isUploadingImage = true);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString("token");
+
+      if (token == null || token.isEmpty) {
+        setState(() => isUploadingImage = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Token not found. Please login again.")),
+        );
+        return;
+      }
+
+      // Call delete endpoint
+      final success = await UserService.deleteProfilePicture(token);
+
+      if (success) {
+        setState(() {
+          _profileImage = null;
+          _profileImageUrl = null;
+          _profileImageBytes = null;
+          isUploadingImage = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Profile picture removed ✅")),
+        );
+      } else {
+        setState(() => isUploadingImage = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to remove picture")),
+        );
+      }
+    } catch (e) {
+      setState(() => isUploadingImage = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
     }
   }
 
@@ -158,11 +325,59 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
-                  const CircleAvatar(
-                    radius: 48,
-                    backgroundColor: Color(0xFFE6E6FA),
-                    child:
-                        Icon(Icons.person, size: 48, color: Colors.deepPurple),
+                  // Profile Picture Section
+                  Stack(
+                    children: [
+                      CircleAvatar(
+                        radius: 48,
+                        backgroundColor: const Color(0xFFE6E6FA),
+                        backgroundImage: _buildProfileImageProvider(),
+                        child: (_profileImage == null &&
+                                (_profileImageUrl == null || _profileImageUrl!.isEmpty))
+                            ? const Icon(Icons.person, size: 48, color: Colors.deepPurple)
+                            : null,
+                      ),
+                      if (isUploadingImage)
+                        Positioned.fill(
+                          child: CircleAvatar(
+                            radius: 48,
+                            backgroundColor: Colors.black54,
+                            child: const CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation(Colors.white),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      GestureDetector(
+                        onTap: isUploadingImage ? null : _pickImageFromGallery,
+                        child: Text(
+                          "Change Profile Picture",
+                          style: TextStyle(
+                            color: isUploadingImage ? Colors.grey : const Color(0xFF2E6BE6),
+                            fontWeight: FontWeight.w600,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 20),
+                      if (_profileImageUrl != null && _profileImageUrl!.isNotEmpty)
+                        GestureDetector(
+                          onTap: isUploadingImage ? null : _removeProfilePicture,
+                          child: Text(
+                            "Remove",
+                            style: TextStyle(
+                              color: isUploadingImage ? Colors.grey : Colors.red,
+                              fontWeight: FontWeight.w600,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 30),
 

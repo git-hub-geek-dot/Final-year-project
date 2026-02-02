@@ -12,8 +12,12 @@ import 'about_volunteerx_screen.dart';
 import 'edit_profile_screen.dart';
 import 'get_verified_screen.dart';
 import 'leaderboard_screen.dart';
+<<<<<<< HEAD
 import 'organiser_activity_screen.dart';
 
+=======
+import 'my_events_screen.dart';
+>>>>>>> 967aa70e5ed64bd61653889365519a10808ddf2e
 
 class OrganiserProfileScreen extends StatefulWidget {
   const OrganiserProfileScreen({super.key});
@@ -31,6 +35,7 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
   String? email;
   String? city;
   String? role;
+  String? profilePictureUrl;
   String? verificationStatus;
 
   @override
@@ -78,6 +83,7 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
           name = data["name"];
           email = data["email"];
           city = data["city"];
+          profilePictureUrl = data["profile_picture_url"];
           role = data["role"];
           loading = false;
         });
@@ -231,10 +237,15 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
                               ],
                             ),
                             const SizedBox(height: 20),
-                            const CircleAvatar(
+                            CircleAvatar(
                               radius: 38,
                               backgroundColor: Colors.white,
-                              child: Icon(Icons.person, size: 40),
+                              backgroundImage: profilePictureUrl != null
+                                  ? NetworkImage(profilePictureUrl!)
+                                  : null,
+                              child: profilePictureUrl == null
+                                  ? const Icon(Icons.person, size: 40)
+                                  : null,
                             ),
                             const SizedBox(height: 10),
                             Row(
@@ -310,6 +321,20 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: Column(
                           children: [
+                            _profileOption(
+                              context: context,
+                              icon: Icons.event,
+                              text: "My Events",
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const MyEventsScreen(),
+                                  ),
+                                );
+                              },
+                            ),
                             _profileOption(
                               context: context,
                               icon: Icons.manage_accounts,

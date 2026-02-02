@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../node_modules/@prisma/client/.prisma/client"
   engineType = "library"
 }
 
@@ -102,6 +101,7 @@ model Event {
   paymentPerDay        Decimal?         @map("payment_per_day") @db.Decimal(10, 2)
   startTime            DateTime?        @map("start_time") @db.Time(6)
   endTime              DateTime?        @map("end_time") @db.Time(6)
+  createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamp(6)
 
   organiser             User?            @relation(fields: [organiserId], references: [id])
   applications          Application[]
@@ -188,6 +188,7 @@ model User {
   city        String?
   govtId      String?     @map("government_id")
   isVerified  Boolean     @default(false) // ✅ added (safe)
+  profilePictureUrl String? @map("profile_picture_url") // ✅ added (safe)
   createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamp(6)
 
   applications Application[]

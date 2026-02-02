@@ -5,11 +5,11 @@ import '../config/api_config.dart';
 
 class AdminService {
   // ================= EVENTS =================
-  static Future<List<dynamic>> getAllEvents() async {
+  static Future<Map<String, dynamic>> getAllEvents({int page = 1, int limit = 20}) async {
     final token = await TokenService.getToken();
 
     final response = await http.get(
-      Uri.parse("${ApiConfig.baseUrl}/admin/events"),
+      Uri.parse("${ApiConfig.baseUrl}/admin/events?page=$page&limit=$limit"),
       headers: {
         "Content-Type": "application/json",
         "Authorization": "Bearer $token",
@@ -39,11 +39,11 @@ class AdminService {
   }
 
   // ================= USERS =================
-  static Future<List<dynamic>> getAllUsers() async {
+  static Future<Map<String, dynamic>> getAllUsers({int page = 1, int limit = 20}) async {
     final token = await TokenService.getToken();
 
     final res = await http.get(
-      Uri.parse("${ApiConfig.baseUrl}/admin/users"),
+      Uri.parse("${ApiConfig.baseUrl}/admin/users?page=$page&limit=$limit"),
       headers: {
         "Content-Type": "application/json",
         "Authorization": "Bearer $token",
@@ -75,11 +75,11 @@ class AdminService {
   }
 
   // ================= APPLICATIONS =================
-  static Future<List<dynamic>> getAllApplications() async {
+  static Future<Map<String, dynamic>> getAllApplications({int page = 1, int limit = 20}) async {
     final token = await TokenService.getToken();
 
     final res = await http.get(
-      Uri.parse("${ApiConfig.baseUrl}/admin/applications"),
+      Uri.parse("${ApiConfig.baseUrl}/admin/applications?page=$page&limit=$limit"),
       headers: {
         "Content-Type": "application/json",
         "Authorization": "Bearer $token",

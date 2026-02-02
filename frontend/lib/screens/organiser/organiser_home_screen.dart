@@ -16,7 +16,8 @@ class OrganiserHomeScreen extends StatefulWidget {
 class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
   bool loading = true;
   List events = [];
-  String? userId;
+  int? userId;
+  int _selectedTab = 0; // 0: Ongoing, 1: Upcoming, 2: Completed
 
   @override
   void initState() {
@@ -122,16 +123,34 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
 
           const SizedBox(height: 20),
 
+          // 📑 TAB SELECTOR
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                _tabButton("Ongoing", 0),
+                const SizedBox(width: 8),
+                _tabButton("Upcoming", 1),
+                const SizedBox(width: 8),
+                _tabButton("Completed", 2),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
           Expanded(
             child: loading
                 ? const Center(child: CircularProgressIndicator())
                 : ListView(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     children: [
-                      _section("Ongoing Events", ongoing),
-                      _section("Upcoming Events", upcoming),
-                      _section("Completed Events", completed),
-                      _section("Deleted Events", getDeletedEvents()),
+                      if (_selectedTab == 0)
+                        _section("Ongoing Events", ongoing, isCompleted: false)
+                      else if (_selectedTab == 1)
+                        _section("Upcoming Events", upcoming, isCompleted: false)
+                      else
+                        _section("Completed Events", completed, isCompleted: true),
                     ],
                   ),
           ),
@@ -184,8 +203,18 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
     );
   }
 
-  Widget _section(String title, List list) {
-    if (list.isEmpty) return const SizedBox();
+  Widget _section(String title, List list, {bool isCompleted = false}) {
+    if (list.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 40),
+          child: Text(
+            "No $title",
+            style: const TextStyle(color: Colors.grey, fontSize: 16),
+          ),
+        ),
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -203,8 +232,30 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
               event,
               loadEvents,
               _isMyEvent(event),
+              isCompleted: isCompleted,
             )),
       ],
+    );
+  }
+
+  Widget _tabButton(String label, int tabIndex) {
+    final isActive = _selectedTab == tabIndex;
+    return InkWell(
+      onTap: () => setState(() => _selectedTab = tabIndex),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isActive ? const Color(0xFF22C55E) : Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isActive ? Colors.white : Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
     );
   }
 
@@ -218,8 +269,9 @@ Widget eventCard(
   BuildContext context,
   Map event,
   VoidCallback onRefresh,
-  bool isMine,
-) {
+  bool isMine, {
+  bool isCompleted = false,
+}) {
   return InkWell(
     onTap: () {
       Navigator.push(
@@ -246,43 +298,62 @@ Widget eventCard(
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            if (isMine)
-              Container(
-                margin: const EdgeInsets.only(bottom: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFDCFCE7),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: const Text(
-                  "My Event",
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF16A34A),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              if (isMine)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isCompleted
+                        ? const Color(0xFFDCFCE7)
+                        : const Color(0xFFDCFCE7),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    isCompleted ? "✅ Completed" : "My Event",
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: isCompleted
+                          ? const Color(0xFF16A34A)
+                          : const Color(0xFF16A34A),
+                    ),
                   ),
                 ),
-              ),
-            if (!isMine && event["organiser_name"] != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Text(
-                  "Organiser: ${event["organiser_name"]}",
+              if (!isMine && event["organiser_name"] != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text(
+                    "Organiser: ${event["organiser_name"]}",
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.black54,
+                    ),
+                  ),
+                ),
+              Text(event["title"] ?? "Untitled",
                   style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.black54,
-                  ),
+                      fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 6),
+              Text("📍 ${event["location"] ?? ""}"),
+              Text("📅 ${event["event_date"].toString().split("T")[0]}"),
+              if (isCompleted) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.star, size: 16, color: Colors.amber),
+                    const SizedBox(width: 4),
+                    Text(
+                      event["rating"] != null ? "${event["rating"]} (${event["review_count"] ?? 0})" : "No ratings yet",
+                      style: const TextStyle(fontSize: 12, color: Colors.black54),
+                    ),
+                  ],
                 ),
-              ),
-            Text(event["title"] ?? "Untitled",
-                style: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 6),
-            Text("📍 ${event["location"] ?? ""}"),
-            Text("📅 ${event["event_date"].toString().split("T")[0]}"),
-          ]),
-          if (isMine)
+              ],
+            ]),
+          ),
+          if (isMine && !isCompleted)
             InkWell(
               onTap: () {
                 Navigator.push(
@@ -303,7 +374,7 @@ Widget eventCard(
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: const Text(
-                  "Review Applications",
+                  "Review",
                   style: TextStyle(
                       color: Colors.white,
                       fontSize: 12,

@@ -19,6 +19,8 @@ app.use("/api", require("./routes/ratingRoutes"));
 app.use("/api", require("./routes/userRoutes"));
 app.use("/api", require("./routes/accountRoutes"));
 app.use("/api", require("./routes/profileRoutes"));
+// Uploads (images)
+app.use("/api", require("./routes/upload"));
 
 // 🔥 ADMIN ROUTES (already correct)
 app.use("/api/admin", require("./routes/adminRoutes"));

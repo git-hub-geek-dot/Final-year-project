@@ -12,6 +12,8 @@ import 'about_volunteerx_screen.dart';
 import 'edit_profile_screen.dart';
 import 'get_verified_screen.dart';
 import 'leaderboard_screen.dart';
+import 'organiser_activity_screen.dart';
+
 
 class OrganiserProfileScreen extends StatefulWidget {
   const OrganiserProfileScreen({super.key});
@@ -343,6 +345,20 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
                                       );
                                     },
                             ),
+                            _profileOption(
+  context: context,
+  icon: Icons.dashboard,
+  text: "Organisation Activity",
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const OrganiserActivityScreen(),
+      ),
+    );
+  },
+),
+
                             _profileOption(
                               context: context,
                               icon: Icons.help_outline,

@@ -29,6 +29,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Uint8List? _profileImageBytes; // Store bytes for web preview
   String? _profileImageUrl;
   bool isUploadingImage = false;
+  bool _hasProfileChanges = false;
 
   @override
   void initState() {
@@ -149,6 +150,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (imageUrl != null) {
         setState(() {
           _profileImageUrl = imageUrl;
+          _hasProfileChanges = true;
           isUploadingImage = false;
         });
 
@@ -213,6 +215,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           _profileImage = null;
           _profileImageUrl = null;
           _profileImageBytes = null;
+          _hasProfileChanges = true;
           isUploadingImage = false;
         });
 
@@ -279,6 +282,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       if (response.statusCode == 200) {
         if (!mounted) return;
+        _hasProfileChanges = true;
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Profile updated ✅")),
@@ -309,7 +313,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return WillPopScope(
+      onWillPop: () async {
+        if (_hasProfileChanges) {
+          Navigator.pop(context, true);
+          return false;
+        }
+        return true;
+      },
+      child: Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
         elevation: 0,
@@ -317,6 +329,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         title: const Text(
           "Edit Profile",
           style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pop(context, _hasProfileChanges);
+          },
         ),
       ),
       body: loadingProfile
@@ -435,6 +453,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ],
               ),
             ),
+      ),
     );
   }
 

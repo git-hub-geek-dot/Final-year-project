@@ -20,6 +20,14 @@ const rejectUnauthorized = ["true", "1", "yes"].includes(
   (process.env.PGSSL_REJECT_UNAUTHORIZED || "").toLowerCase()
 );
 
+if ((process.env.PGSSL_DEBUG || "").toLowerCase() === "true") {
+  console.log("[PGSSL] useSsl:", useSsl);
+  console.log("[PGSSL] rejectUnauthorized:", rejectUnauthorized);
+  console.log("[PGSSL] PGSSL:", pgSslEnv || "(empty)");
+  console.log("[PGSSL] PGSSLMODE:", pgSslMode || "(empty)");
+  console.log("[PGSSL] sslmode in URL:", sslModeRequired);
+}
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: useSsl ? { rejectUnauthorized } : undefined,

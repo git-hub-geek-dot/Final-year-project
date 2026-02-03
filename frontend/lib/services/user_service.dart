@@ -60,18 +60,27 @@ class UserService {
         // Parse the response to get the URL
         final jsonResponse = jsonDecode(responseBody);
         
+        print("Parsed response: $jsonResponse");
+        print("User object: ${jsonResponse['user']}");
+        
         // The backend returns the full user object with profile_picture_url
-        final uploadedUrl = jsonResponse['data']?['profile_picture_url'] ?? 
-                           jsonResponse['user']?['profile_picture_url'] ??
+        final uploadedUrl = jsonResponse['user']?['profile_picture_url'] ??
+                           jsonResponse['data']?['profile_picture_url'] ?? 
                            jsonResponse['profile_picture_url'] ??
                            jsonResponse['url'];
+
+        print("Extracted URL: $uploadedUrl");
 
         if (uploadedUrl != null && uploadedUrl.toString().isNotEmpty) {
           print("✅ Image uploaded successfully: $uploadedUrl");
           return uploadedUrl.toString();
         } else {
           print("No URL in upload response");
-          print("Full response: $jsonResponse");
+          print("Full response JSON: $jsonResponse");
+          print("Looking for user.profile_picture_url: ${jsonResponse['user']?['profile_picture_url']}");
+          print("Looking for data.profile_picture_url: ${jsonResponse['data']?['profile_picture_url']}");
+          print("Looking for profile_picture_url: ${jsonResponse['profile_picture_url']}");
+          print("Looking for url: ${jsonResponse['url']}");
           return null;
         }
       } else {

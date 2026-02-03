@@ -28,6 +28,8 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
   bool loading = true;
   String? errorMessage;
 
+  int? _imageCacheBuster;
+
   String? name;
   String? email;
   String? city;
@@ -83,12 +85,19 @@ Future<void> loadVerificationStatus() async {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
+        print("Profile data fetched: $data");
+        print("Profile picture URL from API: ${data["profile_picture_url"]}");
+
         setState(() {
           name = data["name"];
           email = data["email"];
           city = data["city"];
           role = data["role"];
-          profilePictureUrl = data["profile_picture_url"];
+          profilePictureUrl = _normalizeProfileImageUrl(
+            data["profile_picture_url"],
+          );
+          print("Normalized URL: $profilePictureUrl");
+          _imageCacheBuster = DateTime.now().millisecondsSinceEpoch;
           loading = false;
         });
       } else {
@@ -118,6 +127,113 @@ Future<void> loadVerificationStatus() async {
       context,
       MaterialPageRoute(builder: (_) => const LoginScreen()),
       (_) => false,
+    );
+  }
+
+  double _profileCompletionPercent() {
+    final total = 5;
+    var completed = 0;
+
+    if ((name ?? '').trim().isNotEmpty) completed++;
+    if ((email ?? '').trim().isNotEmpty) completed++;
+    if ((city ?? '').trim().isNotEmpty) completed++;
+    if ((profilePictureUrl ?? '').trim().isNotEmpty) completed++;
+    if ((verificationStatus ?? '').trim().isNotEmpty) completed++;
+
+    return completed / total;
+  }
+
+  List<String> _missingProfileItems() {
+    final missing = <String>[];
+    if ((name ?? '').trim().isEmpty) missing.add("Name");
+    if ((email ?? '').trim().isEmpty) missing.add("Email");
+    if ((city ?? '').trim().isEmpty) missing.add("City");
+    if ((profilePictureUrl ?? '').trim().isEmpty) {
+      missing.add("Profile photo");
+    }
+    if ((verificationStatus ?? '').trim().isEmpty) {
+      missing.add("Verification status");
+    }
+    return missing;
+  }
+
+  String? _normalizeProfileImageUrl(String? url) {
+    if (url == null || url.trim().isEmpty) {
+      print("URL is null or empty: '$url'");
+      return null;
+    }
+
+    final baseUri = Uri.parse(ApiConfig.baseUrl);
+    final origin =
+        "${baseUri.scheme}://${baseUri.host}${baseUri.hasPort ? ':${baseUri.port}' : ''}";
+
+    print("Normalizing URL: '$url' with origin: '$origin'");
+
+    if (url.startsWith("/uploads/")) {
+      final normalized = "$origin$url";
+      print("Normalized /uploads/ path to: $normalized");
+      return normalized;
+    }
+
+    if (url.startsWith("uploads/")) {
+      final normalized = "$origin/$url";
+      print("Normalized uploads/ path to: $normalized");
+      return normalized;
+    }
+
+    if (url.contains("localhost") || url.contains("127.0.0.1")) {
+      final parsed = Uri.tryParse(url);
+      if (parsed != null) {
+        final pathWithQuery = parsed.hasQuery
+            ? "${parsed.path}?${parsed.query}"
+            : parsed.path;
+        final normalized = "$origin$pathWithQuery";
+        print("Normalized localhost URL to: $normalized");
+        return normalized;
+      }
+    }
+
+    print("Returning URL as-is: $url");
+    return url;
+  }
+
+  Widget _buildProfileAvatar() {
+    final normalizedUrl = _normalizeProfileImageUrl(profilePictureUrl);
+    print("Building avatar with URL: $normalizedUrl");
+    
+    if (normalizedUrl == null || normalizedUrl.isEmpty) {
+      return const CircleAvatar(
+        radius: 42,
+        backgroundColor: Colors.white,
+        child: Icon(Icons.person, size: 42),
+      );
+    }
+
+    final imageUrl = "${normalizedUrl}?v=${_imageCacheBuster ?? 0}";
+    print("Final image URL: $imageUrl");
+
+    return CircleAvatar(
+      radius: 42,
+      backgroundColor: Colors.white,
+      child: ClipOval(
+        child: Image.network(
+          imageUrl,
+          width: 84,
+          height: 84,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            print("Image load error: $error");
+            print("Stack trace: $stackTrace");
+            return const Icon(Icons.person, size: 42);
+          },
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return const Center(
+              child: CircularProgressIndicator(strokeWidth: 2),
+            );
+          },
+        ),
+      ),
     );
   }
 
@@ -276,18 +392,7 @@ Future<void> loadVerificationStatus() async {
                         ),
                         child: Column(
                           children: [
-                            CircleAvatar(
-                              radius: 42,
-                              backgroundColor: Colors.white,
-                              backgroundImage: (profilePictureUrl != null &&
-                                      profilePictureUrl!.isNotEmpty)
-                                  ? NetworkImage(profilePictureUrl!) as ImageProvider
-                                  : null,
-                              child: (profilePictureUrl == null ||
-                                      profilePictureUrl!.isEmpty)
-                                  ? const Icon(Icons.person, size: 42)
-                                  : null,
-                            ),
+                            _buildProfileAvatar(),
                             const SizedBox(height: 12),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -323,17 +428,16 @@ Future<void> loadVerificationStatus() async {
                             /// EDIT PROFILE
                             GestureDetector(
                               onTap: () async {
-                                final updated = await Navigator.push(
+                                await Navigator.push(
                                   context,
                                   MaterialPageRoute(
                                     builder: (_) =>
                                         const EditProfileScreen(),
                                   ),
                                 );
-
-                                if (updated == true) {
-                                  fetchProfile();
-                                }
+                                // Force refresh after a brief delay to ensure backend has updated
+                                await Future.delayed(const Duration(milliseconds: 500));
+                                fetchProfile();
                               },
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
@@ -355,6 +459,61 @@ Future<void> loadVerificationStatus() async {
                       ),
 
                       const SizedBox(height: 24),
+
+                      /// ================= PROFILE COMPLETENESS =================
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Card(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  "Profile Completeness",
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: LinearProgressIndicator(
+                                    value: _profileCompletionPercent(),
+                                    minHeight: 10,
+                                    backgroundColor: const Color(0xFFE5E7EB),
+                                    valueColor: const AlwaysStoppedAnimation(
+                                      Color(0xFF22C55E),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  "${(_profileCompletionPercent() * 100).round()}% complete",
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                if (_missingProfileItems().isNotEmpty)
+                                  Text(
+                                    "Missing: ${_missingProfileItems().join(', ')}",
+                                    style: const TextStyle(
+                                      color: Colors.grey,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
 
                       /// ================= ACTIVITIES =================
                       Padding(

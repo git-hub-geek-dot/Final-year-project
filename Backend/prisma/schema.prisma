@@ -5,7 +5,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 //// ENUMS
@@ -154,6 +153,16 @@ model UserBadge {
   @@map("user_badges")
 }
 
+model VolunteerPreference {
+  userId    Int      @id @map("user_id")
+  skills    String[] @default([])
+  interests String[] @default([])
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("volunteer_preferences")
+}
+
 model VerificationRequest {
   id                Int                 @id @default(autoincrement())
   userId            Int                 @map("user_id")
@@ -197,6 +206,7 @@ model User {
   ratingsGiven  Rating[] @relation("RatingRater")
   ratingsTaken  Rating[] @relation("RatingRatee")
   userBadges    UserBadge[]
+  volunteerPreference VolunteerPreference?
   verificationRequests VerificationRequest[]
 
   @@map("users")

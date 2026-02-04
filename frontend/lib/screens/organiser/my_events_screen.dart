@@ -348,67 +348,6 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
     );
   }
 
-  // ================= SECTION =================
-
-  Widget _section(String title, List list) {
-    if (list.isEmpty) return const SizedBox();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8, top: 16),
-          child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        ...list.map((event) => _eventCard(event)),
-      ],
-    );
-  }
-
-  // ================= EVENT CARD =================
-
-  Widget _eventCard(dynamic event) {
-    final eventDate = event["event_date"] != null
-        ? event["event_date"].toString().split("T")[0]
-        : "-";
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-      ),
-      elevation: 1,
-      child: ListTile(
-        title: Text(
-          event["title"] ?? "Untitled Event",
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Text("📍 ${event["location"] ?? "-"}"),
-            const SizedBox(height: 4),
-            Text(
-              "Status: ${event["status"] ?? "open"}",
-              style: const TextStyle(fontSize: 13),
-            ),
-          ],
-        ),
-        trailing: Text(
-          eventDate,
-          style: const TextStyle(fontSize: 12),
-        ),
-      ),
-    );
-  }
-
   @override
   void dispose() {
     _searchController.dispose();

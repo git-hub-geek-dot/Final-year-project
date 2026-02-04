@@ -87,61 +87,73 @@ class AdminHomeScreen extends StatelessWidget {
         ],
       ),
       body: AppBackground(
-        child: GridView.builder(
-          padding: const EdgeInsets.all(16.0),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 16.0,
-            mainAxisSpacing: 16.0,
-            childAspectRatio: 1.2,
-          ),
-          itemCount: items.length,
-          itemBuilder: (context, index) {
-            final item = items[index];
-            return Card(
-              elevation: 4.0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16.0),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth;
+            final crossAxisCount = width < 600
+                ? 1
+                : width < 900
+                    ? 2
+                    : 3;
+            final childAspectRatio = width < 600 ? 1.6 : 1.2;
+
+            return GridView.builder(
+              padding: const EdgeInsets.all(16.0),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossAxisCount,
+                crossAxisSpacing: 16.0,
+                mainAxisSpacing: 16.0,
+                childAspectRatio: childAspectRatio,
               ),
-              child: InkWell(
-                onTap: item.onTap,
-                borderRadius: BorderRadius.circular(16.0),
-                child: Container(
-                  decoration: BoxDecoration(
+              itemCount: items.length,
+              itemBuilder: (context, index) {
+                final item = items[index];
+                return Card(
+                  elevation: 4.0,
+                  shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16.0),
-                    gradient: LinearGradient(
-                      colors: [item.color.withOpacity(0.7), item.color],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+                  ),
+                  child: InkWell(
+                    onTap: item.onTap,
+                    borderRadius: BorderRadius.circular(16.0),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16.0),
+                        gradient: LinearGradient(
+                          colors: [item.color.withOpacity(0.7), item.color],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(item.icon, size: 48.0, color: Colors.white),
+                          const SizedBox(height: 12.0),
+                          Text(
+                            item.title,
+                            style: const TextStyle(
+                              fontSize: 16.0,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 4.0),
+                          Text(
+                            item.subtitle,
+                            style: const TextStyle(
+                              fontSize: 12.0,
+                              color: Colors.white70,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(item.icon, size: 48.0, color: Colors.white),
-                      const SizedBox(height: 12.0),
-                      Text(
-                        item.title,
-                        style: const TextStyle(
-                          fontSize: 16.0,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 4.0),
-                      Text(
-                        item.subtitle,
-                        style: const TextStyle(
-                          fontSize: 12.0,
-                          color: Colors.white70,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+                );
+              },
             );
           },
         ),

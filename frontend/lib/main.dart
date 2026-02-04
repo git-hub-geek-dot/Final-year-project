@@ -17,6 +17,7 @@ import 'screens/admin/admin_home_screen.dart';
 
 // 👤 ORGANISER
 import 'screens/organiser/organiser_profile_screen.dart';
+import 'services/token_service.dart';
 
 void main() {
   runApp(const MyApp());
@@ -30,8 +31,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
 
-      // ✅ LOGIN IS DEFAULT LANDING PAGE
-      initialRoute: '/',
+      home: const AuthGate(),
 
       routes: {
         // 🔐 AUTH
@@ -60,4 +60,52 @@ class MyApp extends StatelessWidget {
       },
     );
   }
+}
+
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
+
+  Future<_AuthState> _loadAuth() async {
+    final token = await TokenService.getToken();
+    final role = await TokenService.getRole();
+    return _AuthState(token: token, role: role);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<_AuthState>(
+      future: _loadAuth(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final token = snapshot.data?.token;
+        final role = snapshot.data?.role;
+
+        if (token == null || token.isEmpty || role == null || role.isEmpty) {
+          return const LoginScreen();
+        }
+
+        if (role == "admin") {
+          return const AdminHomeScreen();
+        } else if (role == "organiser") {
+          return const OrganiserHomeScreen();
+        } else if (role == "volunteer") {
+          return const VolunteerHomeScreen();
+        }
+
+        return const LoginScreen();
+      },
+    );
+  }
+}
+
+class _AuthState {
+  final String? token;
+  final String? role;
+
+  _AuthState({required this.token, required this.role});
 }

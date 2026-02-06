@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const { notifyUser } = require("../services/notificationService");
 
 // ================= APPLY TO EVENT =================
 exports.applyToEvent = async (req, res) => {
@@ -197,6 +198,23 @@ exports.updateApplicationStatus = async (req, res) => {
       message: "Application status updated",
       application: result.rows[0],
     });
+
+    try {
+      const app = result.rows[0];
+      const eventResult = await pool.query(
+        "SELECT title FROM events WHERE id = $1",
+        [app.event_id]
+      );
+      const eventTitle = eventResult.rows[0]?.title || "your event";
+
+      await notifyUser(app.volunteer_id, {
+        title: "Application update",
+        body: `Your application for ${eventTitle} was ${app.status}.`,
+        data: { type: "application_status", status: app.status },
+      });
+    } catch (notifyErr) {
+      console.error("APPLICATION STATUS NOTIFY ERROR:", notifyErr);
+    }
   } catch (err) {
     console.error("UPDATE APPLICATION STATUS ERROR:", err);
     res.status(500).json({ error: "Failed to update status" });

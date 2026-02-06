@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const { notifyUsers } = require("../services/notificationService");
 
 /*
 EVENTS TABLE (SOURCE OF TRUTH)
@@ -310,7 +311,25 @@ exports.updateEvent = async (req, res) => {
       return res.status(404).json({ error: "Event not found" });
     }
 
-    res.json(result.rows[0]);
+    const updatedEvent = result.rows[0];
+
+    res.json(updatedEvent);
+
+    try {
+      const volunteerResult = await pool.query(
+        "SELECT volunteer_id FROM applications WHERE event_id = $1",
+        [eventId]
+      );
+      const volunteerIds = volunteerResult.rows.map((r) => r.volunteer_id);
+
+      await notifyUsers(volunteerIds, {
+        title: "Event update",
+        body: `${updatedEvent.title} details were updated.`,
+        data: { type: "event_update", eventId: String(eventId) },
+      });
+    } catch (notifyErr) {
+      console.error("EVENT UPDATE NOTIFY ERROR:", notifyErr);
+    }
   } catch (err) {
     console.error("UPDATE EVENT ERROR:", err);
     res.status(500).json({ error: "Failed to update event" });

@@ -1,6 +1,7 @@
 # Backend
 Backend/node_modules/
 Backend/.env
+Backend/firebase-service-account.json
 
 # Flutter
 frontend/build/

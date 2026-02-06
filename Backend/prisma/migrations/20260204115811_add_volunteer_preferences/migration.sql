@@ -1,10 +1,9 @@
-﻿-- CreateTable
+-- CreateTable
 CREATE TABLE "volunteer_preferences" (
-	"user_id" INTEGER NOT NULL,
-	"skills" TEXT[] DEFAULT '{}'::TEXT[],
-	"interests" TEXT[] DEFAULT '{}'::TEXT[],
-
-	CONSTRAINT "volunteer_preferences_pkey" PRIMARY KEY ("user_id")
+  "user_id" INTEGER NOT NULL,
+  "skills" TEXT[] DEFAULT '{}'::TEXT[],
+  "interests" TEXT[] DEFAULT '{}'::TEXT[],
+  CONSTRAINT "volunteer_preferences_pkey" PRIMARY KEY ("user_id")
 );
 
 -- AddForeignKey

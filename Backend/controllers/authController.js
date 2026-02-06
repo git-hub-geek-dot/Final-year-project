@@ -1,7 +1,184 @@
 const bcrypt = require("bcrypt");
+const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const pool = require("../config/db");
 const transporter = require("../config/email");
+
+const OTP_TTL_MINUTES = 10;
+
+const normalizeIdentifier = (identifier) => identifier.trim().toLowerCase();
+
+const generateOtp = () =>
+  Math.floor(100000 + Math.random() * 900000).toString();
+
+const hashOtp = (identifier, otp) => {
+  const secret = process.env.OTP_SECRET || process.env.JWT_SECRET || "otp";
+  return crypto
+    .createHmac("sha256", secret)
+    .update(`${identifier}:${otp}`)
+    .digest("hex");
+};
+
+const getExpiryDate = () =>
+  new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000);
+
+const isVerified = async (identifier, channel) => {
+  const result = await pool.query(
+    `
+    SELECT id
+    FROM otp_verifications
+    WHERE identifier = $1
+      AND channel = $2
+      AND verified_at IS NOT NULL
+      AND expires_at > NOW()
+    ORDER BY verified_at DESC
+    LIMIT 1
+    `,
+    [identifier, channel]
+  );
+
+  return result.rows.length > 0;
+};
+
+// ================= OTP REQUEST =================
+exports.requestOtp = async (req, res) => {
+  try {
+    const { identifier, channel } = req.body;
+
+    if (!identifier || !channel) {
+      return res.status(400).json({
+        success: false,
+        message: "Identifier and channel are required",
+      });
+    }
+
+    if (!['email', 'phone'].includes(channel)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid channel",
+      });
+    }
+
+    if (channel === "phone") {
+      return res.status(400).json({
+        success: false,
+        message: "Use Firebase client to send phone OTP",
+      });
+    }
+
+    const normalized = normalizeIdentifier(identifier);
+    const otp = generateOtp();
+    const otpHash = hashOtp(normalized, otp);
+    const expiresAt = getExpiryDate();
+
+    await pool.query(
+      `
+      INSERT INTO otp_verifications (identifier, channel, code_hash, expires_at)
+      VALUES ($1, $2, $3, $4)
+      `,
+      [normalized, channel, otpHash, expiresAt]
+    );
+
+    await transporter.sendMail({
+      to: normalized,
+      subject: "Your VolunteerX verification code",
+      text: `Your OTP is ${otp}. It expires in ${OTP_TTL_MINUTES} minutes.`,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "OTP sent",
+    });
+  } catch (err) {
+    console.error("REQUEST OTP ERROR:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to send OTP",
+    });
+  }
+};
+
+// ================= OTP VERIFY =================
+exports.verifyOtp = async (req, res) => {
+  try {
+    const { identifier, channel, otp } = req.body;
+
+    if (!identifier || !channel || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: "Identifier, channel, and otp are required",
+      });
+    }
+
+    if (!['email', 'phone'].includes(channel)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid channel",
+      });
+    }
+
+    const normalized = normalizeIdentifier(identifier);
+    const otpHash = hashOtp(normalized, otp);
+
+    const result = await pool.query(
+      `
+      SELECT id
+      FROM otp_verifications
+      WHERE identifier = $1
+        AND channel = $2
+        AND code_hash = $3
+        AND expires_at > NOW()
+        AND verified_at IS NULL
+      ORDER BY created_at DESC
+      LIMIT 1
+      `,
+      [normalized, channel, otpHash]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired OTP",
+      });
+    }
+
+    await pool.query(
+      `
+      UPDATE otp_verifications
+      SET verified_at = NOW()
+      WHERE id = $1
+      `,
+      [result.rows[0].id]
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "OTP verified",
+    });
+  } catch (err) {
+    console.error("VERIFY OTP ERROR:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to verify OTP",
+    });
+  }
+};
+
+// ================= PHONE VERIFY (FIREBASE) =================
+exports.verifyPhoneToken = async (req, res) => {
+  try {
+    return res.status(501).json({
+      success: false,
+      message: "Firebase Admin not configured",
+    });
+  } catch (err) {
+    console.error("VERIFY PHONE ERROR:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to verify phone",
+    });
+  }
+};
 
 // ================= REGISTER =================
 exports.register = async (req, res) => {
@@ -41,9 +218,29 @@ exports.register = async (req, res) => {
       });
     }
 
+    const normalizedEmail = normalizeIdentifier(email);
+
+    const emailVerified = await isVerified(normalizedEmail, "email");
+    if (!emailVerified) {
+      return res.status(400).json({
+        success: false,
+        message: "Email verification required",
+      });
+    }
+
+    if (process.env.REQUIRE_PHONE_OTP === "true" && contact_number) {
+      const phoneVerified = await isVerified(contact_number.trim(), "phone");
+      if (!phoneVerified) {
+        return res.status(400).json({
+          success: false,
+          message: "Phone verification required",
+        });
+      }
+    }
+
     const existing = await pool.query(
       "SELECT id FROM users WHERE email = $1",
-      [email]
+      [normalizedEmail]
     );
 
     if (existing.rows.length > 0) {
@@ -64,7 +261,7 @@ exports.register = async (req, res) => {
       `,
       [
         name,
-        email,
+        normalizedEmail,
         hashedPassword,
         finalRole,
         finalRole === "organiser" ? contact_number ?? null : null,

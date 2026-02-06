@@ -39,6 +39,12 @@ enum VerificationStatus {
   rejected
 }
 
+enum OtpChannel {
+  email
+  phone
+}
+
+
 //// MODELS
 
 model Application {
@@ -163,6 +169,32 @@ model VolunteerPreference {
   @@map("volunteer_preferences")
 }
 
+model OtpVerification {
+  id         Int        @id @default(autoincrement())
+  identifier String
+  channel    OtpChannel
+  codeHash   String?
+  expiresAt  DateTime   @map("expires_at")
+  verifiedAt DateTime?  @map("verified_at")
+  createdAt  DateTime   @default(now()) @map("created_at")
+
+  @@index([identifier, channel], map: "idx_otp_identifier_channel")
+  @@map("otp_verifications")
+}
+
+model DeviceToken {
+  id        Int            @id @default(autoincrement())
+  userId    Int            @map("user_id")
+  token     String         @unique
+  platform  String         @db.VarChar(20)
+  createdAt DateTime       @default(now()) @map("created_at")
+
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_device_tokens_user_id")
+  @@map("device_tokens")
+}
+
 model VerificationRequest {
   id                Int                 @id @default(autoincrement())
   userId            Int                 @map("user_id")
@@ -208,6 +240,7 @@ model User {
   userBadges    UserBadge[]
   volunteerPreference VolunteerPreference?
   verificationRequests VerificationRequest[]
+  deviceTokens DeviceToken[]
 
   @@map("users")
 }

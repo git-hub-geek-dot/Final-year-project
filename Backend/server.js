@@ -24,6 +24,8 @@ app.use("/api", require("./routes/accountRoutes"));
 app.use("/api", require("./routes/profileRoutes"));
 // Uploads (images)
 app.use("/api", require("./routes/upload"));
+// Push notifications
+app.use("/api", require("./routes/notificationRoutes"));
 
 // 🔥 ADMIN ROUTES (already correct)
 app.use("/api/admin", require("./routes/adminRoutes"));

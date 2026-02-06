@@ -58,6 +58,7 @@ class _LoginScreenState extends State<LoginScreen> {
         await TokenService.saveAuthData(
           token: token,
           userId: userId,
+          role: role,
         );
 
         if (!mounted) return;

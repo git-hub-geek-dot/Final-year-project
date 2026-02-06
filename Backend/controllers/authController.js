@@ -177,6 +177,7 @@ exports.getProfile = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    console.log("GET PROFILE - User ID:", userId, "Profile data:", result.rows[0]);
     res.status(200).json(result.rows[0]);
   } catch (error) {
     console.error(error);

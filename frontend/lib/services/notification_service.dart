@@ -10,7 +10,7 @@ class NotificationService {
   static Future<void> init() async {
     await FirebaseMessaging.instance.requestPermission();
 
-    FirebaseMessaging.onTokenRefresh.listen((token) async {
+    FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
       await _sendTokenToBackend(token);
     });
   }

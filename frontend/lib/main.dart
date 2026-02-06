@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 // 🔐 AUTH
 import 'screens/auth/login_screen.dart';
@@ -18,8 +19,11 @@ import 'screens/admin/admin_home_screen.dart';
 // 👤 ORGANISER
 import 'screens/organiser/organiser_profile_screen.dart';
 import 'services/token_service.dart';
+import 'services/notification_service.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(const MyApp());
 }
 
@@ -35,7 +39,6 @@ class MyApp extends StatelessWidget {
 
       routes: {
         // 🔐 AUTH
-        '/': (context) => const LoginScreen(),
         '/register': (context) => const RoleSelectionScreen(),
         '/register-volunteer': (context) =>
             const RegisterVolunteerScreen(),
@@ -68,6 +71,10 @@ class AuthGate extends StatelessWidget {
   Future<_AuthState> _loadAuth() async {
     final token = await TokenService.getToken();
     final role = await TokenService.getRole();
+    if (token != null && token.isNotEmpty) {
+      await NotificationService.init();
+      await NotificationService.registerToken();
+    }
     return _AuthState(token: token, role: role);
   }
 

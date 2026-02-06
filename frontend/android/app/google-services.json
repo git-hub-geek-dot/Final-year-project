@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "168651342268",
+    "project_id": "volunteerx-dc1e5",
+    "storage_bucket": "volunteerx-dc1e5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:168651342268:android:a0cb5cf02608ecc9f8ebb9",
+        "android_client_info": {
+          "package_name": "com.volunteerx.frontend"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDo8BtU4gUPqFe8Xb4TpZ3tQej170fEVrY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const { notifyUser } = require("../services/notificationService");
 
 // ================= GET ALL USERS =================
 const getUsers = async (req, res) => {
@@ -150,6 +151,16 @@ const getStats = async (req, res) => {
       message: "User status updated",
       user: result.rows[0],
     });
+
+    try {
+      await notifyUser(userId, {
+        title: "Account status update",
+        body: `Your account status is now ${status}.`,
+        data: { type: "account_status", status },
+      });
+    } catch (notifyErr) {
+      console.error("USER STATUS NOTIFY ERROR:", notifyErr);
+    }
   } catch (err) {
     console.error("UPDATE USER STATUS ERROR:", err);
     res.status(500).json({ error: "Failed to update user status" });
@@ -170,6 +181,23 @@ const getStats = async (req, res) => {
     }
 
     res.json({ message: "Application cancelled" });
+
+    try {
+      const appResult = await pool.query(
+        "SELECT volunteer_id FROM applications WHERE id = $1",
+        [appId]
+      );
+      const volunteerId = appResult.rows[0]?.volunteer_id;
+      if (volunteerId) {
+        await notifyUser(volunteerId, {
+          title: "Application update",
+          body: "Your application was cancelled by admin.",
+          data: { type: "application_cancelled" },
+        });
+      }
+    } catch (notifyErr) {
+      console.error("CANCEL APPLICATION NOTIFY ERROR:", notifyErr);
+    }
   } catch (err) {
     console.error("CANCEL APPLICATION ERROR:", err);
     res.status(500).json({ error: "Failed to cancel application" });

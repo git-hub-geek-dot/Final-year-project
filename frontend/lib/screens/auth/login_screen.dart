@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../../services/token_service.dart';
+import '../../services/notification_service.dart';
 import '../../config/api_config.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/gradient_button.dart';
@@ -60,6 +61,9 @@ class _LoginScreenState extends State<LoginScreen> {
           userId: userId,
           role: role,
         );
+
+        await NotificationService.init();
+        await NotificationService.registerToken();
 
         if (!mounted) return;
 

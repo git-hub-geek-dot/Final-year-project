@@ -1,6 +1,7 @@
 import 'login_screen.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 
 import '../../config/api_config.dart';
@@ -23,11 +24,23 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
 
+  final emailOtpController = TextEditingController();
+  final phoneOtpController = TextEditingController();
+
   final contactController = TextEditingController();
   final cityController = TextEditingController();
   final govIdController = TextEditingController();
 
   bool loading = false;
+  bool sendingOtp = false;
+  bool verifyingOtp = false;
+  bool emailOtpSent = false;
+  bool emailVerified = false;
+  bool sendingPhoneOtp = false;
+  bool verifyingPhoneOtp = false;
+  bool phoneOtpSent = false;
+  bool phoneVerified = false;
+  String? phoneVerificationId;
   bool _obscurePassword = true;
   String? errorMessage;
 
@@ -36,6 +49,8 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
     nameController.dispose();
     emailController.dispose();
     passwordController.dispose();
+    emailOtpController.dispose();
+    phoneOtpController.dispose();
     contactController.dispose();
     cityController.dispose();
     govIdController.dispose();
@@ -53,6 +68,17 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
     if (widget.role == "organiser" &&
         contactController.text.trim().isEmpty) {
       showError("Contact number is required for organiser");
+      return;
+    }
+
+    if (!emailVerified) {
+      showError("Please verify your email");
+      return;
+    }
+
+    final phoneValue = contactController.text.trim();
+    if (phoneValue.isNotEmpty && !phoneVerified) {
+      showError("Please verify your phone number");
       return;
     }
 
@@ -117,6 +143,205 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
 
   void showError(String msg) {
     setState(() => errorMessage = msg);
+  }
+
+  Future<void> sendEmailOtp() async {
+    if (emailController.text.trim().isEmpty) {
+      showError("Email is required");
+      return;
+    }
+
+    setState(() {
+      sendingOtp = true;
+      errorMessage = null;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse("${ApiConfig.baseUrl}/auth/request-otp"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "identifier": emailController.text.trim(),
+          "channel": "email",
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        setState(() => emailOtpSent = true);
+      } else {
+        final data = jsonDecode(response.body);
+        showError(data["message"] ?? "Failed to send OTP");
+      }
+    } catch (_) {
+      showError("Failed to send OTP");
+    } finally {
+      if (mounted) setState(() => sendingOtp = false);
+    }
+  }
+
+  Future<void> verifyEmailOtp() async {
+    if (emailOtpController.text.trim().isEmpty) {
+      showError("Enter the OTP sent to your email");
+      return;
+    }
+
+    setState(() {
+      verifyingOtp = true;
+      errorMessage = null;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse("${ApiConfig.baseUrl}/auth/verify-otp"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "identifier": emailController.text.trim(),
+          "channel": "email",
+          "otp": emailOtpController.text.trim(),
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        setState(() => emailVerified = true);
+      } else {
+        final data = jsonDecode(response.body);
+        showError(data["message"] ?? "OTP verification failed");
+      }
+    } catch (_) {
+      showError("OTP verification failed");
+    } finally {
+      if (mounted) setState(() => verifyingOtp = false);
+    }
+  }
+
+  Future<void> sendPhoneOtp() async {
+    final phone = contactController.text.trim();
+    if (phone.isEmpty) {
+      showError("Phone number is required");
+      return;
+    }
+
+    setState(() {
+      sendingPhoneOtp = true;
+      errorMessage = null;
+    });
+
+    await FirebaseAuth.instance.verifyPhoneNumber(
+      phoneNumber: phone,
+      timeout: const Duration(seconds: 60),
+      verificationCompleted: (credential) async {
+        try {
+          await FirebaseAuth.instance.signInWithCredential(credential);
+          if (mounted) {
+            setState(() {
+              phoneVerified = true;
+              sendingPhoneOtp = false;
+            });
+          }
+          await FirebaseAuth.instance.signOut();
+        } catch (e) {
+          if (mounted) {
+            setState(() => sendingPhoneOtp = false);
+          }
+          showError("Phone verification failed");
+        }
+      },
+      verificationFailed: (e) {
+        if (mounted) {
+          setState(() => sendingPhoneOtp = false);
+        }
+        showError(e.message ?? "Phone verification failed");
+      },
+      codeSent: (verificationId, _) {
+        if (mounted) {
+          setState(() {
+            phoneVerificationId = verificationId;
+            phoneOtpSent = true;
+            sendingPhoneOtp = false;
+          });
+        }
+      },
+      codeAutoRetrievalTimeout: (verificationId) {
+        if (mounted) {
+          setState(() {
+            phoneVerificationId = verificationId;
+            sendingPhoneOtp = false;
+          });
+        }
+      },
+    );
+  }
+
+  Future<void> verifyPhoneOtp() async {
+    final otp = phoneOtpController.text.trim();
+    if (otp.isEmpty || phoneVerificationId == null) {
+      showError("Enter the OTP sent to your phone");
+      return;
+    }
+
+    setState(() {
+      verifyingPhoneOtp = true;
+      errorMessage = null;
+    });
+
+    try {
+      final credential = PhoneAuthProvider.credential(
+        verificationId: phoneVerificationId!,
+        smsCode: otp,
+      );
+
+      await FirebaseAuth.instance.signInWithCredential(credential);
+
+      if (mounted) {
+        setState(() => phoneVerified = true);
+      }
+
+      await FirebaseAuth.instance.signOut();
+    } catch (_) {
+      showError("Phone OTP verification failed");
+    } finally {
+      if (mounted) setState(() => verifyingPhoneOtp = false);
+    }
+  }
+
+  Widget _phoneOtpSection() {
+    if (contactController.text.trim().isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton(
+                onPressed: sendingPhoneOtp ? null : sendPhoneOtp,
+                child: Text(
+                  sendingPhoneOtp ? "Sending..." : "Send Phone OTP",
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            if (phoneVerified)
+              const Icon(Icons.verified, color: Colors.green),
+          ],
+        ),
+        if (phoneOtpSent) ...[
+          const SizedBox(height: 12),
+          inputField(
+            icon: Icons.lock_outline,
+            hint: "Enter phone OTP",
+            controller: phoneOtpController,
+          ),
+          ElevatedButton(
+            onPressed: verifyingPhoneOtp ? null : verifyPhoneOtp,
+            child: Text(
+              verifyingPhoneOtp ? "Verifying..." : "Verify Phone OTP",
+            ),
+          ),
+        ],
+      ],
+    );
   }
 
   Widget inputField({
@@ -196,6 +421,35 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
                     hint: "Email",
                     controller: emailController,
                   ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: sendingOtp ? null : sendEmailOtp,
+                          child: Text(
+                            sendingOtp ? "Sending..." : "Send Email OTP",
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      if (emailVerified)
+                        const Icon(Icons.verified, color: Colors.green),
+                    ],
+                  ),
+                  if (emailOtpSent) ...[
+                    const SizedBox(height: 12),
+                    inputField(
+                      icon: Icons.lock_outline,
+                      hint: "Enter OTP",
+                      controller: emailOtpController,
+                    ),
+                    ElevatedButton(
+                      onPressed: verifyingOtp ? null : verifyEmailOtp,
+                      child: Text(
+                        verifyingOtp ? "Verifying..." : "Verify OTP",
+                      ),
+                    ),
+                  ],
                   inputField(
                     icon: Icons.lock,
                     hint: "Password",
@@ -213,6 +467,7 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
                       hint: "Contact number (optional)",
                       controller: contactController,
                     ),
+                    _phoneOtpSection(),
                     inputField(
                       icon: Icons.location_city,
                       hint: "City (optional)",
@@ -226,6 +481,7 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
                       hint: "Contact number",
                       controller: contactController,
                     ),
+                    _phoneOtpSection(),
                     inputField(
                       icon: Icons.badge,
                       hint: "Government ID (optional)",

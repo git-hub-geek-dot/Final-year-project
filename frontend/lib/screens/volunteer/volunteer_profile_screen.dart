@@ -206,8 +206,28 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
       return "$origin/$url";
     }
 
+    final parsed = Uri.tryParse(url);
+    if (parsed != null && parsed.hasScheme) {
+      if (ApiConfig.useCloud) {
+        return url;
+      }
+
+      final host = parsed.host;
+      final isLocalLike = host == "localhost" ||
+          host == "127.0.0.1" ||
+          host.startsWith("10.") ||
+          host.startsWith("192.168.") ||
+          host.startsWith("172.");
+
+      if (isLocalLike && host != baseUri.host) {
+        final pathWithQuery = parsed.hasQuery
+            ? "${parsed.path}?${parsed.query}"
+            : parsed.path;
+        return "$origin$pathWithQuery";
+      }
+    }
+
     if (url.contains("localhost") || url.contains("127.0.0.1")) {
-      final parsed = Uri.tryParse(url);
       if (parsed != null) {
         final pathWithQuery = parsed.hasQuery
             ? "${parsed.path}?${parsed.query}"

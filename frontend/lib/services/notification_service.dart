@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:http/http.dart' as http;
 
@@ -8,6 +9,9 @@ import 'token_service.dart';
 
 class NotificationService {
   static Future<void> init() async {
+    if (kIsWeb) {
+      return;
+    }
     await FirebaseMessaging.instance.requestPermission();
 
     FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
@@ -16,6 +20,9 @@ class NotificationService {
   }
 
   static Future<void> registerToken() async {
+    if (kIsWeb) {
+      return;
+    }
     final token = await FirebaseMessaging.instance.getToken();
     if (token == null || token.isEmpty) {
       return;

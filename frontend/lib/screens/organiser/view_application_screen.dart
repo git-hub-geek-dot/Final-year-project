@@ -4,6 +4,9 @@ import 'package:http/http.dart' as http;
 
 import '../../config/api_config.dart';
 import '../../services/token_service.dart';
+import '../chat/chat_screen.dart';
+import '../../services/chat_service.dart';
+import '../rating/rating_screen.dart';
 
 class ViewApplicationScreen extends StatefulWidget {
   final int applicationId;
@@ -141,6 +144,62 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
     }
   }
 
+  Future<void> openChat() async {
+    final app = application;
+    if (app == null) return;
+
+    final eventId = app["event_id"];
+    final volunteerId = app["volunteer_id"];
+    if (eventId == null || volunteerId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Chat info not available")),
+      );
+      return;
+    }
+
+    try {
+      final thread = await ChatService.getOrCreateThread(
+        eventId: eventId,
+        volunteerId: volunteerId,
+      );
+
+      if (!mounted) return;
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ChatScreen(
+            threadId: thread["id"],
+            title: "Chat",
+          ),
+        ),
+      );
+    } catch (_) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to open chat")),
+      );
+    }
+  }
+
+  void openRating() {
+    final app = application;
+    if (app == null) return;
+    final volunteerId = app["volunteer_id"];
+    final eventId = app["event_id"];
+    if (volunteerId == null || eventId == null) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RatingScreen(
+          eventId: eventId,
+          rateeId: volunteerId,
+          title: "Rate Volunteer",
+        ),
+      ),
+    );
+  }
+
   Color statusColor(String status) {
     switch (status.toLowerCase()) {
       case "accepted":
@@ -235,6 +294,27 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                       ),
 
                       const Spacer(),
+
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: openChat,
+                          icon: const Icon(Icons.chat_bubble_outline),
+                          label: const Text("Message Volunteer"),
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      if (status == "accepted")
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: openRating,
+                            icon: const Icon(Icons.star_border),
+                            label: const Text("Rate Volunteer"),
+                          ),
+                        ),
 
                       Row(
                         children: [

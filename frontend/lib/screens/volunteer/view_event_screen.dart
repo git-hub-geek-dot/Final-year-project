@@ -5,6 +5,7 @@ import '../../config/api_config.dart';
 import '../../services/token_service.dart';
 import 'view_organiser_profile_screen.dart';
 import 'package:share_plus/share_plus.dart';
+import '../rating/rating_screen.dart';
 
 
 class ViewEventScreen extends StatefulWidget {
@@ -232,6 +233,32 @@ Widget _eventBanner() {
             _statusPill(
               _statusText(applicationStatus!),
               _statusColor(applicationStatus!),
+            ),
+          ],
+          if ((widget.event["computed_status"] == "completed") &&
+              (applicationStatus == "accepted" ||
+                  applicationStatus == "completed")) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  final organiserId = widget.event["organiser_id"];
+                  if (organiserId == null) return;
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => RatingScreen(
+                        eventId: widget.event["id"],
+                        rateeId: organiserId,
+                        title: "Rate Organiser",
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.star_border),
+                label: const Text("Rate organiser"),
+              ),
             ),
           ],
         ],

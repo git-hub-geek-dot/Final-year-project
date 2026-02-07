@@ -49,7 +49,17 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        Map<String, dynamic> data;
+        try {
+          data = jsonDecode(response.body) as Map<String, dynamic>;
+        } catch (_) {
+          final snippet = response.body.trim();
+          final maxLen = snippet.length > 200 ? 200 : snippet.length;
+          showError(
+            "Invalid response from server: ${snippet.substring(0, maxLen)}",
+          );
+          return;
+        }
 
         final String token = data["token"];
         final String role = data["user"]["role"];
@@ -82,11 +92,22 @@ class _LoginScreenState extends State<LoginScreen> {
           showError("Unknown role: $role");
         }
       } else {
-        final err = jsonDecode(response.body);
-        showError(err["message"] ?? "Login failed");
+        String message = "Login failed (HTTP ${response.statusCode})";
+        try {
+          final err = jsonDecode(response.body);
+          message = err["message"] ?? message;
+        } catch (_) {
+          final snippet = response.body.trim();
+          if (snippet.isNotEmpty) {
+            final maxLen = snippet.length > 200 ? 200 : snippet.length;
+            message = "$message: ${snippet.substring(0, maxLen)}";
+          }
+        }
+        showError(message);
       }
     } catch (e) {
-      showError("Network error. Please try again.");
+      debugPrint("Login network error: $e");
+      showError("Network error: $e");
     } finally {
       if (mounted) setState(() => loading = false);
     }

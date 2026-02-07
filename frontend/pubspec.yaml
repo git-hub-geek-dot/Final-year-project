@@ -29,9 +29,15 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.1
 
 flutter:
   uses-material-design: true
 
   assets:
     - assets/images/
+
+flutter_icons:
+  android: true
+  ios: false
+  image_path: assets/images/volunteerx_logo.png

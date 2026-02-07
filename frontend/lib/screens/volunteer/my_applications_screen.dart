@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import '../../config/api_config.dart';
 import '../../services/token_service.dart';
 
 class MyApplicationsScreen extends StatefulWidget {
@@ -39,7 +40,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
         return;
       }
 
-      final url = Uri.parse("http://127.0.0.1:4000/api/applications/my");
+      final url = Uri.parse("${ApiConfig.baseUrl}/applications/my");
 
       final response = await http.get(
         url,

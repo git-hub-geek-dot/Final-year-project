@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../../config/api_config.dart';
 import '../../services/token_service.dart';
 
 class MyApplicationsScreen extends StatefulWidget {
@@ -24,7 +25,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
     final token = await TokenService.getToken();
 
     final response = await http.get(
-      Uri.parse("http://10.0.2.2:4000/api/applications/my"),
+      Uri.parse("${ApiConfig.baseUrl}/applications/my"),
       headers: {
         "Authorization": "Bearer $token",
       },

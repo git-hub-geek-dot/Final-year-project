@@ -38,6 +38,21 @@ class AdminService {
     }
   }
 
+  static Future<void> hardDeleteEvent(int eventId) async {
+    final token = await TokenService.getToken();
+
+    final response = await http.delete(
+      Uri.parse("${ApiConfig.baseUrl}/admin/events/$eventId/hard"),
+      headers: {
+        "Authorization": "Bearer $token",
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception("Failed to permanently delete event");
+    }
+  }
+
   // ================= USERS =================
   static Future<Map<String, dynamic>> getAllUsers({int page = 1, int limit = 20}) async {
     final token = await TokenService.getToken();

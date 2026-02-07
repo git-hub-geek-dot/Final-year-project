@@ -61,6 +61,13 @@ router.delete(
   adminController.deleteEvent
 );
 
+router.delete(
+  "/events/:id/hard",
+  authenticateToken,
+  adminOnly,
+  adminController.hardDeleteEvent
+);
+
 // ================= LEADERBOARD =================
 router.get(
   "/leaderboard/volunteers",

@@ -225,6 +225,61 @@ const deleteEvent = async (req, res) => {
   }
 };
 
+const hardDeleteEvent = async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const eventId = req.params.id;
+
+    await client.query("BEGIN");
+
+    const check = await client.query(
+      "SELECT id FROM events WHERE id = $1",
+      [eventId]
+    );
+
+    if (check.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    await client.query(
+      `
+      DELETE FROM chat_messages
+      WHERE thread_id IN (
+        SELECT id FROM chat_threads WHERE event_id = $1
+      )
+      `,
+      [eventId]
+    );
+
+    await client.query("DELETE FROM chat_threads WHERE event_id = $1", [
+      eventId,
+    ]);
+    await client.query("DELETE FROM ratings WHERE event_id = $1", [eventId]);
+    await client.query("DELETE FROM applications WHERE event_id = $1", [
+      eventId,
+    ]);
+    await client.query(
+      "DELETE FROM event_responsibilities WHERE event_id = $1",
+      [eventId]
+    );
+    await client.query("DELETE FROM event_categories WHERE event_id = $1", [
+      eventId,
+    ]);
+
+    await client.query("DELETE FROM events WHERE id = $1", [eventId]);
+
+    await client.query("COMMIT");
+    res.json({ message: "Event permanently deleted" });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("HARD DELETE EVENT ERROR:", err);
+    res.status(500).json({ error: "Failed to permanently delete event" });
+  } finally {
+    client.release();
+  }
+};
+
 // Volunteer leaderboard
 const getVolunteerLeaderboard = async (req, res) => {
   try {
@@ -530,6 +585,7 @@ module.exports = {
   updateUserStatus,
   cancelApplication,
   deleteEvent,
+  hardDeleteEvent,
   getVolunteerLeaderboard,
   getOrganiserLeaderboard,
   evaluateBadges,

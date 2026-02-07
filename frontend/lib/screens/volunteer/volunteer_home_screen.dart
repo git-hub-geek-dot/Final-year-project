@@ -6,6 +6,7 @@ import 'volunteer_profile_screen.dart';
 import 'leaderboard_screen.dart';
 import 'view_event_screen.dart'; // ✅ ADDED
 import '../../config/api_config.dart';
+import '../chat/chat_inbox_screen.dart';
 
 
 class VolunteerHomeScreen extends StatefulWidget {
@@ -408,6 +409,19 @@ return RefreshIndicator(
           "VolunteerX",
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.chat_bubble_outline),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ChatInboxScreen(),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: getBody(),
       bottomNavigationBar: BottomNavigationBar(

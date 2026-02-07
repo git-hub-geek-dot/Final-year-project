@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:frontend/config/api_config.dart';
 import '../../services/token_service.dart';
 import '../../services/verification_service.dart';
+import '../../services/rating_service.dart';
 import '../auth/login_screen.dart';
 
 import 'edit_profile_screen.dart';
@@ -40,6 +41,7 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
   List<String> _interests = [];
   String _impactEvents = '0';
   String _impactRating = '0';
+  String _ratingCount = '0';
   Map<String, dynamic>? _upcomingEvent;
   List<Map<String, dynamic>> _activity = [];
 
@@ -49,6 +51,7 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
     fetchProfile();
     loadVerificationStatus();
     fetchDashboard();
+    loadRatingSummary();
   }
 
   Future<void> loadVerificationStatus() async {
@@ -90,6 +93,21 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
       }
     } catch (_) {
       // Keep existing state on error
+    }
+  }
+
+  Future<void> loadRatingSummary() async {
+    try {
+      final userId = await TokenService.getUserId();
+      if (userId == null) return;
+
+      final data = await RatingService.fetchSummary(userId);
+      setState(() {
+        _impactRating = data["rating"]?.toString() ?? _impactRating;
+        _ratingCount = data["review_count"]?.toString() ?? _ratingCount;
+      });
+    } catch (_) {
+      // Keep existing values
     }
   }
 
@@ -674,7 +692,11 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
                           children: [
                             _statCard("Events", _impactEvents, Icons.event),
                             const SizedBox(width: 10),
-                            _statCard("Rating", _impactRating, Icons.star),
+                            _statCard(
+                              "Rating",
+                              "$_impactRating ($_ratingCount)",
+                              Icons.star,
+                            ),
                           ],
                         ),
                       ),

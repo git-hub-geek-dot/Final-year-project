@@ -5,6 +5,7 @@ import 'create_event_screen.dart';
 import 'leaderboard_screen.dart';
 import 'review_application_screen.dart';
 import 'event_details_screen.dart';
+import '../chat/chat_inbox_screen.dart';
 
 class OrganiserHomeScreen extends StatefulWidget {
   const OrganiserHomeScreen({super.key});
@@ -18,6 +19,7 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
   List events = [];
   int? userId;
   int _selectedTab = 0; // 0: Ongoing, 1: Upcoming, 2: Completed
+  bool showAllEvents = false;
 
   @override
   void initState() {
@@ -28,7 +30,9 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
   Future<void> loadEvents() async {
     try {
       final id = await TokenService.getUserId();
-      final data = await EventService.fetchAllEvents();
+      final data = showAllEvents
+          ? await EventService.fetchAllEvents()
+          : await EventService.fetchMyEvents();
       setState(() {
         userId = id;
         events = data;
@@ -75,15 +79,33 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: const [
-                Text(
+              children: [
+                const Text(
                   "Volunteerx",
                   style: TextStyle(
                       color: Colors.white,
                       fontSize: 22,
                       fontWeight: FontWeight.bold),
                 ),
-                Icon(Icons.notifications, color: Colors.white),
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ChatInboxScreen(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(
+                        Icons.chat_bubble_outline,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const Icon(Icons.notifications, color: Colors.white),
+                  ],
+                ),
               ],
             ),
           ),
@@ -122,6 +144,27 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
           ),
 
           const SizedBox(height: 20),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                _eventScopeButton("My Events", !showAllEvents, () {
+                  if (!showAllEvents) return;
+                  setState(() => showAllEvents = false);
+                  loadEvents();
+                }),
+                const SizedBox(width: 10),
+                _eventScopeButton("All Events", showAllEvents, () {
+                  if (showAllEvents) return;
+                  setState(() => showAllEvents = true);
+                  loadEvents();
+                }),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 12),
 
           // 📑 TAB SELECTOR
           Padding(
@@ -259,9 +302,29 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
     );
   }
 
+  Widget _eventScopeButton(String label, bool active, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: active ? const Color(0xFF3B82F6) : Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: active ? Colors.white : Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
   bool _isMyEvent(Map event) {
     if (userId == null) return false;
-    return event["organiser_id"].toString() == userId;
+    return event["organiser_id"] == userId;
   }
 }
 

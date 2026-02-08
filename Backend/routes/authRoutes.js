@@ -6,6 +6,9 @@ const authMiddleware = require("../middleware/auth");
 
 router.post("/register", authController.register);
 router.post("/login", authController.login);
+router.post("/auth/request-otp", authController.requestOtp);
+router.post("/auth/verify-otp", authController.verifyOtp);
+router.post("/auth/verify-phone", authController.verifyPhoneToken);
 router.post("/forgot-password", authController.forgotPassword);
 router.post("/reset-password", authController.resetPassword);
 

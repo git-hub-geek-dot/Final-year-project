@@ -2,7 +2,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import '../../config/api_config.dart';
 import '../../services/token_service.dart';
+import '../../services/chat_service.dart';
+import '../chat/chat_screen.dart';
 
 class MyApplicationsScreen extends StatefulWidget {
   const MyApplicationsScreen({super.key});
@@ -39,7 +42,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
         return;
       }
 
-      final url = Uri.parse("http://127.0.0.1:4000/api/applications/my");
+      final url = Uri.parse("${ApiConfig.baseUrl}/applications/my");
 
       final response = await http.get(
         url,
@@ -136,6 +139,34 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                           child: ListTile(
                             title: Text(title),
                             subtitle: Text(location),
+                            onTap: () async {
+                              try {
+                                final eventId = app["event_id"]; 
+                                if (eventId == null) return;
+
+                                final thread = await ChatService.getOrCreateThread(
+                                  eventId: eventId,
+                                );
+
+                                if (!context.mounted) return;
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ChatScreen(
+                                      threadId: thread["id"],
+                                      title: "Chat",
+                                    ),
+                                  ),
+                                );
+                              } catch (_) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text("Failed to open chat"),
+                                  ),
+                                );
+                              }
+                            },
                             trailing: Chip(
                               label: Text(status.toString().toUpperCase()),
                               backgroundColor:

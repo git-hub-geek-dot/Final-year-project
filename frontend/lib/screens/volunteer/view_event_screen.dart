@@ -5,6 +5,7 @@ import '../../config/api_config.dart';
 import '../../services/token_service.dart';
 import 'view_organiser_profile_screen.dart';
 import 'package:share_plus/share_plus.dart';
+import '../rating/rating_screen.dart';
 
 
 class ViewEventScreen extends StatefulWidget {
@@ -198,27 +199,30 @@ Widget _eventBanner() {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-  widget.event["title"] ?? "",
-  style: const TextStyle(
-    fontSize: 24,
-    fontWeight: FontWeight.w700,
-    letterSpacing: 0.3,
-  ),
-),
-const SizedBox(height: 6),
-Text(
-  widget.event["description"] ?? "",
-  style: TextStyle(
-    color: Colors.grey.shade600,
-    height: 1.4,
-  ),
-),
-
+            widget.event["title"] ?? "",
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.3,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            widget.event["description"] ?? "",
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              height: 1.4,
+            ),
+          ),
           const SizedBox(height: 16),
           _iconRow(Icons.location_on, widget.event["location"] ?? "N/A"),
           _iconRow(
             Icons.calendar_today,
             widget.event["event_date"]?.toString().split("T")[0] ?? "",
+          ),
+          _iconRow(
+            Icons.access_time,
+            "${_formatTime(widget.event["start_time"])} - ${_formatTime(widget.event["end_time"])}",
           ),
           _iconRow(
             Icons.people,
@@ -229,6 +233,32 @@ Text(
             _statusPill(
               _statusText(applicationStatus!),
               _statusColor(applicationStatus!),
+            ),
+          ],
+          if ((widget.event["computed_status"] == "completed") &&
+              (applicationStatus == "accepted" ||
+                  applicationStatus == "completed")) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  final organiserId = widget.event["organiser_id"];
+                  if (organiserId == null) return;
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => RatingScreen(
+                        eventId: widget.event["id"],
+                        rateeId: organiserId,
+                        title: "Rate Organiser",
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.star_border),
+                label: const Text("Rate organiser"),
+              ),
             ),
           ],
         ],
@@ -377,6 +407,16 @@ Text(
   }
 
   // ================= HELPERS =================
+  String _formatTime(dynamic timeValue) {
+    if (timeValue == null) return "N/A";
+    try {
+      final time = timeValue.toString();
+      return time.length >= 5 ? time.substring(0, 5) : time;
+    } catch (_) {
+      return "N/A";
+    }
+  }
+
   Widget _card({required Widget child}) {
   return Container(
     width: double.infinity,

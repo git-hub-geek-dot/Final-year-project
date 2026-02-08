@@ -61,7 +61,7 @@ async function main() {
     });
   }
 
-  // ================== ADMIN USER ==================
+  // ================== USERS ==================
   const hashedPassword = await bcrypt.hash('a', 10);
 
   await prisma.user.upsert({
@@ -75,7 +75,29 @@ async function main() {
     },
   });
 
-  console.log('✅ Admin user and categories seeded');
+  await prisma.user.upsert({
+    where: { email: 'r@test.com' },
+    update: {},
+    create: {
+      name: 'organiser',
+      email: 'r@test.com',
+      password: hashedPassword,
+      role: 'organiser',
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { email: 'v@test.com' },
+    update: {},
+    create: {
+      name: 'volunteer',
+      email: 'v@test.com',
+      password: hashedPassword,
+      role: 'volunteer',
+    },
+  });
+
+  console.log('✅ Users and categories seeded');
 }
 
 main()

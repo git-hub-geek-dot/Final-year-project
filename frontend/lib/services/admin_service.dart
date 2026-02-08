@@ -141,6 +141,23 @@ class AdminService {
     return jsonDecode(res.body);
   }
 
+  static Future<List<dynamic>> getStatsTimeseries({int days = 7}) async {
+    final token = await TokenService.getToken();
+
+    final res = await http.get(
+      Uri.parse("${ApiConfig.baseUrl}/admin/stats/timeseries?days=$days"),
+      headers: {
+        "Authorization": "Bearer $token",
+      },
+    );
+
+    if (res.statusCode != 200) {
+      throw Exception("Failed to load stats timeseries");
+    }
+
+    return jsonDecode(res.body);
+  }
+
   // ================= LEADERBOARD =================
   static Future<List<dynamic>> getVolunteerLeaderboard() async {
     final token = await TokenService.getToken();

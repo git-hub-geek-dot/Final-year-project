@@ -115,7 +115,8 @@ const getStats = async (req, res) => {
         (SELECT COUNT(*) FROM users) AS total_users,
         (SELECT COUNT(*) FROM events) AS total_events,
         (SELECT COUNT(*) FROM events WHERE status = 'open') AS active_events,
-        (SELECT COUNT(*) FROM applications) AS total_applications
+        (SELECT COUNT(*) FROM applications) AS total_applications,
+        (SELECT COUNT(*) FROM verification_requests WHERE status = 'pending') AS pending_verifications
     `);
 
     res.json({
@@ -123,11 +124,55 @@ const getStats = async (req, res) => {
       totalEvents: parseInt(result.rows[0].total_events),
       activeEvents: parseInt(result.rows[0].active_events),
       totalApplications: parseInt(result.rows[0].total_applications),
+      pendingVerifications: parseInt(result.rows[0].pending_verifications),
     });
   } catch (err) {
     res.status(500).json({ error: "Stats fetch failed" });
   }
  };
+
+const getStatsTimeseries = async (req, res) => {
+  try {
+    const days = Math.max(parseInt(req.query.days || "7", 10), 1);
+
+    const result = await pool.query(
+      `
+      WITH days AS (
+        SELECT generate_series(
+          CURRENT_DATE - ($1::int - 1),
+          CURRENT_DATE,
+          interval '1 day'
+        )::date AS day
+      ),
+      event_counts AS (
+        SELECT created_at::date AS day, COUNT(*)::int AS count
+        FROM events
+        WHERE created_at::date >= CURRENT_DATE - ($1::int - 1)
+        GROUP BY created_at::date
+      ),
+      application_counts AS (
+        SELECT applied_at::date AS day, COUNT(*)::int AS count
+        FROM applications
+        WHERE applied_at::date >= CURRENT_DATE - ($1::int - 1)
+        GROUP BY applied_at::date
+      )
+      SELECT d.day,
+             COALESCE(e.count, 0) AS events,
+             COALESCE(a.count, 0) AS applications
+      FROM days d
+      LEFT JOIN event_counts e ON e.day = d.day
+      LEFT JOIN application_counts a ON a.day = d.day
+      ORDER BY d.day
+      `,
+      [days]
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("STATS TIMESERIES ERROR:", err);
+    res.status(500).json({ error: "Stats timeseries fetch failed" });
+  }
+};
 
  const updateUserStatus = async (req, res) => {
   try {
@@ -582,6 +627,7 @@ module.exports = {
   getEvents,
   getApplications,
   getStats,
+  getStatsTimeseries,
   updateUserStatus,
   cancelApplication,
   deleteEvent,

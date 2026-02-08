@@ -50,19 +50,20 @@ class EventService {
   /// ================= CREATE EVENT =================
   static Future<bool> createEvent({
     required String title,
-    required String description,
-    required String location,
-    required String eventDate,
-    required String endDate,
-    required String applicationDeadline,
-    required int volunteersRequired,
-    required String eventType,
+    String? description,
+    String? location,
+    String? eventDate,
+    String? endDate,
+    String? applicationDeadline,
+    int? volunteersRequired,
+    String? eventType,
     double? paymentPerDay,
     String? bannerUrl,
-    required List<String> categories,
-    required List<String> responsibilities,
-    required String startTime,
-    required String endTime,
+    List<String>? categories,
+    List<String>? responsibilities,
+    String? startTime,
+    String? endTime,
+    bool isDraft = false,
   }) async {
     final token = await TokenService.getToken();
     if (token == null) {
@@ -86,10 +87,11 @@ class EventService {
         "event_type": eventType,
         "payment_per_day": eventType == "paid" ? paymentPerDay : null,
         "banner_url": bannerUrl,
-        "categories": categories,
-        "responsibilities": responsibilities,
+        "categories": categories ?? [],
+        "responsibilities": responsibilities ?? [],
         "start_time": startTime,
         "end_time": endTime,
+        "is_draft": isDraft,
       }),
     );
 

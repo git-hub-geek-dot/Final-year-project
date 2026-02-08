@@ -14,9 +14,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   final List<dynamic> users = [];
   bool loading = true;
   bool loadingMore = false;
+  bool bulkLoading = false;
   int page = 1;
   int totalPages = 1;
   String? errorMessage;
+
+  final Set<int> selectedUserIds = {};
 
   String search = "";
   String statusFilter = "all"; // all | active | inactive | banned
@@ -64,6 +67,72 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         }
       });
     }
+  }
+
+  bool get _selectionMode => selectedUserIds.isNotEmpty;
+
+  void _toggleSelected(int userId) {
+    setState(() {
+      if (selectedUserIds.contains(userId)) {
+        selectedUserIds.remove(userId);
+      } else {
+        selectedUserIds.add(userId);
+      }
+    });
+  }
+
+  Future<void> _bulkUpdateStatus(String status) async {
+    if (selectedUserIds.isEmpty || bulkLoading) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Bulk update status"),
+        content: Text(
+          "Set ${selectedUserIds.length} users to ${status.toUpperCase()}?",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text("Confirm"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => bulkLoading = true);
+
+    final totalSelected = selectedUserIds.length;
+    int successCount = 0;
+    for (final id in selectedUserIds) {
+      try {
+        await AdminService.updateUserStatus(id, status);
+        successCount++;
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          "Updated $successCount of $totalSelected users",
+        ),
+      ),
+    );
+
+    setState(() {
+      bulkLoading = false;
+      selectedUserIds.clear();
+    });
+
+    _fetchUsers(reset: true);
   }
 
   @override
@@ -177,6 +246,52 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
                       const SizedBox(height: 8),
 
+                      if (_selectionMode)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text("${selectedUserIds.length} selected"),
+                              OutlinedButton(
+                                onPressed: bulkLoading
+                                    ? null
+                                    : () => setState(
+                                          () => selectedUserIds.clear(),
+                                        ),
+                                child: const Text("Clear"),
+                              ),
+                              ElevatedButton(
+                                onPressed: bulkLoading
+                                    ? null
+                                    : () => _bulkUpdateStatus("active"),
+                                child: const Text("Set Active"),
+                              ),
+                              ElevatedButton(
+                                onPressed: bulkLoading
+                                    ? null
+                                    : () => _bulkUpdateStatus("inactive"),
+                                child: const Text("Set Inactive"),
+                              ),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                  foregroundColor: Colors.white,
+                                ),
+                                onPressed: bulkLoading
+                                    ? null
+                                    : () => _bulkUpdateStatus("banned"),
+                                child: const Text("Set Banned"),
+                              ),
+                            ],
+                          ),
+                        ),
+
                       // 📋 User list
                       Expanded(
                         child: filtered.isEmpty
@@ -211,34 +326,126 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
                                   final u = filtered[i];
                                   final isAdmin = u["role"] == "admin";
+                                  final isVerified = u["isVerified"] == true;
+                                  final userId = (u["id"] as num?)?.toInt();
+                                  final canSelect = !isAdmin && userId != null;
+                                  final selected =
+                                      userId != null && selectedUserIds.contains(userId);
                                   final profileUrl =
                                       (u["profile_picture_url"] ?? "")
                                           .toString();
 
                                   return Card(
                                     child: ListTile(
-                                      leading: CircleAvatar(
-                                        backgroundImage: profileUrl.isNotEmpty
-                                            ? NetworkImage(profileUrl)
-                                            : null,
-                                        child: profileUrl.isEmpty
-                                            ? const Icon(Icons.person)
-                                            : null,
-                                      ),
+                                      leading: _selectionMode || selected
+                                          ? SizedBox(
+                                              width: 72,
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Checkbox(
+                                                    value: selected,
+                                                    onChanged: canSelect
+                                                        ? (_) => _toggleSelected(userId!)
+                                                        : null,
+                                                  ),
+                                                  CircleAvatar(
+                                                    backgroundImage: profileUrl.isNotEmpty
+                                                        ? NetworkImage(profileUrl)
+                                                        : null,
+                                                    child: profileUrl.isEmpty
+                                                        ? const Icon(Icons.person)
+                                                        : null,
+                                                  ),
+                                                ],
+                                              ),
+                                            )
+                                          : CircleAvatar(
+                                              backgroundImage: profileUrl.isNotEmpty
+                                                  ? NetworkImage(profileUrl)
+                                                  : null,
+                                              child: profileUrl.isEmpty
+                                                  ? const Icon(Icons.person)
+                                                  : null,
+                                            ),
                                       title: Text(u["name"]),
                                       subtitle: Text(
                                         "${u["email"]} • ${u["role"]} • ${u["status"]}",
                                       ),
-                                      onTap: () => _showUserDetails(context, u),
-                                      trailing: isAdmin
-                                          ? const Text("Admin")
-                                          : PopupMenuButton<String>(
+                                      onTap: () {
+                                        if (_selectionMode && canSelect) {
+                                          _toggleSelected(userId!);
+                                          return;
+                                        }
+                                        _showUserDetails(context, u);
+                                      },
+                                      onLongPress: canSelect
+                                          ? () => _toggleSelected(userId!)
+                                          : null,
+                                      trailing: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          _verificationBadge(isVerified),
+                                          const SizedBox(width: 6),
+                                          if (isAdmin)
+                                            const Text("Admin")
+                                          else
+                                            PopupMenuButton<String>(
                                               onSelected: (value) async {
-                                                await AdminService.updateUserStatus(
-                                                  u["id"],
-                                                  value,
+                                                final confirm =
+                                                    await showDialog<bool>(
+                                                  context: context,
+                                                  builder: (ctx) => AlertDialog(
+                                                    title: const Text(
+                                                      "Update user status",
+                                                    ),
+                                                    content: Text(
+                                                      "Set ${u["name"]} to ${value.toUpperCase()}?",
+                                                    ),
+                                                    actions: [
+                                                      TextButton(
+                                                        onPressed: () =>
+                                                            Navigator.pop(ctx, false),
+                                                        child: const Text("Cancel"),
+                                                      ),
+                                                      TextButton(
+                                                        onPressed: () =>
+                                                            Navigator.pop(ctx, true),
+                                                        child: const Text("Confirm"),
+                                                      ),
+                                                    ],
+                                                  ),
                                                 );
-                                                _fetchUsers(reset: true);
+
+                                                if (confirm != true) return;
+
+                                                try {
+                                                  await AdminService
+                                                      .updateUserStatus(
+                                                    u["id"],
+                                                    value,
+                                                  );
+                                                  if (!mounted) return;
+                                                  ScaffoldMessenger.of(context)
+                                                      .showSnackBar(
+                                                    SnackBar(
+                                                      content: Text(
+                                                        "Status updated to ${value.toUpperCase()}",
+                                                      ),
+                                                    ),
+                                                  );
+                                                  _fetchUsers(reset: true);
+                                                } catch (_) {
+                                                  if (!mounted) return;
+                                                  ScaffoldMessenger.of(context)
+                                                      .showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text(
+                                                        "Failed to update status",
+                                                      ),
+                                                    ),
+                                                  );
+                                                }
                                               },
                                               itemBuilder: (context) => const [
                                                 PopupMenuItem(
@@ -262,6 +469,8 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                                 ),
                                               ),
                                             ),
+                                        ],
+                                      ),
                                     ),
                                   );
                                 },
@@ -339,6 +548,24 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
           ),
           Expanded(child: Text(value)),
         ],
+      ),
+    );
+  }
+
+  Widget _verificationBadge(bool isVerified) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isVerified ? Colors.green.shade50 : Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        isVerified ? "Verified" : "Unverified",
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: isVerified ? Colors.green.shade700 : Colors.grey.shade700,
+        ),
       ),
     );
   }

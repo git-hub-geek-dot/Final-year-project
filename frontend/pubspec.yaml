@@ -12,6 +12,7 @@ dependencies:
     sdk: flutter
   image_picker: ^1.0.7
   share_plus: ^10.0.0
+  fl_chart: ^0.66.2
 
   
 
@@ -24,14 +25,21 @@ dependencies:
   firebase_core: ^3.6.0
   firebase_auth: ^5.3.1
   firebase_messaging: ^15.1.0
+  socket_io_client: ^2.0.3+1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.1
 
 flutter:
   uses-material-design: true
 
   assets:
     - assets/images/
+
+flutter_icons:
+  android: true
+  ios: false
+  image_path: assets/images/volunteerx_logo.png

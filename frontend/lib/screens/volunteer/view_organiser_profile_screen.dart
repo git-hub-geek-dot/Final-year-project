@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../config/api_config.dart';
+import '../../services/rating_service.dart';
+import '../../services/token_service.dart';
 
 class ViewOrganiserProfileScreen extends StatefulWidget {
   final int organiserId;
@@ -20,11 +22,14 @@ class _ViewOrganiserProfileScreenState extends State<ViewOrganiserProfileScreen>
   bool isLoading = true;
   String? errorMessage;
   Map<String, dynamic>? profile;
+  String _ratingValue = "0.0";
+  String _ratingCount = "0";
 
   @override
   void initState() {
     super.initState();
     _fetchProfile();
+    _fetchRatingSummary();
   }
 
   Future<void> _fetchProfile() async {
@@ -52,6 +57,23 @@ class _ViewOrganiserProfileScreenState extends State<ViewOrganiserProfileScreen>
         errorMessage = "Network error";
         isLoading = false;
       });
+    }
+  }
+
+  Future<void> _fetchRatingSummary() async {
+    try {
+      final token = await TokenService.getToken();
+      if (token == null || token.isEmpty) return;
+
+      final data = await RatingService.fetchSummary(widget.organiserId);
+      if (!mounted) return;
+
+      setState(() {
+        _ratingValue = data["rating"]?.toString() ?? _ratingValue;
+        _ratingCount = data["review_count"]?.toString() ?? _ratingCount;
+      });
+    } catch (_) {
+      // Keep defaults
     }
   }
 
@@ -125,7 +147,10 @@ class _ViewOrganiserProfileScreenState extends State<ViewOrganiserProfileScreen>
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 4),
-          const Text("⭐ N/A rating", style: TextStyle(color: Colors.grey)),
+          Text(
+            "⭐ $_ratingValue ($_ratingCount)",
+            style: const TextStyle(color: Colors.grey),
+          ),
         ],
       ),
     );
@@ -202,7 +227,7 @@ class _ViewOrganiserProfileScreenState extends State<ViewOrganiserProfileScreen>
         children: [
           _Stat(volunteersEngaged, "Volunteers"),
           _Stat(eventsCount, "Events"),
-          const _Stat("N/A", "Rating"),
+          _Stat(_ratingValue, "Rating"),
         ],
       ),
     );

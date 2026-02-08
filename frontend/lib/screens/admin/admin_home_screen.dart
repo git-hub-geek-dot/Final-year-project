@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:frontend/widgets/app_background.dart';
 
 import '../../services/token_service.dart';
+import '../../services/admin_service.dart';
 import '../auth/login_screen.dart';
 import 'admin_events_screen.dart';
 import 'admin_users_screen.dart';
@@ -11,8 +12,27 @@ import 'admin_leaderboard_screen.dart';
 import 'admin_badges_screen.dart';
 import 'admin_verification_screen.dart';
 
-class AdminHomeScreen extends StatelessWidget {
+class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
+
+  @override
+  State<AdminHomeScreen> createState() => _AdminHomeScreenState();
+}
+
+class _AdminHomeScreenState extends State<AdminHomeScreen> {
+  late Future<Map<String, dynamic>> _statsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _statsFuture = AdminService.getStats();
+  }
+
+  void _refreshStats() {
+    setState(() {
+      _statsFuture = AdminService.getStats();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -73,6 +93,10 @@ class AdminHomeScreen extends StatelessWidget {
         title: const Text("Admin Dashboard"),
         actions: [
           IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _refreshStats,
+          ),
+          IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
               await TokenService.clearToken();
@@ -87,75 +111,244 @@ class AdminHomeScreen extends StatelessWidget {
         ],
       ),
       body: AppBackground(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth;
-            final crossAxisCount = width < 600
-                ? 1
-                : width < 900
-                    ? 2
-                    : 3;
-            final childAspectRatio = width < 600 ? 1.6 : 1.2;
+        child: FutureBuilder<Map<String, dynamic>>(
+          future: _statsFuture,
+          builder: (context, snapshot) {
+            final stats = snapshot.data;
+            final loadingStats = snapshot.connectionState == ConnectionState.waiting;
 
-            return GridView.builder(
-              padding: const EdgeInsets.all(16.0),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: crossAxisCount,
-                crossAxisSpacing: 16.0,
-                mainAxisSpacing: 16.0,
-                childAspectRatio: childAspectRatio,
-              ),
-              itemCount: items.length,
-              itemBuilder: (context, index) {
-                final item = items[index];
-                return Card(
-                  elevation: 4.0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16.0),
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: Row(
+                    children: [
+                      loadingStats
+                          ? _statSkeletonCard()
+                          : _statCard(
+                              label: "Users",
+                              value: stats?['totalUsers']?.toString() ?? "-",
+                              icon: Icons.people,
+                              color: Colors.blue,
+                            ),
+                      const SizedBox(width: 12),
+                      loadingStats
+                          ? _statSkeletonCard()
+                          : _statCard(
+                              label: "Events",
+                              value: stats?['totalEvents']?.toString() ?? "-",
+                              icon: Icons.event,
+                              color: Colors.green,
+                            ),
+                    ],
                   ),
-                  child: InkWell(
-                    onTap: item.onTap,
-                    borderRadius: BorderRadius.circular(16.0),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16.0),
-                        gradient: LinearGradient(
-                          colors: [item.color.withOpacity(0.7), item.color],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Row(
+                    children: [
+                      loadingStats
+                          ? _statSkeletonCard()
+                          : _statCard(
+                              label: "Pending Verifications",
+                              value: stats?['pendingVerifications']?.toString() ?? "-",
+                              icon: Icons.verified_user,
+                              color: Colors.orange,
+                            ),
+                      const SizedBox(width: 12),
+                      loadingStats
+                          ? _statSkeletonCard()
+                          : _statCard(
+                              label: "Applications",
+                              value:
+                                  stats?['totalApplications']?.toString() ?? "-",
+                              icon: Icons.assignment,
+                              color: Colors.purple,
+                            ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final width = constraints.maxWidth;
+                      final crossAxisCount = width < 600
+                          ? 1
+                          : width < 900
+                              ? 2
+                              : 3;
+                      final childAspectRatio = width < 600 ? 1.6 : 1.2;
+
+                      return GridView.builder(
+                        padding: const EdgeInsets.all(16.0),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxisCount,
+                          crossAxisSpacing: 16.0,
+                          mainAxisSpacing: 16.0,
+                          childAspectRatio: childAspectRatio,
                         ),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(item.icon, size: 48.0, color: Colors.white),
-                          const SizedBox(height: 12.0),
-                          Text(
-                            item.title,
-                            style: const TextStyle(
-                              fontSize: 16.0,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                        itemCount: items.length,
+                        itemBuilder: (context, index) {
+                          final item = items[index];
+                          return Card(
+                            elevation: 4.0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16.0),
                             ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 4.0),
-                          Text(
-                            item.subtitle,
-                            style: const TextStyle(
-                              fontSize: 12.0,
-                              color: Colors.white70,
+                            child: InkWell(
+                              onTap: item.onTap,
+                              borderRadius: BorderRadius.circular(16.0),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(16.0),
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      item.color.withOpacity(0.7),
+                                      item.color
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(item.icon,
+                                        size: 48.0, color: Colors.white),
+                                    const SizedBox(height: 12.0),
+                                    Text(
+                                      item.title,
+                                      style: const TextStyle(
+                                        fontSize: 16.0,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: 4.0),
+                                    Text(
+                                      item.subtitle,
+                                      style: const TextStyle(
+                                        fontSize: 12.0,
+                                        color: Colors.white70,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
-                    ),
+                          );
+                        },
+                      );
+                    },
                   ),
-                );
-              },
+                ),
+              ],
             );
           },
+        ),
+      ),
+    );
+  }
+
+  Widget _statCard({
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Expanded(
+      child: Card(
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: color.withOpacity(0.12),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.black54,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      value,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _statSkeletonCard() {
+    return Expanded(
+      child: Card(
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 50,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    width: 36,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

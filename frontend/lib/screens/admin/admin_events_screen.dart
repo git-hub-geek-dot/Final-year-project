@@ -10,6 +10,8 @@ class AdminEventsScreen extends StatefulWidget {
   State<AdminEventsScreen> createState() => _AdminEventsScreenState();
 }
 
+enum _DeleteAction { soft, hard }
+
 class _AdminEventsScreenState extends State<AdminEventsScreen> {
   final List<dynamic> events = [];
   bool loading = true;
@@ -25,6 +27,80 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
   void initState() {
     super.initState();
     _fetchEvents(reset: true);
+  }
+
+  Future<void> _confirmDelete(Map event) async {
+    final action = await showDialog<_DeleteAction>(
+      context: context,
+      builder: (context) {
+        bool confirmHardDelete = false;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text("Delete event"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Choose delete type for \"${event["title"]}\".\n\n"
+                    "Soft delete hides the event. Hard delete removes it permanently.",
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: confirmHardDelete,
+                        onChanged: (value) =>
+                            setDialogState(() => confirmHardDelete = value ?? false),
+                      ),
+                      const Expanded(
+                        child: Text(
+                          "I understand hard delete is permanent.",
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Cancel"),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, _DeleteAction.soft),
+                  child: const Text("Soft Delete"),
+                ),
+                TextButton(
+                  onPressed: confirmHardDelete
+                      ? () => Navigator.pop(context, _DeleteAction.hard)
+                      : null,
+                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                  child: const Text("Hard Delete"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (action == null) return;
+
+    try {
+      if (action == _DeleteAction.soft) {
+        await AdminService.deleteEvent(event["id"]);
+      } else {
+        await AdminService.hardDeleteEvent(event["id"]);
+      }
+      _fetchEvents(reset: true);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Delete failed")),
+      );
+    }
   }
 
   Future<void> _fetchEvents({bool reset = false}) async {
@@ -192,10 +268,7 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
                                           onPressed: isDeleted
                                               ? null
                                               : () async {
-                                                  await AdminService.deleteEvent(
-                                                    event["id"],
-                                                  );
-                                                  _fetchEvents(reset: true);
+                                                  await _confirmDelete(event);
                                                 },
                                         ),
                                       ),

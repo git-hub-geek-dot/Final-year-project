@@ -1,11 +1,11 @@
 const express = require("express");
 const {
   deleteUser,
-  getOrganiserProfile,
   updateUser,
   getVolunteerDashboard,
   updateVolunteerPreferences,
 } = require("../controllers/usercontroller");
+const { getOrganiserPublicProfile } = require("../controllers/organiserController");
 
 const authMiddleware = require("../middleware/auth");
 
@@ -17,8 +17,8 @@ router.put("/users/:id", authMiddleware, updateUser);
 // DELETE user by ID
 router.delete("/users/:id", authMiddleware, deleteUser);
 
-// GET organiser profile (public)
-router.get("/organisers/:id", getOrganiserProfile);
+// GET organiser profile (public – for volunteers)
+router.get("/organisers/:id", getOrganiserPublicProfile);
 
 // GET volunteer dashboard (auth)
 router.get("/volunteer/dashboard", authMiddleware, getVolunteerDashboard);

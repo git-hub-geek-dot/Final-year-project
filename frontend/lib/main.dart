@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 // 🔐 AUTH
@@ -23,7 +24,14 @@ import 'services/notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  if (!kIsWeb) {
+    try {
+      await Firebase.initializeApp();
+    } catch (e, s) {
+      debugPrint("Firebase init failed: $e");
+      debugPrintStack(stackTrace: s);
+    }
+  }
   runApp(const MyApp());
 }
 

@@ -22,6 +22,7 @@ enum UserStatus {
 }
 
 enum EventStatus {
+  draft
   open
   closed
   completed
@@ -193,6 +194,35 @@ model DeviceToken {
 
   @@index([userId], map: "idx_device_tokens_user_id")
   @@map("device_tokens")
+}
+
+model ChatThread {
+  id          Int      @id @default(autoincrement())
+  eventId     Int      @map("event_id")
+  organiserId Int      @map("organiser_id")
+  volunteerId Int      @map("volunteer_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  messages    ChatMessage[]
+
+  @@unique([eventId, organiserId, volunteerId], map: "uniq_chat_thread")
+  @@index([organiserId], map: "idx_chat_thread_organiser_id")
+  @@index([volunteerId], map: "idx_chat_thread_volunteer_id")
+  @@map("chat_threads")
+}
+
+model ChatMessage {
+  id        Int      @id @default(autoincrement())
+  threadId  Int      @map("thread_id")
+  senderId  Int      @map("sender_id")
+  message   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  thread    ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId], map: "idx_chat_message_thread_id")
+  @@index([senderId], map: "idx_chat_message_sender_id")
+  @@map("chat_messages")
 }
 
 model VerificationRequest {

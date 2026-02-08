@@ -53,12 +53,26 @@ router.get(
   adminController.getStats
 );
 
+router.get(
+  "/stats/timeseries",
+  authenticateToken,
+  adminOnly,
+  adminController.getStatsTimeseries
+);
+
 // ================= EVENTS DELETE =================
 router.delete(
   "/events/:id",
   authenticateToken,
   adminOnly,
   adminController.deleteEvent
+);
+
+router.delete(
+  "/events/:id/hard",
+  authenticateToken,
+  adminOnly,
+  adminController.hardDeleteEvent
 );
 
 // ================= LEADERBOARD =================

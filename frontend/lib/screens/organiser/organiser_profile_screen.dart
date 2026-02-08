@@ -6,12 +6,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../config/api_config.dart';
 import '../../services/token_service.dart';
 import '../../services/verification_service.dart';
+import '../../services/rating_service.dart';
 import 'account_settings_screen.dart';
 import 'help_support_screen.dart';
 import 'about_volunteerx_screen.dart';
 import 'edit_profile_screen.dart';
 import 'get_verified_screen.dart';
 import 'leaderboard_screen.dart';
+import 'organiser_activity_screen.dart';
 import 'my_events_screen.dart';
 
 class OrganiserProfileScreen extends StatefulWidget {
@@ -32,12 +34,15 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
   String? role;
   String? profilePictureUrl;
   String? verificationStatus;
+  String _ratingValue = "0.0";
+  String _ratingCount = "0";
 
   @override
   void initState() {
     super.initState();
     fetchProfile();
     loadVerificationStatus();
+    loadRatingSummary();
   }
 
   Future<void> loadVerificationStatus() async {
@@ -93,6 +98,21 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
         loading = false;
         errorMessage = "Error: $e";
       });
+    }
+  }
+
+  Future<void> loadRatingSummary() async {
+    try {
+      final userId = await TokenService.getUserId();
+      if (userId == null) return;
+
+      final data = await RatingService.fetchSummary(userId);
+      setState(() {
+        _ratingValue = data["rating"]?.toString() ?? _ratingValue;
+        _ratingCount = data["review_count"]?.toString() ?? _ratingCount;
+      });
+    } catch (_) {
+      // Keep defaults
     }
   }
 
@@ -266,6 +286,10 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
+                              "Rating: $_ratingValue ($_ratingCount)",
+                              style: const TextStyle(color: Colors.white70),
+                            ),
+                            Text(
                               city == null || city!.isEmpty
                                   ? "City not set"
                                   : "$city, India",
@@ -365,6 +389,20 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
                                       );
                                     },
                             ),
+                            _profileOption(
+  context: context,
+  icon: Icons.dashboard,
+  text: "Organisation Activity",
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const OrganiserActivityScreen(),
+      ),
+    );
+  },
+),
+
                             _profileOption(
                               context: context,
                               icon: Icons.help_outline,

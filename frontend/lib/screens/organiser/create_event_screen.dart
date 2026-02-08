@@ -57,17 +57,20 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   final List<String> selectedCategories = [];
   final List<String> responsibilities = [];
 
-  // ---------------- HELPERS ----------------
-
   String _fmtDate(DateTime d) =>
       "${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
 
-    String _fmtTime(TimeOfDay t) =>
+  String _fmtTime(TimeOfDay t) =>
       "${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:00";
 
+  int? _parseVolunteers() {
+    final text = volunteersController.text.trim();
+    if (text.isEmpty) return null;
+    return int.tryParse(text);
+  }
+
   void _toast(String msg) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   Future<void> pickDate(bool isStart) async {
@@ -116,47 +119,46 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     });
   }
 
-  // ---------------- SUBMIT ----------------
-
-  Future<void> handleCreateEvent() async {
+  Future<void> _submitEvent({required bool saveAsDraft}) async {
     if (titleController.text.trim().isEmpty) {
       _toast("Event title is required");
       return;
     }
-    if (locationController.text.trim().isEmpty) {
+
+    if (!saveAsDraft && locationController.text.trim().isEmpty) {
       _toast("Location is required");
       return;
     }
-    if (descriptionController.text.trim().isEmpty) {
+    if (!saveAsDraft && descriptionController.text.trim().isEmpty) {
       _toast("Description is required");
       return;
     }
-    if (volunteersController.text.trim().isEmpty) {
-      _toast("Volunteers required is missing");
+    if (!saveAsDraft && _parseVolunteers() == null) {
+      _toast("Enter valid volunteers required");
       return;
     }
-    if (eventStartDate == null || eventEndDate == null) {
+    if (!saveAsDraft && (eventStartDate == null || eventEndDate == null)) {
       _toast("Select event start and end dates");
       return;
     }
-    if (eventStartTime == null || eventEndTime == null) {
+    if (!saveAsDraft && (eventStartTime == null || eventEndTime == null)) {
       _toast("Select event start and end time");
       return;
     }
-    if (applicationDeadline == null) {
+    if (!saveAsDraft && applicationDeadline == null) {
       _toast("Select application deadline");
       return;
     }
-    if (bannerImage == null) {
+    if (!saveAsDraft && bannerImage == null) {
       _toast("Upload event banner");
       return;
     }
-    if (selectedCategories.isEmpty) {
+    if (!saveAsDraft && selectedCategories.isEmpty) {
       _toast("Select at least one category");
       return;
     }
 
-    if (eventType == "paid") {
+    if (!saveAsDraft && eventType == "paid") {
       final pay = double.tryParse(paymentController.text);
       if (pay == null || pay <= 0) {
         _toast("Enter valid payment per day");
@@ -167,37 +169,41 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     setState(() => loading = true);
 
     try {
-      // 🔼 Upload image first and get real URL
-final bannerUrl = await EventService.uploadImage(bannerImage!);
+      String? bannerUrl;
+      if (bannerImage != null) {
+        bannerUrl = await EventService.uploadImage(bannerImage!);
+      }
 
-final success = await EventService.createEvent(
-  title: titleController.text.trim(),
-  description: descriptionController.text.trim(),
-  location: locationController.text.trim(),
-  eventDate: _fmtDate(eventStartDate!),
-  endDate: _fmtDate(eventEndDate!),
-  applicationDeadline: _fmtDate(applicationDeadline!),
-  volunteersRequired: int.parse(volunteersController.text),
-  eventType: eventType,
-  paymentPerDay:
-      eventType == "paid" ? double.parse(paymentController.text) : null,
-
-  // ✅ Save REAL URL returned by backend
-  bannerUrl: bannerUrl,
-
-  categories: selectedCategories,
-  responsibilities: responsibilities,
-  startTime: _fmtTime(eventStartTime!),
-  endTime: _fmtTime(eventEndTime!),
-);
-
-
+      final success = await EventService.createEvent(
+        title: titleController.text.trim(),
+        description: descriptionController.text.trim().isEmpty
+            ? null
+            : descriptionController.text.trim(),
+        location:
+            locationController.text.trim().isEmpty ? null : locationController.text.trim(),
+        eventDate: eventStartDate == null ? null : _fmtDate(eventStartDate!),
+        endDate: eventEndDate == null ? null : _fmtDate(eventEndDate!),
+        applicationDeadline:
+            applicationDeadline == null ? null : _fmtDate(applicationDeadline!),
+        volunteersRequired: _parseVolunteers(),
+        eventType: eventType,
+        paymentPerDay: eventType == "paid" ? double.tryParse(paymentController.text) : null,
+        bannerUrl: bannerUrl,
+        categories: selectedCategories,
+        responsibilities: responsibilities,
+        startTime: eventStartTime == null ? null : _fmtTime(eventStartTime!),
+        endTime: eventEndTime == null ? null : _fmtTime(eventEndTime!),
+        isDraft: saveAsDraft,
+      );
 
       if (success && mounted) {
+        _toast(saveAsDraft ? "Draft saved" : "Event created");
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const MyEventsScreen()),
         );
+      } else if (mounted) {
+        _toast(saveAsDraft ? "Failed to save draft" : "Failed to create event");
       }
     } catch (e) {
       _toast("Error: $e");
@@ -205,8 +211,6 @@ final success = await EventService.createEvent(
       if (mounted) setState(() => loading = false);
     }
   }
-
-  // ---------------- UI ----------------
 
   @override
   Widget build(BuildContext context) {
@@ -235,28 +239,23 @@ final success = await EventService.createEvent(
           _sectionCard("Schedule", [
             Row(children: [
               Expanded(
-                child: _dateTile(
-                    "Start Date", eventStartDate, () => pickDate(true)),
+                child: _dateTile("Start Date", eventStartDate, () => pickDate(true)),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _dateTile(
-                    "End Date", eventEndDate, () => pickDate(false)),
+                child: _dateTile("End Date", eventEndDate, () => pickDate(false)),
               ),
             ]),
             Row(children: [
               Expanded(
-                child: _timeTile(
-                    "Start Time", eventStartTime, () => pickTime(true)),
+                child: _timeTile("Start Time", eventStartTime, () => pickTime(true)),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child:
-                    _timeTile("End Time", eventEndTime, () => pickTime(false)),
+                child: _timeTile("End Time", eventEndTime, () => pickTime(false)),
               ),
             ]),
-            _dateTile(
-                "Application Deadline", applicationDeadline, pickDeadline),
+            _dateTile("Application Deadline", applicationDeadline, pickDeadline),
           ]),
 
           _sectionCard("Event Banner", [
@@ -273,10 +272,8 @@ final success = await EventService.createEvent(
                     : ClipRRect(
                         borderRadius: BorderRadius.circular(16),
                         child: kIsWeb
-                            ? Image.network(bannerImage!.path,
-                                fit: BoxFit.cover)
-                            : Image.file(File(bannerImage!.path),
-                                fit: BoxFit.cover),
+                            ? Image.network(bannerImage!.path, fit: BoxFit.cover)
+                            : Image.file(File(bannerImage!.path), fit: BoxFit.cover),
                       ),
               ),
             ),
@@ -296,7 +293,7 @@ final success = await EventService.createEvent(
               onChanged: (v) => setState(() => eventType = v!),
             ),
             if (eventType == "paid")
-              _input("Payment per day (₹)", paymentController,
+              _input("Payment per day", paymentController,
                   keyboardType: TextInputType.number),
           ]),
 
@@ -323,8 +320,7 @@ final success = await EventService.createEvent(
               ],
             ),
             const SizedBox(height: 8),
-            if (responsibilities.isEmpty)
-              const Text("No responsibilities added"),
+            if (responsibilities.isEmpty) const Text("No responsibilities added"),
             if (responsibilities.isNotEmpty)
               Wrap(
                 spacing: 8,
@@ -352,13 +348,10 @@ final success = await EventService.createEvent(
                   label: Text(c),
                   selected: selected,
                   selectedColor: const Color(0xFF22C55E),
-                  labelStyle: TextStyle(
-                      color: selected ? Colors.white : Colors.black),
+                  labelStyle: TextStyle(color: selected ? Colors.white : Colors.black),
                   onSelected: (v) {
                     setState(() {
-                      v
-                          ? selectedCategories.add(c)
-                          : selectedCategories.remove(c);
+                      v ? selectedCategories.add(c) : selectedCategories.remove(c);
                     });
                   },
                 );
@@ -368,15 +361,11 @@ final success = await EventService.createEvent(
 
           const SizedBox(height: 24),
 
-          loading
-              ? const CircularProgressIndicator()
-              : _submitButton(),
+          loading ? const CircularProgressIndicator() : _actionButtons(),
         ]),
       ),
     );
   }
-
-  // ---------------- WIDGETS ----------------
 
   Widget _sectionCard(String title, List<Widget> children) {
     return Container(
@@ -393,31 +382,48 @@ final success = await EventService.createEvent(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(title,
-                style:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             ...children,
           ]),
     );
   }
 
-  Widget _submitButton() => InkWell(
-        onTap: handleCreateEvent,
-        child: Container(
-          height: 56,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
+  Widget _actionButtons() => Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: () => _submitEvent(saveAsDraft: true),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 56),
+                side: const BorderSide(color: Color(0xFF3B82F6)),
+              ),
+              child: const Text("Save Draft"),
             ),
-            borderRadius: BorderRadius.circular(30),
           ),
-          child: const Center(
-            child: Text("Create Event",
-                style:
-                    TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: InkWell(
+              onTap: () => _submitEvent(saveAsDraft: false),
+              child: Container(
+                height: 56,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
+                  ),
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: const Center(
+                  child: Text(
+                    "Create Event",
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ),
           ),
-        ),
+        ],
       );
 
   Widget _input(String hint, TextEditingController c,
@@ -430,21 +436,18 @@ final success = await EventService.createEvent(
         keyboardType: keyboardType,
         decoration: InputDecoration(
           hintText: hint,
-          border:
-              OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
     );
   }
 
   Widget _dateTile(String title, DateTime? value, VoidCallback onTap) {
-    return _tile(Icons.calendar_today,
-        value == null ? title : _fmtDate(value), onTap);
+    return _tile(Icons.calendar_today, value == null ? title : _fmtDate(value), onTap);
   }
 
   Widget _timeTile(String title, TimeOfDay? value, VoidCallback onTap) {
-    return _tile(Icons.access_time,
-        value == null ? title : value.format(context), onTap);
+    return _tile(Icons.access_time, value == null ? title : value.format(context), onTap);
   }
 
   Widget _tile(IconData icon, String text, VoidCallback onTap) {

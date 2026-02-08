@@ -1,18 +1,13 @@
 const express = require("express");
-<<<<<<< HEAD
-const { deleteUser } = require("../controllers/usercontroller");
-const { getOrganiserPublicProfile } = require("../controllers/organiserController");
-=======
 const {
   deleteUser,
-  getOrganiserProfile,
   updateUser,
   getVolunteerDashboard,
   updateVolunteerPreferences,
 } = require("../controllers/usercontroller");
+const { getOrganiserPublicProfile } = require("../controllers/organiserController");
 
 const authMiddleware = require("../middleware/auth");
->>>>>>> 967aa70e5ed64bd61653889365519a10808ddf2e
 
 const router = express.Router();
 

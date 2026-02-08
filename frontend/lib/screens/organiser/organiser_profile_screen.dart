@@ -13,12 +13,8 @@ import 'about_volunteerx_screen.dart';
 import 'edit_profile_screen.dart';
 import 'get_verified_screen.dart';
 import 'leaderboard_screen.dart';
-<<<<<<< HEAD
 import 'organiser_activity_screen.dart';
-
-=======
 import 'my_events_screen.dart';
->>>>>>> 967aa70e5ed64bd61653889365519a10808ddf2e
 
 class OrganiserProfileScreen extends StatefulWidget {
   const OrganiserProfileScreen({super.key});

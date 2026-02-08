@@ -13,7 +13,7 @@ event_date
 category
 slots_total
 slots_filled
-status          -- 'open' | 'closed' | 'completed' | 'deleted'
+status          -- 'draft' | 'open' | 'closed' | 'completed' | 'deleted'
 created_at
 */
 
@@ -43,29 +43,51 @@ exports.createEvent = async (req, res) => {
       responsibilities,
       start_time,
       end_time,
+      is_draft,
     } = req.body;
 
+    if (!title) {
+      return res.status(400).json({
+        error: "Event title is required",
+      });
+    }
+
+    const saveAsDraft = is_draft === true;
+
     if (
-      !title ||
-      !location ||
-      !event_date ||
-      !end_date ||
-      !volunteers_required ||
-      !application_deadline ||
-      !event_type ||
-      !start_time ||
-      !end_time
+      !saveAsDraft &&
+      (!location ||
+        !event_date ||
+        !end_date ||
+        !volunteers_required ||
+        !application_deadline ||
+        !event_type ||
+        !start_time ||
+        !end_time)
     ) {
       return res.status(400).json({
         error: "Missing required event fields",
       });
     }
 
-    if (event_type === "paid" && (!payment_per_day || payment_per_day <= 0)) {
+    if (
+      !saveAsDraft &&
+      event_type === "paid" &&
+      (!payment_per_day || payment_per_day <= 0)
+    ) {
       return res.status(400).json({
         error: "Payment per day is required for paid events",
       });
     }
+
+    const safeEventType = event_type === "paid" ? "paid" : "unpaid";
+    const parsedVolunteers = Number.parseInt(volunteers_required, 10);
+    const safeVolunteersRequired =
+      Number.isInteger(parsedVolunteers) && parsedVolunteers >= 0
+        ? parsedVolunteers
+        : 0;
+    const safePaymentPerDay =
+      safeEventType === "paid" && payment_per_day ? payment_per_day : null;
 
     const eventResult = await pool.query(
       `
@@ -82,25 +104,27 @@ exports.createEvent = async (req, res) => {
         payment_per_day,
         banner_url,
         start_time,
-        end_time
+        end_time,
+        status
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
       RETURNING *
       `,
       [
         req.user.id,
         title,
         description ?? null,
-        location,
-        event_date,
-        end_date,
-        volunteers_required,
-        application_deadline,
-        event_type,
-        event_type === "paid" ? payment_per_day : null,
+        location ?? null,
+        event_date ?? null,
+        end_date ?? null,
+        safeVolunteersRequired,
+        application_deadline ?? null,
+        safeEventType,
+        safePaymentPerDay,
         banner_url ?? null,
         start_time ?? null,
         end_time ?? null,
+        saveAsDraft ? "draft" : "open",
       ]
     );
 
@@ -189,6 +213,7 @@ exports.getMyEvents = async (req, res) => {
           '{}'
         ) AS responsibilities,
        CASE
+  WHEN status = 'draft' THEN 'draft'
   WHEN status = 'deleted' THEN 'deleted_by_admin'
   WHEN NOW() < (event_date + COALESCE(start_time, TIME '00:00:00')) THEN 'upcoming'
   WHEN NOW() BETWEEN (event_date + COALESCE(start_time, TIME '00:00:00'))
@@ -199,7 +224,7 @@ END AS computed_status
       FROM events e
       LEFT JOIN event_responsibilities er ON er.event_id = e.id
       WHERE organiser_id = $1
-        AND status IN ('open', 'closed', 'completed', 'deleted')
+        AND status IN ('draft', 'open', 'closed', 'completed', 'deleted')
       GROUP BY e.id
       ORDER BY event_date DESC
       `,

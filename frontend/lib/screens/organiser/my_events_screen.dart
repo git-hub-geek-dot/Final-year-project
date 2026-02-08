@@ -174,7 +174,9 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                               ? Colors.blue
                               : status == "ongoing"
                                   ? Colors.orange
-                                  : Colors.green;
+                                  : status == "draft"
+                                      ? Colors.grey
+                                      : Colors.green;
 
                           return InkWell(
                             onTap: () {

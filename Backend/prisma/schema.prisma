@@ -22,6 +22,7 @@ enum UserStatus {
 }
 
 enum EventStatus {
+  draft
   open
   closed
   completed

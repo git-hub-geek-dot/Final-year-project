@@ -18,7 +18,7 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
   bool loading = true;
   List events = [];
   int? userId;
-  int _selectedTab = 0; // 0: Ongoing, 1: Upcoming, 2: Completed
+  int _selectedTab = 0; // 0: Ongoing, 1: Upcoming, 2: Completed, 3: Draft
   bool showAllEvents = false;
 
   @override
@@ -33,36 +33,41 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
       final data = showAllEvents
           ? await EventService.fetchAllEvents()
           : await EventService.fetchMyEvents();
+      if (!mounted) return;
       setState(() {
         userId = id;
         events = data;
         loading = false;
       });
-    } catch (e) {
+    } catch (_) {
+      if (!mounted) return;
       setState(() => loading = false);
     }
   }
 
-  String _status(Map e) => e["computed_status"] ?? e["status"] ?? "upcoming";
+  String _status(Map e) =>
+      (e['computed_status'] ?? e['status'] ?? 'upcoming').toString();
 
   List getUpcomingEvents() =>
-      events.where((e) => _status(e) == "upcoming").toList();
+      events.where((e) => _status(e) == 'upcoming').toList();
 
   List getOngoingEvents() =>
-      events.where((e) => _status(e) == "ongoing").toList();
+      events.where((e) => _status(e) == 'ongoing').toList();
 
   List getCompletedEvents() =>
-      events.where((e) => _status(e) == "completed").toList();
+      events.where((e) => _status(e) == 'completed').toList();
+
+  List getDraftEvents() => events.where((e) => _status(e) == 'draft').toList();
 
   List getDeletedEvents() =>
-    events.where((e) => _status(e) == "deleted_by_admin").toList();
-
+      events.where((e) => _status(e) == 'deleted_by_admin').toList();
 
   @override
   Widget build(BuildContext context) {
     final upcoming = getUpcomingEvents();
     final ongoing = getOngoingEvents();
     final completed = getCompletedEvents();
+    final draft = getDraftEvents();
 
     return Scaffold(
       body: Column(
@@ -74,18 +79,18 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
               gradient: LinearGradient(
                 colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
               ),
-              borderRadius:
-                  BorderRadius.vertical(bottom: Radius.circular(40)),
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(40)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  "Volunteerx",
+                  'Volunteerx',
                   style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold),
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 Row(
                   children: [
@@ -109,17 +114,14 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
               ],
             ),
           ),
-
           const SizedBox(height: 20),
-
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: InkWell(
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                      builder: (_) => const CreateEventScreen()),
+                  MaterialPageRoute(builder: (_) => const CreateEventScreen()),
                 ).then((_) => loadEvents());
               },
               child: Container(
@@ -132,30 +134,29 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
                 ),
                 child: const Center(
                   child: Text(
-                    "Create Event",
+                    'Create Event',
                     style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold),
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-
           const SizedBox(height: 20),
-
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
               children: [
-                _eventScopeButton("My Events", !showAllEvents, () {
+                _eventScopeButton('My Events', !showAllEvents, () {
                   if (!showAllEvents) return;
                   setState(() => showAllEvents = false);
                   loadEvents();
                 }),
                 const SizedBox(width: 10),
-                _eventScopeButton("All Events", showAllEvents, () {
+                _eventScopeButton('All Events', showAllEvents, () {
                   if (showAllEvents) return;
                   setState(() => showAllEvents = true);
                   loadEvents();
@@ -163,25 +164,28 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
               ],
             ),
           ),
-
           const SizedBox(height: 12),
-
-          // 📑 TAB SELECTOR
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                _tabButton("Ongoing", 0),
-                const SizedBox(width: 8),
-                _tabButton("Upcoming", 1),
-                const SizedBox(width: 8),
-                _tabButton("Completed", 2),
-              ],
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _tabButton('Ongoing', 0),
+                    const SizedBox(width: 8),
+                    _tabButton('Upcoming', 1),
+                    const SizedBox(width: 8),
+                    _tabButton('Completed', 2),
+                    const SizedBox(width: 8),
+                    _tabButton('Draft', 3),
+                  ],
+                ),
+              ),
             ),
           ),
-
           const SizedBox(height: 20),
-
           Expanded(
             child: loading
                 ? const Center(child: CircularProgressIndicator())
@@ -189,15 +193,16 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     children: [
                       if (_selectedTab == 0)
-                        _section("Ongoing Events", ongoing, isCompleted: false)
+                        _section('Ongoing Events', ongoing, isCompleted: false)
                       else if (_selectedTab == 1)
-                        _section("Upcoming Events", upcoming, isCompleted: false)
+                        _section('Upcoming Events', upcoming, isCompleted: false)
+                      else if (_selectedTab == 2)
+                        _section('Completed Events', completed, isCompleted: true)
                       else
-                        _section("Completed Events", completed, isCompleted: true),
+                        _section('Draft Events', draft, isDraft: true),
                     ],
                   ),
           ),
-
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Container(
@@ -211,14 +216,14 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  StatItem(events.length.toString(), "Total"),
-                  StatItem(ongoing.length.toString(), "Ongoing"),
-                  StatItem(upcoming.length.toString(), "Upcoming"),
+                  StatItem(events.length.toString(), 'Total'),
+                  StatItem(draft.length.toString(), 'Draft'),
+                  StatItem(ongoing.length.toString(), 'Ongoing'),
+                  StatItem(upcoming.length.toString(), 'Upcoming'),
                 ],
               ),
             ),
           ),
-
           const SizedBox(height: 10),
         ],
       ),
@@ -233,26 +238,33 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
               MaterialPageRoute(builder: (_) => const LeaderboardScreen()),
             );
           } else if (index == 2) {
-            Navigator.pushNamed(context, "/organiser-profile");
+            Navigator.pushNamed(context, '/organiser-profile');
           }
         },
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(
-              icon: Icon(Icons.leaderboard), label: "Leaderboard"),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
+            icon: Icon(Icons.leaderboard),
+            label: 'Leaderboard',
+          ),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
     );
   }
 
-  Widget _section(String title, List list, {bool isCompleted = false}) {
+  Widget _section(
+    String title,
+    List list, {
+    bool isCompleted = false,
+    bool isDraft = false,
+  }) {
     if (list.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 40),
           child: Text(
-            "No $title",
+            'No $title',
             style: const TextStyle(color: Colors.grey, fontSize: 16),
           ),
         ),
@@ -266,17 +278,19 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
           padding: const EdgeInsets.symmetric(vertical: 12),
           child: Text(
             title,
-            style:
-                const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
         ),
-        ...list.map((event) => eventCard(
-              context,
-              event,
-              loadEvents,
-              _isMyEvent(event),
-              isCompleted: isCompleted,
-            )),
+        ...list.map(
+          (event) => eventCard(
+            context,
+            event,
+            loadEvents,
+            _isMyEvent(event),
+            isCompleted: isCompleted,
+            isDraft: isDraft,
+          ),
+        ),
       ],
     );
   }
@@ -324,7 +338,7 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
 
   bool _isMyEvent(Map event) {
     if (userId == null) return false;
-    return event["organiser_id"] == userId;
+    return event['organiser_id'] == userId;
   }
 }
 
@@ -334,6 +348,7 @@ Widget eventCard(
   VoidCallback onRefresh,
   bool isMine, {
   bool isCompleted = false,
+  bool isDraft = false,
 }) {
   return InkWell(
     onTap: () {
@@ -362,74 +377,95 @@ Widget eventCard(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              if (isMine)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 6),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isCompleted
-                        ? const Color(0xFFDCFCE7)
-                        : const Color(0xFFDCFCE7),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    isCompleted ? "✅ Completed" : "My Event",
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (isMine)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
                       color: isCompleted
-                          ? const Color(0xFF16A34A)
-                          : const Color(0xFF16A34A),
+                          ? const Color(0xFFDCFCE7)
+                          : isDraft
+                              ? Colors.grey.shade200
+                              : const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      isCompleted
+                          ? 'Completed'
+                          : isDraft
+                              ? 'Draft'
+                              : 'My Event',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: isCompleted
+                            ? const Color(0xFF16A34A)
+                            : isDraft
+                                ? Colors.grey.shade700
+                                : const Color(0xFF16A34A),
+                      ),
                     ),
                   ),
-                ),
-              if (!isMine && event["organiser_name"] != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Text(
-                    "Organiser: ${event["organiser_name"]}",
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.black54,
+                if (!isMine && event['organiser_name'] != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text(
+                      'Organiser: ${event['organiser_name']}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.black54,
+                      ),
                     ),
                   ),
-                ),
-              Text(event["title"] ?? "Untitled",
+                Text(
+                  event['title'] ?? 'Untitled',
                   style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 6),
-              Text("📍 ${event["location"] ?? ""}"),
-              Text("📅 ${event["event_date"].toString().split("T")[0]}"),
-              if (isCompleted) ...[
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(Icons.star, size: 16, color: Colors.amber),
-                    const SizedBox(width: 4),
-                    Text(
-                      event["rating"] != null ? "${event["rating"]} (${event["review_count"] ?? 0})" : "No ratings yet",
-                      style: const TextStyle(fontSize: 12, color: Colors.black54),
-                    ),
-                  ],
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
+                const SizedBox(height: 6),
+                Text('Location: ${event['location'] ?? 'N/A'}'),
+                Text(
+                  'Date: ${event['event_date'] == null ? 'N/A' : event['event_date'].toString().split('T')[0]}',
+                ),
+                if (isCompleted) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.star, size: 16, color: Colors.amber),
+                      const SizedBox(width: 4),
+                      Text(
+                        event['rating'] != null
+                            ? "${event['rating']} (${event['review_count'] ?? 0})"
+                            : 'No ratings yet',
+                        style:
+                            const TextStyle(fontSize: 12, color: Colors.black54),
+                      ),
+                    ],
+                  ),
+                ],
               ],
-            ]),
+            ),
           ),
-          if (isMine && !isCompleted)
+          if (isMine && !isCompleted && !isDraft)
             InkWell(
               onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) =>
-                        ReviewApplicationsScreen(eventId: event["id"]),
+                    builder: (_) => ReviewApplicationsScreen(eventId: event['id']),
                   ),
                 );
               },
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
@@ -437,11 +473,12 @@ Widget eventCard(
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: const Text(
-                  "Review",
+                  'Review',
                   style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold),
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
@@ -461,15 +498,19 @@ class StatItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(value,
-            style: const TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold)),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         const SizedBox(height: 4),
-        Text(label,
-            style:
-                const TextStyle(color: Colors.white70, fontSize: 12)),
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white70, fontSize: 12),
+        ),
       ],
     );
   }

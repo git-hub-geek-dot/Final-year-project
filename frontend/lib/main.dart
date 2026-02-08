@@ -24,11 +24,13 @@ import 'services/notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await Firebase.initializeApp();
-  } catch (e, s) {
-    debugPrint("Firebase init failed: $e");
-    debugPrintStack(stackTrace: s);
+  if (!kIsWeb) {
+    try {
+      await Firebase.initializeApp();
+    } catch (e, s) {
+      debugPrint("Firebase init failed: $e");
+      debugPrintStack(stackTrace: s);
+    }
   }
   runApp(const MyApp());
 }

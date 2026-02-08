@@ -6,6 +6,8 @@ import 'volunteer_profile_screen.dart';
 import 'leaderboard_screen.dart';
 import 'view_event_screen.dart'; // ✅ ADDED
 import '../../config/api_config.dart';
+import '../../services/saved_events_service.dart';
+import '../../services/token_service.dart';
 
 
 class VolunteerHomeScreen extends StatefulWidget {
@@ -20,9 +22,13 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
   
   int selectedIndex = 0;
   List events = [];
+  List myApplications = [];
   bool loading = true;
+  bool loadingApplications = true;
+  Set<String> savedEventIds = {};
   
-String searchQuery = "";
+  String searchQuery = "";
+  String selectedFeed = "all"; // all | confirmed | pending
 
 
   // 🔹 FILTER UI STATE (UNCHANGED)
@@ -57,6 +63,77 @@ String searchQuery = "";
   void initState() {
     super.initState();
     fetchEvents();
+    fetchMyApplications();
+    _loadSavedEvents();
+  }
+
+  Future<void> fetchMyApplications() async {
+    try {
+      final token = await TokenService.getToken();
+      if (token == null || token.isEmpty) {
+        setState(() {
+          myApplications = [];
+          loadingApplications = false;
+        });
+        return;
+      }
+
+      final response = await http.get(
+        Uri.parse("${ApiConfig.baseUrl}/applications/my"),
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        final data = decoded is List ? decoded : [];
+
+        setState(() {
+          myApplications = data;
+          loadingApplications = false;
+        });
+      } else {
+        setState(() {
+          myApplications = [];
+          loadingApplications = false;
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        myApplications = [];
+        loadingApplications = false;
+      });
+    }
+  }
+
+  Future<void> _loadSavedEvents() async {
+    final saved = await SavedEventsService.getSavedEvents();
+    if (!mounted) return;
+
+    setState(() {
+      savedEventIds = saved
+          .map((event) => event["id"].toString())
+          .toSet();
+    });
+  }
+
+  Future<void> _toggleSaved(Map<String, dynamic> event) async {
+    final updated = await SavedEventsService.toggleSaved(event);
+    if (!mounted) return;
+
+    setState(() {
+      final id = event["id"].toString();
+      if (updated) {
+        savedEventIds.add(id);
+      } else {
+        savedEventIds.remove(id);
+      }
+    });
   }
 
   // ================= LOGIC UNCHANGED =================
@@ -131,13 +208,21 @@ String searchQuery = "";
     matchesPayment = !isPaid;
   }
 
-  return matchesSearch && matchesCategory && matchesPayment;
+  final computedStatus = e["computed_status"]?.toString();
+  final isCompleted = computedStatus == "completed" ||
+      _isPastEventDate(e["event_date"]?.toString());
+
+  return matchesSearch && matchesCategory && matchesPayment && !isCompleted;
 }).toList();
 
 
 
 return RefreshIndicator(
-  onRefresh: fetchEvents,
+  onRefresh: () async {
+    await fetchEvents();
+    await fetchMyApplications();
+    await _loadSavedEvents();
+  },
   child: Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
@@ -167,79 +252,89 @@ return RefreshIndicator(
               ),
             ),
             const SizedBox(width: 12),
-            GestureDetector(
-              onTap: _openFilterSheet,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2ECC71),
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.tune, color: Colors.white, size: 18),
-                    SizedBox(width: 6),
-                    Text(
-                      "Filter",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
+            if (selectedFeed == "all")
+              GestureDetector(
+                onTap: _openFilterSheet,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2ECC71),
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.tune, color: Colors.white, size: 18),
+                      SizedBox(width: 6),
+                      Text(
+                        "Filter",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),
 
-      // 🟦 CATEGORY CHIPS
-      SizedBox(
-        height: 46,
-        child: ListView.builder(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          scrollDirection: Axis.horizontal,
-          itemCount: eventCategories.length,
-          itemBuilder: (context, index) {
-            final category = eventCategories[index];
-            final selected = category == selectedCategory;
-
-            return GestureDetector(
-              onTap: () {
-                setState(() => selectedCategory = category);
-              },
-              child: Container(
-                margin: const EdgeInsets.only(right: 10),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(
-                  color: selected
-                      ? const Color(0xFF2E6BE6)
-                      : Colors.white,
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: Text(
-                  category,
-                  style: TextStyle(
-                    color: selected ? Colors.white : Colors.black87,
-                    fontWeight: FontWeight.w500,
-                  ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: _feedSegment(
+                  label: "All",
+                  value: "all",
+                  count: filteredEvents.length,
                 ),
               ),
-            );
-          },
+              const SizedBox(width: 6),
+              Expanded(
+                child: _feedSegment(
+                  label: "Confirmed",
+                  value: "confirmed",
+                  count: _countByStatus("accepted"),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _feedSegment(
+                  label: "Pending",
+                  value: "pending",
+                  count: _countByStatus("pending"),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
 
-      const SizedBox(height: 12),
-
-      const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Text(
-          "Volunteer Jobs",
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          selectedFeed == "confirmed"
+              ? "Confirmed Events"
+              : selectedFeed == "pending"
+                  ? "Pending Events"
+                  : "Volunteer Jobs",
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
       ),
 
@@ -247,39 +342,187 @@ return RefreshIndicator(
 
       // 📋 EVENTS LIST
       Expanded(
-        child: filteredEvents.isEmpty
-            ? const Center(child: Text("No events found"))
-            : ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: filteredEvents.length,
-                itemBuilder: (context, index) {
-                  final event = filteredEvents[index];
-
-                  return GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ViewEventScreen(event: event),
-                        ),
-                      );
-                    },
-                    child: eventCard(
-                      title: event["title"] ?? "",
-                      location: event["location"] ?? "",
-                      date: event["event_date"]
-                              ?.toString()
-                              .split("T")[0] ??
-                          "",
-                      slotsLeft: event["volunteers_required"] ?? 0,
-                    ),
-                  );
-                },
-              ),
+        child: _buildEventList(filteredEvents),
       ),
     ],
   ),
 );
+  }
+
+  Widget _buildEventList(List filteredEvents) {
+    if (selectedFeed != "all" && loadingApplications) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (selectedFeed == "all") {
+      if (filteredEvents.isEmpty) {
+        return const Center(child: Text("No events found"));
+      }
+      return _eventListView(filteredEvents);
+    }
+
+    final apps = _filteredApplications();
+    if (apps.isEmpty) {
+      return Center(
+        child: Text(
+          selectedFeed == "confirmed"
+              ? "No confirmed events"
+              : "No pending events",
+        ),
+      );
+    }
+
+    final eventById = {
+      for (final event in events)
+        event["id"]?.toString(): event,
+    };
+
+    final merged = apps.map((app) {
+      final eventId = app["event_id"]?.toString();
+      return eventById[eventId] ?? app;
+    }).toList();
+
+    return _eventListView(merged);
+  }
+
+  Widget _eventListView(List list) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: list.length,
+      itemBuilder: (context, index) {
+        final event = list[index];
+
+        final eventId = event["id"]?.toString() ??
+            event["event_id"]?.toString();
+        final isSaved =
+            eventId != null && savedEventIds.contains(eventId);
+
+        return GestureDetector(
+          onTap: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ViewEventScreen(event: event),
+              ),
+            );
+            await _loadSavedEvents();
+            await fetchMyApplications();
+          },
+          child: _eventCard(
+            title: event["title"] ?? "",
+            location: event["location"] ?? "",
+            date: event["event_date"]
+                    ?.toString()
+                    .split("T")[0] ??
+                "",
+            slotsLeft: event["volunteers_required"] ?? 0,
+            isSaved: isSaved,
+            onToggleSaved: () => _toggleSaved(event),
+          ),
+        );
+      },
+    );
+  }
+
+  List _filteredApplications() {
+    return myApplications.where((app) {
+      final status = app["status"]?.toString().toLowerCase() ?? "";
+      if (selectedFeed == "confirmed" && status != "accepted") {
+        return false;
+      }
+      if (selectedFeed == "pending" && status != "pending") {
+        return false;
+      }
+
+      if (status != "accepted" &&
+          _isPastEventDate(app["event_date"]?.toString())) {
+        return false;
+      }
+
+      final title = (app["title"] ?? "").toString().toLowerCase();
+      final location = (app["location"] ?? "").toString().toLowerCase();
+      return title.contains(searchQuery) || location.contains(searchQuery);
+    }).toList();
+  }
+
+  Widget _feedSegment({
+    required String label,
+    required String value,
+    required int count,
+  }) {
+    final selected = selectedFeed == value;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          selectedFeed = value;
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFF2E6BE6) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: selected ? Colors.white : Colors.black87,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: selected
+                    ? Colors.white.withOpacity(0.2)
+                    : const Color(0xFFE5E7EB),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                count.toString(),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: selected ? Colors.white : Colors.black87,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  int _countByStatus(String status) {
+    return myApplications.where((app) {
+      final appStatus = app["status"]?.toString().toLowerCase();
+      if (appStatus != status) return false;
+
+      if (status != "accepted" &&
+          _isPastEventDate(app["event_date"]?.toString())) {
+        return false;
+      }
+
+      return true;
+    }).length;
+  }
+
+  bool _isPastEventDate(String? rawDate) {
+    if (rawDate == null || rawDate.isEmpty) return false;
+
+    final parsed = DateTime.tryParse(rawDate);
+    if (parsed == null) return false;
+
+    final now = DateTime.now();
+    final eventDateOnly = DateTime(parsed.year, parsed.month, parsed.day);
+    final today = DateTime(now.year, now.month, now.day);
+
+    return eventDateOnly.isBefore(today);
   }
 
 
@@ -424,14 +667,16 @@ return RefreshIndicator(
   }
 }
 
-// ================= EVENT CARD (HOME) =================
-Widget eventCard({
-  required String title,
-  required String location,
-  required String date,
-  required int slotsLeft,
-}) {
-  return Container(
+  // ================= EVENT CARD (HOME) =================
+  Widget _eventCard({
+    required String title,
+    required String location,
+    required String date,
+    required int slotsLeft,
+    required bool isSaved,
+    required VoidCallback onToggleSaved,
+  }) {
+    return Container(
     margin: const EdgeInsets.only(bottom: 16),
     decoration: BoxDecoration(
       borderRadius: BorderRadius.circular(20),
@@ -489,6 +734,15 @@ Widget eventCard({
                 Text(date, style: const TextStyle(color: Colors.grey)),
               ],
             ),
+          ),
+
+          IconButton(
+            icon: Icon(
+              isSaved ? Icons.bookmark : Icons.bookmark_border,
+              color: isSaved ? const Color(0xFF2E6BE6) : Colors.grey,
+            ),
+            onPressed: onToggleSaved,
+            tooltip: isSaved ? "Remove from saved" : "Save event",
           ),
         ],
       ),

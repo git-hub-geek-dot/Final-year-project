@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../config/api_config.dart';
 import '../../services/token_service.dart';
+import '../../services/saved_events_service.dart';
 import 'view_organiser_profile_screen.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -19,6 +20,8 @@ class ViewEventScreen extends StatefulWidget {
 class _ViewEventScreenState extends State<ViewEventScreen> {
   bool isLoadingStatus = true;
   bool isApplying = false;
+  bool isSaved = false;
+  String? organiserPhotoUrl;
 
   /// null | pending | accepted | rejected
   String? applicationStatus;
@@ -27,6 +30,68 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
   void initState() {
     super.initState();
     _fetchApplicationStatus();
+    _loadSavedState();
+    _loadOrganiserPhoto();
+  }
+
+  Future<void> _loadOrganiserPhoto() async {
+    final eventPhoto = widget.event["organiser_profile_picture_url"]?.toString();
+    final normalisedEventPhoto = _normalizeImageUrl(eventPhoto);
+    if (normalisedEventPhoto != null) {
+      setState(() {
+        organiserPhotoUrl = normalisedEventPhoto;
+      });
+      return;
+    }
+
+    final organiserId = widget.event["organiser_id"];
+    if (organiserId == null) return;
+
+    try {
+      final response = await http.get(
+        Uri.parse("${ApiConfig.baseUrl}/organisers/$organiserId"),
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final photo = _normalizeImageUrl(
+          data["profile_picture_url"]?.toString(),
+        );
+
+        if (photo != null) {
+          setState(() {
+            organiserPhotoUrl = photo;
+          });
+        }
+      }
+    } catch (_) {
+      // Keep fallback avatar on error.
+    }
+  }
+
+  Future<void> _loadSavedState() async {
+    final id = widget.event["id"]?.toString();
+    if (id == null) return;
+
+    final saved = await SavedEventsService.isSaved(id);
+    if (!mounted) return;
+
+    setState(() {
+      isSaved = saved;
+    });
+  }
+
+  Future<void> _toggleSaved() async {
+    final updated = await SavedEventsService.toggleSaved(widget.event);
+    if (!mounted) return;
+
+    setState(() {
+      isSaved = updated;
+    });
+
+    _snack(updated ? "Saved event" : "Removed from saved");
   }
 
   // ================= APPLICATION STATUS =================
@@ -108,6 +173,11 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
       appBar: AppBar(
   title: const Text("Event Details"),
   actions: [
+    IconButton(
+      icon: Icon(isSaved ? Icons.bookmark : Icons.bookmark_border),
+      onPressed: _toggleSaved,
+      tooltip: isSaved ? "Remove from saved" : "Save event",
+    ),
     IconButton(
       icon: const Icon(Icons.share),
       onPressed: () {
@@ -227,6 +297,13 @@ Widget _eventBanner() {
             Icons.people,
             "Volunteers Needed: ${widget.event["volunteers_required"] ?? "N/A"}",
           ),
+          _iconRow(
+            Icons.payments,
+            _paymentText(
+              widget.event["event_type"],
+              widget.event["payment_per_day"],
+            ),
+          ),
           if (applicationStatus != null) ...[
             const SizedBox(height: 16),
             _statusPill(
@@ -308,11 +385,7 @@ Widget _eventBanner() {
       child: _card(
         child: Row(
           children: [
-            const CircleAvatar(
-              radius: 22,
-              backgroundColor: Colors.green,
-              child: Icon(Icons.eco, color: Colors.white),
-            ),
+            _organiserAvatar(organiserPhotoUrl),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -336,10 +409,65 @@ Widget _eventBanner() {
     );
   }
 
+  Widget _organiserAvatar(String? imageUrl) {
+    const double size = 44;
+
+    if (imageUrl == null) {
+      return const CircleAvatar(
+        radius: 22,
+        backgroundColor: Colors.green,
+        child: Icon(Icons.eco, color: Colors.white),
+      );
+    }
+
+    return ClipOval(
+      child: Image.network(
+        imageUrl,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) {
+          return const CircleAvatar(
+            radius: 22,
+            backgroundColor: Colors.green,
+            child: Icon(Icons.eco, color: Colors.white),
+          );
+        },
+      ),
+    );
+  }
+
   // ================= APPLY =================
   Widget _buildApplySection() {
     if (isLoadingStatus) {
       return const Center(child: CircularProgressIndicator());
+    }
+
+    final computedStatus = widget.event["computed_status"]?.toString();
+    final status = widget.event["status"]?.toString();
+    final isCompleted = computedStatus == "completed" || _isPastEvent();
+    final isClosed = status != null && status != "open";
+
+    if (isCompleted || isClosed) {
+      return SizedBox(
+        height: 54,
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: null,
+          style: ElevatedButton.styleFrom(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+            padding: EdgeInsets.zero,
+          ),
+          child: const Text(
+            "Applications closed",
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      );
     }
 
     if (applicationStatus == null) {
@@ -388,6 +516,45 @@ Widget _eventBanner() {
     } catch (_) {
       return "N/A";
     }
+  }
+
+  bool _isPastEvent() {
+    final eventDateRaw = widget.event["event_date"]?.toString();
+    if (eventDateRaw == null || eventDateRaw.isEmpty) return false;
+
+    final parsed = DateTime.tryParse(eventDateRaw);
+    if (parsed == null) return false;
+
+    final now = DateTime.now();
+    final eventDateOnly = DateTime(parsed.year, parsed.month, parsed.day);
+    final today = DateTime(now.year, now.month, now.day);
+
+    return eventDateOnly.isBefore(today);
+  }
+
+  String? _normalizeImageUrl(String? url) {
+    if (url == null || url.trim().isEmpty) return null;
+
+    final trimmed = url.trim();
+    if (trimmed.startsWith("http")) return trimmed;
+
+    final baseUri = Uri.parse(ApiConfig.baseUrl);
+    final origin =
+        "${baseUri.scheme}://${baseUri.host}${baseUri.hasPort ? ':${baseUri.port}' : ''}";
+
+    return trimmed.startsWith("/") ? "$origin$trimmed" : "$origin/$trimmed";
+  }
+
+  String _paymentText(dynamic eventType, dynamic paymentPerDay) {
+    final type = eventType?.toString().toLowerCase();
+    if (type == "paid") {
+      final amount = paymentPerDay?.toString();
+      if (amount != null && amount.isNotEmpty) {
+        return "Paid: ₹$amount/day";
+      }
+      return "Paid";
+    }
+    return "Unpaid";
   }
 
   Widget _card({required Widget child}) {

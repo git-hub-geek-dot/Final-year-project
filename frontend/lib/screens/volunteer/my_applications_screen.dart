@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import '../../config/api_config.dart';
 import '../../services/token_service.dart';
 
 class MyApplicationsScreen extends StatefulWidget {
@@ -39,7 +40,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
         return;
       }
 
-      final url = Uri.parse("http://127.0.0.1:4000/api/applications/my");
+      final url = Uri.parse("${ApiConfig.baseUrl}/applications/my");
 
       final response = await http.get(
         url,
@@ -65,6 +66,12 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
         } else {
           applications = [];
         }
+
+        applications = applications.where((app) {
+          final status = app["status"]?.toString().toLowerCase() ?? "";
+          if (status == "accepted") return true;
+          return !_isPastEventDate(app["event_date"]?.toString());
+        }).toList();
 
         setState(() {
           loading = false;
@@ -92,6 +99,19 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
       default:
         return Colors.orange;
     }
+  }
+
+  bool _isPastEventDate(String? rawDate) {
+    if (rawDate == null || rawDate.isEmpty) return false;
+
+    final parsed = DateTime.tryParse(rawDate);
+    if (parsed == null) return false;
+
+    final now = DateTime.now();
+    final eventDateOnly = DateTime(parsed.year, parsed.month, parsed.day);
+    final today = DateTime(now.year, now.month, now.day);
+
+    return eventDateOnly.isBefore(today);
   }
 
   @override

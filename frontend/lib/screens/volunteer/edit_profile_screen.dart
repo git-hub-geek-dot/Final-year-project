@@ -21,6 +21,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController cityController = TextEditingController();
   final TextEditingController contactController = TextEditingController();
+  final TextEditingController skillsController = TextEditingController();
+  final TextEditingController interestsController = TextEditingController();
 
   bool isLoading = false;
   bool loadingProfile = true;
@@ -35,6 +37,47 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void initState() {
     super.initState();
     _fetchProfileFromApi();
+    _fetchPreferences();
+  }
+
+  Future<void> _fetchPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString("token");
+
+      if (token == null || token.isEmpty) {
+        return;
+      }
+
+      final url = Uri.parse("${ApiConfig.baseUrl}/volunteer/dashboard");
+
+      final response = await http.get(
+        url,
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final skills = (data["skills"] as List?)
+                ?.map((s) => s.toString())
+                .toList() ??
+            [];
+        final interests = (data["interests"] as List?)
+                ?.map((s) => s.toString())
+                .toList() ??
+            [];
+
+        setState(() {
+          skillsController.text = skills.join(", ");
+          interestsController.text = interests.join(", ");
+        });
+      }
+    } catch (_) {
+      // Keep fields empty on error.
+    }
   }
 
   // ================= FETCH PROFILE =================
@@ -236,6 +279,43 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  Future<bool> _savePreferences(String token) async {
+    try {
+      final skills = skillsController.text
+          .split(",")
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+      final interests = interestsController.text
+          .split(",")
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+
+      final url = Uri.parse("${ApiConfig.baseUrl}/volunteer/preferences");
+      final response = await http.put(
+        url,
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode({
+          "skills": skills,
+          "interests": interests,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        _hasProfileChanges = true;
+        return true;
+      }
+    } catch (_) {
+      return false;
+    }
+
+    return false;
+  }
+
   // ================= SAVE PROFILE =================
   Future<void> _saveChanges() async {
     final name = nameController.text.trim();
@@ -278,11 +358,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         }),
       );
 
-      setState(() => isLoading = false);
-
       if (response.statusCode == 200) {
         if (!mounted) return;
         _hasProfileChanges = true;
+
+        final preferencesSaved = await _savePreferences(token);
+
+        if (!mounted) return;
+        setState(() => isLoading = false);
+
+        if (!preferencesSaved) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Profile updated, but preferences failed")),
+          );
+          return;
+        }
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Profile updated ✅")),
@@ -290,6 +380,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
         Navigator.pop(context, true); // 🔁 trigger refresh
       } else {
+        setState(() => isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Update failed: ${response.body}")),
         );
@@ -308,6 +399,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     emailController.dispose();
     cityController.dispose();
     contactController.dispose();
+    skillsController.dispose();
+    interestsController.dispose();
     super.dispose();
   }
 
@@ -423,6 +516,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     icon: Icons.phone,
                     controller: contactController,
                     keyboardType: TextInputType.phone,
+                  ),
+
+                  _inputField(
+                    label: "Skills (comma separated)",
+                    icon: Icons.auto_awesome,
+                    controller: skillsController,
+                  ),
+
+                  _inputField(
+                    label: "Interests (comma separated)",
+                    icon: Icons.favorite_border,
+                    controller: interestsController,
                   ),
 
                   const SizedBox(height: 30),

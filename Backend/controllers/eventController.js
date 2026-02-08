@@ -222,6 +222,7 @@ exports.getAllEvents = async (req, res) => {
       SELECT
         e.*,
         u.name AS organiser_name,
+        u.profile_picture_url AS organiser_profile_picture_url,
         COALESCE(
           array_agg(er.responsibility) FILTER (WHERE er.responsibility IS NOT NULL),
           '{}'
@@ -236,7 +237,7 @@ exports.getAllEvents = async (req, res) => {
       JOIN users u ON e.organiser_id = u.id
       LEFT JOIN event_responsibilities er ON er.event_id = e.id
       WHERE e.status = 'open'
-      GROUP BY e.id, u.name
+      GROUP BY e.id, u.name, u.profile_picture_url
       ORDER BY event_date ASC
     `);
 

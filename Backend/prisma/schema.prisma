@@ -53,6 +53,7 @@ model Application {
   eventId      Int?      @map("event_id")
   volunteerId  Int?      @map("volunteer_id")
   status       String?   @default("pending") @db.VarChar(20)
+  compensationStatus String? @map("compensation_status") @db.VarChar(20)
   appliedAt    DateTime? @default(now()) @map("applied_at") @db.Timestamp(6)
 
   event        Event?    @relation(fields: [eventId], references: [id])

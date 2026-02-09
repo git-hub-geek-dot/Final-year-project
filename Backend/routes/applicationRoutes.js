@@ -59,4 +59,11 @@ router.put(
   applicationController.updateApplicationStatus
 );
 
+// ✅ NEW: Volunteer updates compensation status
+router.put(
+  "/applications/:id/compensation",
+  authenticateToken,
+  applicationController.updateCompensationStatus
+);
+
 module.exports = router;

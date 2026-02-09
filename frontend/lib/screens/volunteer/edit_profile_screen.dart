@@ -24,6 +24,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final TextEditingController skillsController = TextEditingController();
   final TextEditingController interestsController = TextEditingController();
 
+  final List<String> _skills = [];
+  final List<String> _interests = [];
+
   bool isLoading = false;
   bool loadingProfile = true;
   
@@ -71,13 +74,48 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             [];
 
         setState(() {
-          skillsController.text = skills.join(", ");
-          interestsController.text = interests.join(", ");
+          _skills
+            ..clear()
+            ..addAll(skills);
+          _interests
+            ..clear()
+            ..addAll(interests);
+          skillsController.clear();
+          interestsController.clear();
         });
       }
     } catch (_) {
       // Keep fields empty on error.
     }
+  }
+
+  void _addItem(
+    TextEditingController controller,
+    List<String> items,
+  ) {
+    final text = controller.text.trim();
+    if (text.isEmpty) return;
+
+    final exists = items.any(
+      (item) => item.toLowerCase() == text.toLowerCase(),
+    );
+    if (exists) {
+      controller.clear();
+      return;
+    }
+
+    setState(() {
+      items.add(text);
+      controller.clear();
+      _hasProfileChanges = true;
+    });
+  }
+
+  void _removeItem(List<String> items, String value) {
+    setState(() {
+      items.remove(value);
+      _hasProfileChanges = true;
+    });
   }
 
   // ================= FETCH PROFILE =================
@@ -281,16 +319,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   Future<bool> _savePreferences(String token) async {
     try {
-      final skills = skillsController.text
-          .split(",")
-          .map((s) => s.trim())
-          .where((s) => s.isNotEmpty)
-          .toList();
-      final interests = interestsController.text
-          .split(",")
-          .map((s) => s.trim())
-          .where((s) => s.isNotEmpty)
-          .toList();
+      final skills = <String>[..._skills];
+      final interests = <String>[..._interests];
+
+      final pendingSkill = skillsController.text.trim();
+      if (pendingSkill.isNotEmpty &&
+          !skills.any((s) => s.toLowerCase() == pendingSkill.toLowerCase())) {
+        skills.add(pendingSkill);
+      }
+
+      final pendingInterest = interestsController.text.trim();
+      if (pendingInterest.isNotEmpty &&
+          !interests.any(
+            (s) => s.toLowerCase() == pendingInterest.toLowerCase(),
+          )) {
+        interests.add(pendingInterest);
+      }
 
       final url = Uri.parse("${ApiConfig.baseUrl}/volunteer/preferences");
       final response = await http.put(
@@ -355,6 +399,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           "name": name,
           "city": city,
           "contact_number": contact,
+          "profile_picture_url": _profileImageUrl,
         }),
       );
 
@@ -518,16 +563,24 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     keyboardType: TextInputType.phone,
                   ),
 
-                  _inputField(
-                    label: "Skills (comma separated)",
+                  _chipInputField(
+                    label: "Skills",
                     icon: Icons.auto_awesome,
                     controller: skillsController,
+                    items: _skills,
+                    hintText: "Add skill",
+                    onAdd: () => _addItem(skillsController, _skills),
+                    onRemove: (value) => _removeItem(_skills, value),
                   ),
 
-                  _inputField(
-                    label: "Interests (comma separated)",
+                  _chipInputField(
+                    label: "Interests",
                     icon: Icons.favorite_border,
                     controller: interestsController,
+                    items: _interests,
+                    hintText: "Add interest",
+                    onAdd: () => _addItem(interestsController, _interests),
+                    onRemove: (value) => _removeItem(_interests, value),
                   ),
 
                   const SizedBox(height: 30),
@@ -595,6 +648,69 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _chipInputField({
+    required String label,
+    required IconData icon,
+    required TextEditingController controller,
+    required List<String> items,
+    required String hintText,
+    required VoidCallback onAdd,
+    required void Function(String value) onRemove,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontSize: 13, color: Colors.grey),
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: controller,
+            onSubmitted: (_) => onAdd(),
+            decoration: InputDecoration(
+              prefixIcon: Icon(icon),
+              hintText: hintText,
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding:
+                  const EdgeInsets.symmetric(vertical: 14),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide.none,
+              ),
+              suffixIcon: IconButton(
+                onPressed: onAdd,
+                icon: const Icon(Icons.add_circle_outline),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (items.isEmpty)
+            const Text(
+              "No items added",
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: items
+                  .map(
+                    (item) => InputChip(
+                      label: Text(item),
+                      onDeleted: () => onRemove(item),
+                    ),
+                  )
+                  .toList(),
+            ),
         ],
       ),
     );

@@ -25,7 +25,8 @@ class VolunteerProfileScreen extends StatefulWidget {
       _VolunteerProfileScreenState();
 }
 
-class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
+class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
+  with SingleTickerProviderStateMixin {
   bool loading = true;
   String? errorMessage;
   bool _handlingUnauthorized = false;
@@ -38,6 +39,11 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
   String? role;
   String? verificationStatus;
   String? profilePictureUrl;
+  String? _lastProfilePictureUrl;
+  bool _pendingAvatarSuccess = false;
+
+  late final AnimationController _avatarSuccessController;
+  late final Animation<double> _avatarGlow;
 
   List<String> _skills = [];
   List<String> _interests = [];
@@ -50,10 +56,26 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _avatarSuccessController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+    _avatarGlow = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _avatarSuccessController,
+        curve: Curves.easeOutCubic,
+      ),
+    );
     fetchProfile();
     loadVerificationStatus();
     fetchDashboard();
     loadRatingSummary();
+  }
+
+  @override
+  void dispose() {
+    _avatarSuccessController.dispose();
+    super.dispose();
   }
 
   Future<void> loadVerificationStatus() async {
@@ -154,17 +176,28 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
+        final normalizedUrl = _normalizeProfileImageUrl(
+          data["profile_picture_url"],
+        );
+        final previousUrl = _lastProfilePictureUrl;
+
         setState(() {
           name = data["name"];
           email = data["email"];
           city = data["city"];
           role = data["role"];
-          profilePictureUrl = _normalizeProfileImageUrl(
-            data["profile_picture_url"],
-          );
+          profilePictureUrl = normalizedUrl;
           _imageCacheBuster = DateTime.now().millisecondsSinceEpoch;
           loading = false;
         });
+
+        _lastProfilePictureUrl = normalizedUrl;
+        if (normalizedUrl != null && normalizedUrl.isNotEmpty) {
+          if (_pendingAvatarSuccess || normalizedUrl != previousUrl) {
+            _triggerAvatarSuccess(delay: true);
+          }
+        }
+        _pendingAvatarSuccess = false;
       } else {
         setState(() {
           loading = false;
@@ -177,6 +210,19 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
         errorMessage = "Error: $e";
       });
     }
+  }
+
+  void _triggerAvatarSuccess({bool delay = false}) {
+    if (_avatarSuccessController.isAnimating) return;
+    if (delay) {
+      Future.delayed(const Duration(milliseconds: 250), () {
+        if (mounted) {
+          _avatarSuccessController.forward(from: 0);
+        }
+      });
+      return;
+    }
+    _avatarSuccessController.forward(from: 0);
   }
 
   Future<void> _handleUnauthorized() async {
@@ -287,28 +333,59 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
 
   Widget _buildProfileAvatar() {
     final normalizedUrl = _normalizeProfileImageUrl(profilePictureUrl);
-    if (normalizedUrl == null || normalizedUrl.isEmpty) {
-      return const CircleAvatar(
-        radius: 42,
-        backgroundColor: Colors.white,
-        child: Icon(Icons.person, size: 42),
-      );
-    }
+    final hasImage = normalizedUrl != null && normalizedUrl.isNotEmpty;
+    final imageUrl = hasImage
+        ? "${normalizedUrl}?v=${_imageCacheBuster ?? 0}"
+        : null;
 
-    final imageUrl = "${normalizedUrl}?v=${_imageCacheBuster ?? 0}";
-
-    return CircleAvatar(
-      radius: 42,
-      backgroundColor: Colors.white,
-      child: ClipOval(
-        child: Image.network(
-          imageUrl,
-          width: 84,
-          height: 84,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 42),
-        ),
-      ),
+    return AnimatedBuilder(
+      animation: _avatarSuccessController,
+      builder: (context, _) {
+        final glow = _avatarGlow.value;
+        final glowOpacity = (1 - glow) * 0.85;
+        final glowSize = 96 + (glow * 26);
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            if (hasImage)
+              Container(
+                width: glowSize,
+                height: glowSize,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.green.withOpacity(glowOpacity * 0.6),
+                  border: Border.all(
+                    color: Colors.green.withOpacity(glowOpacity),
+                    width: 3,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.green.withOpacity(glowOpacity),
+                      blurRadius: 32 * (1 - glow),
+                      spreadRadius: 6,
+                    ),
+                  ],
+                ),
+              ),
+            CircleAvatar(
+              radius: 42,
+              backgroundColor: Colors.white,
+              child: hasImage
+                  ? ClipOval(
+                      child: Image.network(
+                        imageUrl!,
+                        width: 84,
+                        height: 84,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            const Icon(Icons.person, size: 42),
+                      ),
+                    )
+                  : const Icon(Icons.person, size: 42),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -502,12 +579,15 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
                             /// EDIT PROFILE
                             GestureDetector(
                               onTap: () async {
-                                await Navigator.push(
+                                final updated = await Navigator.push(
                                   context,
                                   MaterialPageRoute(
                                     builder: (_) => const EditProfileScreen(),
                                   ),
                                 );
+                                if (updated == true) {
+                                  _pendingAvatarSuccess = true;
+                                }
                                 fetchProfile();
                               },
                               child: Container(
@@ -692,13 +772,13 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
 
                             _tile(
                               Icons.payments,
-                              "Payment History",
+                              "Compensation Status",
                               () {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
                                     builder: (_) =>
-                                        const PaymentHistoryScreen(),
+                                        const CompensationStatusScreen(),
                                   ),
                                 );
                               },

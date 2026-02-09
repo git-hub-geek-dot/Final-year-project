@@ -108,10 +108,17 @@ exports.getMyApplications = async (req, res) => {
         a.id,
         a.status,
         a.applied_at,
+        COALESCE(
+          CASE WHEN e.event_type = 'unpaid' THEN 'not_applicable' END,
+          a.compensation_status,
+          'pending'
+        ) AS compensation_status,
         e.id AS event_id,
         e.title,
         e.location,
-        e.event_date
+        e.event_date,
+        e.event_type,
+        e.payment_per_day
       FROM applications a
       JOIN events e ON e.id = a.event_id
       WHERE a.volunteer_id = $1
@@ -124,6 +131,51 @@ exports.getMyApplications = async (req, res) => {
   } catch (err) {
     console.error("MY APPLICATIONS ERROR:", err);
     res.status(500).json({ error: "Failed to fetch my applications" });
+  }
+};
+
+// ================= UPDATE COMPENSATION STATUS =================
+// Volunteer self-reports compensation status
+exports.updateCompensationStatus = async (req, res) => {
+  try {
+    const applicationId = req.params.id;
+    const volunteerId = req.user.id;
+    const { status } = req.body;
+
+    const allowed = ["pending", "received", "not_applicable"];
+    if (!status || !allowed.includes(status)) {
+      return res.status(400).json({
+        error: `Invalid status. Allowed: ${allowed.join(", ")}`,
+      });
+    }
+
+    const result = await pool.query(
+      `
+      UPDATE applications a
+      SET compensation_status =
+        CASE
+          WHEN e.event_type = 'unpaid' THEN 'not_applicable'
+          ELSE $1
+        END
+      FROM events e
+      WHERE a.id = $2 AND a.volunteer_id = $3 AND e.id = a.event_id
+      RETURNING a.id, a.compensation_status, a.event_id, a.volunteer_id
+      `,
+      [status, applicationId, volunteerId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Application not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Compensation status updated",
+      application: result.rows[0],
+    });
+  } catch (err) {
+    console.error("UPDATE COMPENSATION STATUS ERROR:", err);
+    res.status(500).json({ error: "Failed to update compensation status" });
   }
 };
 

@@ -20,7 +20,23 @@ const giveRating = async (req, res) => {
     }
 
     const eventResult = await pool.query(
-      "SELECT id, organiser_id, status FROM events WHERE id = $1",
+      `
+      SELECT
+        id,
+        organiser_id,
+        status,
+        (
+          status NOT IN ('draft', 'deleted')
+          AND (
+            status = 'completed'
+            OR NOW() >= (
+              COALESCE(end_date, event_date) + COALESCE(end_time, TIME '23:59:59')
+            )
+          )
+        ) AS is_completed
+      FROM events
+      WHERE id = $1
+      `,
       [event_id]
     );
     if (eventResult.rows.length === 0) {
@@ -28,7 +44,7 @@ const giveRating = async (req, res) => {
     }
 
     const event = eventResult.rows[0];
-    if (event.status !== "completed") {
+    if (!event.is_completed) {
       return res.status(400).json({ error: "Event not completed" });
     }
 

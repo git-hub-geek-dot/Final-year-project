@@ -274,6 +274,69 @@ exports.getAllEvents = async (req, res) => {
 };
 
 // =======================================================
+// LEADERBOARD (AUTHENTICATED)
+// =======================================================
+exports.getVolunteerLeaderboard = async (req, res) => {
+  try {
+    const period = req.query.period === "weekly" ? "weekly" : "monthly";
+    const days = period === "weekly" ? 7 : 30;
+
+    const result = await pool.query(
+      `
+      SELECT
+        u.id,
+        u.name,
+        COUNT(a.id)::int AS completed_events
+      FROM users u
+      JOIN applications a ON a.volunteer_id = u.id
+      JOIN events e ON e.id = a.event_id
+      WHERE u.role = 'volunteer'
+        AND a.status = 'completed'
+        AND e.status = 'completed'
+        AND COALESCE(e.end_date, e.event_date) >= CURRENT_DATE - ($1::int - 1)
+      GROUP BY u.id, u.name
+      ORDER BY completed_events DESC, u.name ASC
+      `,
+      [days]
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("VOLUNTEER LEADERBOARD ERROR:", err);
+    res.status(500).json({ error: "Failed to load volunteer leaderboard" });
+  }
+};
+
+exports.getOrganiserLeaderboard = async (req, res) => {
+  try {
+    const period = req.query.period === "weekly" ? "weekly" : "monthly";
+    const days = period === "weekly" ? 7 : 30;
+
+    const result = await pool.query(
+      `
+      SELECT
+        u.id,
+        u.name,
+        COUNT(e.id)::int AS completed_events
+      FROM users u
+      JOIN events e ON e.organiser_id = u.id
+      WHERE u.role = 'organiser'
+        AND e.status = 'completed'
+        AND COALESCE(e.end_date, e.event_date) >= CURRENT_DATE - ($1::int - 1)
+      GROUP BY u.id, u.name
+      ORDER BY completed_events DESC, u.name ASC
+      `,
+      [days]
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("ORGANISER LEADERBOARD ERROR:", err);
+    res.status(500).json({ error: "Failed to load organiser leaderboard" });
+  }
+};
+
+// =======================================================
 // UPDATE EVENT (ORGANISER)
 // =======================================================
 exports.updateEvent = async (req, res) => {

@@ -168,11 +168,16 @@ class EventService {
     required String description,
     required String location,
     required String eventDate,
+    required String endDate,
     required String applicationDeadline,
     required int volunteersRequired,
     required String eventType,
     double? paymentPerDay,
     String? bannerUrl,
+    List<String>? categories,
+    List<String>? responsibilities,
+    String? startTime,
+    String? endTime,
   }) async {
     final token = await TokenService.getToken();
     if (token == null) throw Exception("No token");
@@ -188,11 +193,16 @@ class EventService {
         "description": description,
         "location": location,
         "event_date": eventDate,
+        "end_date": endDate,
         "application_deadline": applicationDeadline,
         "volunteers_required": volunteersRequired,
         "event_type": eventType,
         "payment_per_day": eventType == "paid" ? paymentPerDay : null,
         "banner_url": bannerUrl,
+        "categories": categories ?? [],
+        "responsibilities": responsibilities ?? [],
+        "start_time": startTime,
+        "end_time": endTime,
       }),
     );
 

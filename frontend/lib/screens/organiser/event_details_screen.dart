@@ -1,9 +1,10 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'review_application_screen.dart';
-import 'edit_event_screen.dart';
+import 'package:flutter/material.dart';
+
 import '../../services/event_service.dart';
+import 'edit_event_screen.dart';
+import 'review_application_screen.dart';
 
 class EventDetailsScreen extends StatefulWidget {
   final Map event;
@@ -30,8 +31,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
 
   Future<void> loadStats() async {
     try {
-      final list =
-          await EventService.fetchApplications(widget.event["id"]);
+      final list = await EventService.fetchApplications(widget.event["id"]);
 
       int a = list.length;
       int ap = 0, p = 0, r = 0;
@@ -39,9 +39,13 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
       for (final x in list) {
         final s = (x["status"] ?? "pending").toString().toLowerCase();
 
-        if (s == "accepted" || s == "approved") ap++;
-        else if (s == "rejected") r++;
-        else p++;
+        if (s == "accepted" || s == "approved") {
+          ap++;
+        } else if (s == "rejected") {
+          r++;
+        } else {
+          p++;
+        }
       }
 
       setState(() {
@@ -61,18 +65,14 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     final event = widget.event;
     final bannerUrl = event["banner_url"];
     final status =
-        (event["computed_status"] ?? event["status"] ?? "upcoming")
-            .toString()
-            .toUpperCase();
+        (event["computed_status"] ?? event["status"] ?? "upcoming").toString().toUpperCase();
     final eventDateText = _fmtDate(event["event_date"]);
     final endDateText = _fmtDate(event["end_date"]);
     final deadlineText = _fmtDate(event["application_deadline"]);
     final startTimeText = _fmtTime(event["start_time"]);
     final endTimeText = _fmtTime(event["end_time"]);
-    final responsibilities = (event["responsibilities"] as List?)
-        ?.whereType<String>()
-        .toList() ??
-      [];
+    final responsibilities =
+        (event["responsibilities"] as List?)?.whereType<String>().toList() ?? [];
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FB),
@@ -95,31 +95,33 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
               height: 200,
               child: bannerUrl != null && bannerUrl.toString().isNotEmpty
                   ? kIsWeb
-                      ? Image.network(bannerUrl,
+                      ? Image.network(
+                          bannerUrl,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) =>
-                              _fallbackBanner())
+                          errorBuilder: (_, __, ___) => _fallbackBanner(),
+                        )
                       : (bannerUrl.toString().startsWith("http")
-                          ? Image.network(bannerUrl,
+                          ? Image.network(
+                              bannerUrl,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
-                                  _fallbackBanner())
-                          : Image.file(File(bannerUrl),
+                              errorBuilder: (_, __, ___) => _fallbackBanner(),
+                            )
+                          : Image.file(
+                              File(bannerUrl),
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
-                                  _fallbackBanner()))
+                              errorBuilder: (_, __, ___) => _fallbackBanner(),
+                            ))
                   : _fallbackBanner(),
             ),
-
             const SizedBox(height: 16),
-
             _card(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(event["title"] ?? "Untitled Event",
-                      style: const TextStyle(
-                          fontSize: 20, fontWeight: FontWeight.bold)),
+                  Text(
+                    event["title"] ?? "Untitled Event",
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 6),
                   Row(
                     children: [
@@ -132,133 +134,77 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () async {
-                            final updated = await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    ReviewApplicationsScreen(
-                                  eventId: event["id"],
-                                ),
-                              ),
-                            );
-
-                            if (updated == true) {
-                              loadStats(); // 🔄 refresh overview
-                            }
-                          },
-                          child: const Text("View Volunteers"),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      OutlinedButton.icon(
-                        onPressed: () async {
-                          final updated = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  EditEventScreen(event: event),
-                            ),
-                          );
-                          if (updated == true) {
-                            Navigator.pop(context, true);
-                          }
-                        },
-                        icon: const Icon(Icons.edit),
-                        label: const Text("Edit Event"),
-                      ),
-                      const SizedBox(width: 10),
-                      OutlinedButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                        },
-                        child: const Text("Close"),
-                      ),
-                    ],
-                  ),
+                  _actionButtons(event),
                 ],
               ),
             ),
-
             _card(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("Event Overview",
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const Text(
+                    "Event Overview",
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 14),
                   loadingStats
-                      ? const Center(
-                          child: CircularProgressIndicator())
+                      ? const Center(child: CircularProgressIndicator())
                       : Row(
                           children: [
-                            _statBox("Applied",
-                                applied.toString(), Icons.person),
-                            _statBox("Approved",
-                                approved.toString(), Icons.check_circle),
-                            _statBox("Pending",
-                                pending.toString(), Icons.hourglass_bottom),
-                            _statBox("Rejected",
-                                rejected.toString(), Icons.cancel),
+                            _statBox("Applied", applied.toString(), Icons.person),
+                            _statBox("Approved", approved.toString(), Icons.check_circle),
+                            _statBox("Pending", pending.toString(), Icons.hourglass_bottom),
+                            _statBox("Rejected", rejected.toString(), Icons.cancel),
                           ],
                         ),
                   const SizedBox(height: 12),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
+                      Text("Volunteers Needed: ${event["volunteers_required"] ?? 0}"),
                       Text(
-                          "Volunteers Needed: ${event["volunteers_required"] ?? 0}"),
-                      Text(
-                          "Slots Remaining: ${(event["volunteers_required"] ?? 0) - approved}"),
+                        "Slots Remaining: ${(event["volunteers_required"] ?? 0) - approved}",
+                      ),
                     ],
-                  )
+                  ),
                 ],
               ),
             ),
-
             _card(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("Event Info",
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const Text(
+                    "Event Info",
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 12),
                   _infoRow(Icons.location_on, event["location"]),
                   _infoRow(Icons.category, event["event_type"]),
                   _infoRow(Icons.calendar_today, "Start: $eventDateText"),
                   _infoRow(Icons.event, "End: $endDateText"),
-                  _infoRow(Icons.access_time,
-                      "Time: $startTimeText - $endTimeText"),
-                  _infoRow(Icons.timer,
-                      "Application Deadline: $deadlineText"),
+                  _infoRow(Icons.access_time, "Time: $startTimeText - $endTimeText"),
+                  _infoRow(Icons.timer, "Application Deadline: $deadlineText"),
                 ],
               ),
             ),
-
             _card(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("Responsibilities",
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const Text(
+                    "Responsibilities",
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 12),
-                  if (responsibilities.isEmpty)
-                    const Text("No responsibilities added"),
+                  if (responsibilities.isEmpty) const Text("No responsibilities added"),
                   if (responsibilities.isNotEmpty)
                     ...responsibilities.map(
                       (item) => Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: Row(
                           children: [
-                            const Icon(Icons.check_circle,
-                                color: Colors.green, size: 18),
+                            const Icon(Icons.check_circle, color: Colors.green, size: 18),
                             const SizedBox(width: 8),
                             Expanded(child: Text(item)),
                           ],
@@ -274,11 +220,80 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     );
   }
 
+  Widget _actionButtons(Map event) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 420;
+
+        final viewVolunteersButton = ElevatedButton(
+          onPressed: () async {
+            final updated = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ReviewApplicationsScreen(eventId: event["id"]),
+              ),
+            );
+
+            if (updated == true) {
+              loadStats();
+            }
+          },
+          child: const Text("View Volunteers"),
+        );
+
+        final editEventButton = OutlinedButton.icon(
+          onPressed: () async {
+            final updated = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => EditEventScreen(event: event),
+              ),
+            );
+            if (updated == true) {
+              Navigator.pop(context, true);
+            }
+          },
+          icon: const Icon(Icons.edit),
+          label: const Text("Edit Event"),
+        );
+
+        final closeButton = OutlinedButton(
+          onPressed: () {
+            Navigator.pop(context);
+          },
+          child: const Text("Close"),
+        );
+
+        if (isNarrow) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              viewVolunteersButton,
+              const SizedBox(height: 10),
+              editEventButton,
+              const SizedBox(height: 10),
+              closeButton,
+            ],
+          );
+        }
+
+        return Row(
+          children: [
+            Expanded(child: viewVolunteersButton),
+            const SizedBox(width: 10),
+            editEventButton,
+            const SizedBox(width: 10),
+            closeButton,
+          ],
+        );
+      },
+    );
+  }
+
   static Widget _fallbackBanner() {
     return Container(
       decoration: const BoxDecoration(
-        gradient:
-            LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF22C55E)]),
+        gradient: LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF22C55E)]),
       ),
       child: const Center(
         child: Icon(Icons.image, size: 40, color: Colors.white),
@@ -295,9 +310,10 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: Colors.black12.withOpacity(0.05),
-              blurRadius: 12,
-              offset: const Offset(0, 4)),
+            color: Colors.black12.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: child,
@@ -370,9 +386,10 @@ class _statBox extends StatelessWidget {
           children: [
             Icon(icon, size: 20),
             const SizedBox(height: 6),
-            Text(value,
-                style: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.bold)),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
             Text(label, style: const TextStyle(fontSize: 12)),
           ],
         ),

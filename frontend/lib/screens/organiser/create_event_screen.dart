@@ -149,10 +149,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       _toast("Select application deadline");
       return;
     }
-    if (!saveAsDraft && bannerImage == null) {
-      _toast("Upload event banner");
-      return;
-    }
     if (!saveAsDraft && selectedCategories.isEmpty) {
       _toast("Select at least one category");
       return;
@@ -258,7 +254,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             _dateTile("Application Deadline", applicationDeadline, pickDeadline),
           ]),
 
-          _sectionCard("Event Banner", [
+          _sectionCard("Event Banner (Optional)", [
             InkWell(
               onTap: pickBannerImage,
               child: Container(
@@ -268,7 +264,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   border: Border.all(color: Colors.grey),
                 ),
                 child: bannerImage == null
-                    ? const Center(child: Text("Upload Event Banner"))
+                    ? const Center(child: Text("Upload Event Banner (Optional)"))
                     : ClipRRect(
                         borderRadius: BorderRadius.circular(16),
                         child: kIsWeb

@@ -12,7 +12,7 @@ class MyEventsScreen extends StatefulWidget {
 class _MyEventsScreenState extends State<MyEventsScreen> {
   List events = [];
   bool loading = true;
-  int _selectedFilter = 0; // 0: All, 1: Upcoming, 2: Ongoing, 3: Completed
+  int _selectedFilter = 0; // 0: All, 1: Draft, 2: Upcoming, 3: Ongoing, 4: Completed
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = "";
 
@@ -45,10 +45,12 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
       final status = _getStatus(e);
       switch (_selectedFilter) {
         case 1:
-          return status == "upcoming";
+          return status == "draft";
         case 2:
-          return status == "ongoing";
+          return status == "upcoming";
         case 3:
+          return status == "ongoing";
+        case 4:
           return status == "completed";
         default:
           return true;
@@ -65,6 +67,7 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
   Map<String, int> _getStats() {
     return {
       "total": events.length,
+      "draft": events.where((e) => _getStatus(e) == "draft").length,
       "upcoming": events.where((e) => _getStatus(e) == "upcoming").length,
       "ongoing": events.where((e) => _getStatus(e) == "ongoing").length,
       "completed": events.where((e) => _getStatus(e) == "completed").length,
@@ -104,6 +107,7 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
                         _statCard("${stats['total']}", "Total"),
+                        _statCard("${stats['draft']}", "Draft"),
                         _statCard("${stats['upcoming']}", "Upcoming"),
                         _statCard("${stats['ongoing']}", "Ongoing"),
                         _statCard("${stats['completed']}", "Completed"),
@@ -141,11 +145,13 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                         children: [
                           _filterTab("All", 0),
                           const SizedBox(width: 8),
-                          _filterTab("Upcoming", 1),
+                          _filterTab("Draft", 1),
                           const SizedBox(width: 8),
-                          _filterTab("Ongoing", 2),
+                          _filterTab("Upcoming", 2),
                           const SizedBox(width: 8),
-                          _filterTab("Completed", 3),
+                          _filterTab("Ongoing", 3),
+                          const SizedBox(width: 8),
+                          _filterTab("Completed", 4),
                         ],
                       ),
                     ),

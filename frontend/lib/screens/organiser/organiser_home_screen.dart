@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/event_service.dart';
 import '../../services/token_service.dart';
 import 'create_event_screen.dart';
@@ -15,19 +17,48 @@ class OrganiserHomeScreen extends StatefulWidget {
 }
 
 class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
+  static const String _cacheMyEventsKey = "cached_organiser_my_events";
+  static const String _cacheAllEventsKey = "cached_organiser_all_events";
+
   bool loading = true;
   List events = [];
   int? userId;
   int _selectedTab = 0; // 0: Ongoing, 1: Upcoming, 2: Completed, 3: Draft
   bool showAllEvents = false;
+  String? loadError;
 
   @override
   void initState() {
     super.initState();
+    _loadCachedEvents();
     loadEvents();
   }
 
+  Future<void> _loadCachedEvents() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cacheKey = showAllEvents ? _cacheAllEventsKey : _cacheMyEventsKey;
+    final cached = prefs.getString(cacheKey);
+    if (cached == null || cached.isEmpty) return;
+
+    try {
+      final decoded = jsonDecode(cached);
+      if (decoded is List && mounted) {
+        setState(() {
+          events = decoded;
+          loading = false;
+        });
+      }
+    } catch (_) {}
+  }
+
   Future<void> loadEvents() async {
+    if (mounted) {
+      setState(() {
+        loading = true;
+        loadError = null;
+      });
+    }
+
     try {
       final id = await TokenService.getUserId();
       final data = showAllEvents
@@ -38,10 +69,17 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
         userId = id;
         events = data;
         loading = false;
+        loadError = null;
       });
+      final prefs = await SharedPreferences.getInstance();
+      final cacheKey = showAllEvents ? _cacheAllEventsKey : _cacheMyEventsKey;
+      await prefs.setString(cacheKey, jsonEncode(data));
     } catch (_) {
       if (!mounted) return;
-      setState(() => loading = false);
+      setState(() {
+        loading = false;
+        loadError = "Failed to load events. Pull to refresh or tap Retry.";
+      });
     }
   }
 
@@ -189,18 +227,50 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
           Expanded(
             child: loading
                 ? const Center(child: CircularProgressIndicator())
-                : ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    children: [
-                      if (_selectedTab == 0)
-                        _section('Ongoing Events', ongoing, isCompleted: false)
-                      else if (_selectedTab == 1)
-                        _section('Upcoming Events', upcoming, isCompleted: false)
-                      else if (_selectedTab == 2)
-                        _section('Completed Events', completed, isCompleted: true)
-                      else
-                        _section('Draft Events', draft, isDraft: true),
-                    ],
+                : RefreshIndicator(
+                    onRefresh: loadEvents,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      children: [
+                        if (loadError != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFF4F4),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFFFD7D7)),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.error_outline, color: Colors.red),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      loadError!,
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: loadEvents,
+                                    child: const Text("Retry"),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        if (_selectedTab == 0)
+                          _section('Ongoing Events', ongoing, isCompleted: false)
+                        else if (_selectedTab == 1)
+                          _section('Upcoming Events', upcoming, isCompleted: false)
+                        else if (_selectedTab == 2)
+                          _section('Completed Events', completed, isCompleted: true)
+                        else
+                          _section('Draft Events', draft, isDraft: true),
+                      ],
+                    ),
                   ),
           ),
           Padding(

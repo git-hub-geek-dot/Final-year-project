@@ -83,58 +83,66 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         title: const Text("Leaderboard"),
         backgroundColor: const Color(0xFF2E6BE6),
       ),
-      body: Column(
-        children: [
-          const SizedBox(height: 12),
-          _roleToggleBar(),
-          const SizedBox(height: 12),
-          _periodToggleBar(),
-          const SizedBox(height: 16),
-          if (_loading)
-            const Expanded(child: Center(child: CircularProgressIndicator()))
-          else if (_error != null)
-            Expanded(
-              child: Center(
+      body: RefreshIndicator(
+        onRefresh: _loadLeaderboard,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.only(bottom: 16),
+          children: [
+            const SizedBox(height: 12),
+            _roleToggleBar(),
+            const SizedBox(height: 12),
+            _periodToggleBar(),
+            const SizedBox(height: 16),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 120),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_error != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 120),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(_error!),
+                      const SizedBox(height: 10),
+                      ElevatedButton(
+                        onPressed: _loadLeaderboard,
+                        child: const Text("Retry"),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else if (data.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 120),
+                child: Center(child: Text("No leaderboard data available")),
+              )
+            else ...[
+              _topThree(data),
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(_error!),
-                    const SizedBox(height: 10),
-                    ElevatedButton(
-                      onPressed: _loadLeaderboard,
-                      child: const Text("Retry"),
-                    ),
-                  ],
+                  children: data.map((user) {
+                    return AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      child: _rankCard(
+                        key: ValueKey("${user["rank"]}-$_selectedTab-$isWeekly"),
+                        rank: user["rank"],
+                        name: user["name"],
+                        events: user["events"],
+                      ),
+                    );
+                  }).toList(),
                 ),
               ),
-            )
-          else if (data.isEmpty)
-            const Expanded(
-              child: Center(child: Text("No leaderboard data available")),
-            )
-          else ...[
-            _topThree(data),
-          const SizedBox(height: 16),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: data.length,
-              itemBuilder: (context, index) {
-                final user = data[index];
-                return AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  child: _rankCard(
-                    key: ValueKey("${user["rank"]}-$_selectedTab-$isWeekly"),
-                    rank: user["rank"],
-                    name: user["name"],
-                    events: user["events"],
-                  ),
-                );
-              },
-            ),
-          ),
+            ],
           ],
-        ],
+        ),
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: 1,

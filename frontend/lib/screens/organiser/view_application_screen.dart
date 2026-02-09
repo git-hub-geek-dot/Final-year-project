@@ -236,20 +236,29 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : errorMessage != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      errorMessage!,
-                      style: const TextStyle(color: Colors.red),
-                      textAlign: TextAlign.center,
-                    ),
+              ? RefreshIndicator(
+                  onRefresh: loadApplicationDetails,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
+                          errorMessage!,
+                          style: const TextStyle(color: Colors.red),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
                   ),
                 )
-              : Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
+              : RefreshIndicator(
+                  onRefresh: loadApplicationDetails,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
                       const CircleAvatar(radius: 40),
                       const SizedBox(height: 12),
 
@@ -346,8 +355,9 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                             ),
                           ),
                         ],
-                      )
-                    ],
+                        )
+                      ],
+                    ),
                   ),
                 ),
     );

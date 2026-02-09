@@ -69,6 +69,12 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
           applications = [];
         }
 
+        applications = applications.where((app) {
+          final status = app["status"]?.toString().toLowerCase() ?? "";
+          if (status == "accepted") return true;
+          return !_isPastEventDate(app["event_date"]?.toString());
+        }).toList();
+
         setState(() {
           loading = false;
         });
@@ -95,6 +101,19 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
       default:
         return Colors.orange;
     }
+  }
+
+  bool _isPastEventDate(String? rawDate) {
+    if (rawDate == null || rawDate.isEmpty) return false;
+
+    final parsed = DateTime.tryParse(rawDate);
+    if (parsed == null) return false;
+
+    final now = DateTime.now();
+    final eventDateOnly = DateTime(parsed.year, parsed.month, parsed.day);
+    final today = DateTime(now.year, now.month, now.day);
+
+    return eventDateOnly.isBefore(today);
   }
 
   @override

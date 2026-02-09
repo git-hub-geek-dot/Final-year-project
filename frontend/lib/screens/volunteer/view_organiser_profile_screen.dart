@@ -86,6 +86,8 @@ class _ViewOrganiserProfileScreenState extends State<ViewOrganiserProfileScreen>
     final eventsCount = profile?["events_count"]?.toString() ?? "0";
     final volunteersEngaged =
         profile?["volunteers_engaged"]?.toString() ?? "0";
+    final photoUrl =
+      _normalizeImageUrl(profile?["profile_picture_url"]?.toString());
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
@@ -116,7 +118,7 @@ class _ViewOrganiserProfileScreenState extends State<ViewOrganiserProfileScreen>
                 child: Text(errorMessage!),
               ),
             if (!isLoading && errorMessage == null) ...[
-              _header(name),
+              _header(name, photoUrl),
             const SizedBox(height: 16),
             _about(city),
             const SizedBox(height: 16),
@@ -134,15 +136,11 @@ class _ViewOrganiserProfileScreenState extends State<ViewOrganiserProfileScreen>
   }
 
   // ================= HEADER =================
-  Widget _header(String name) {
+  Widget _header(String name, String? photoUrl) {
     return _card(
       child: Column(
         children: [
-          const CircleAvatar(
-            radius: 42,
-            backgroundColor: Colors.green,
-            child: Icon(Icons.eco, size: 42, color: Colors.white),
-          ),
+          _profileAvatar(photoUrl),
           const SizedBox(height: 12),
           Text(
             name,
@@ -156,6 +154,47 @@ class _ViewOrganiserProfileScreenState extends State<ViewOrganiserProfileScreen>
         ],
       ),
     );
+  }
+
+  Widget _profileAvatar(String? imageUrl) {
+    const double size = 84;
+
+    if (imageUrl == null) {
+      return const CircleAvatar(
+        radius: 42,
+        backgroundColor: Colors.green,
+        child: Icon(Icons.eco, size: 42, color: Colors.white),
+      );
+    }
+
+    return ClipOval(
+      child: Image.network(
+        imageUrl,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) {
+          return const CircleAvatar(
+            radius: 42,
+            backgroundColor: Colors.green,
+            child: Icon(Icons.eco, size: 42, color: Colors.white),
+          );
+        },
+      ),
+    );
+  }
+
+  String? _normalizeImageUrl(String? url) {
+    if (url == null || url.trim().isEmpty) return null;
+
+    final trimmed = url.trim();
+    if (trimmed.startsWith("http")) return trimmed;
+
+    final baseUri = Uri.parse(ApiConfig.baseUrl);
+    final origin =
+        "${baseUri.scheme}://${baseUri.host}${baseUri.hasPort ? ':${baseUri.port}' : ''}";
+
+    return trimmed.startsWith("/") ? "$origin$trimmed" : "$origin/$trimmed";
   }
 
   // ================= ABOUT =================

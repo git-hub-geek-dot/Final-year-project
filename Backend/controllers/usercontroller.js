@@ -62,7 +62,8 @@ const getOrganiserProfile = async (req, res) => {
         email,
         city,
         contact_number,
-        government_id
+        government_id,
+        profile_picture_url
       FROM users
       WHERE id = $1 AND role = 'organiser'
       `,

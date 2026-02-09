@@ -11,6 +11,7 @@ import '../auth/login_screen.dart';
 
 import 'edit_profile_screen.dart';
 import 'my_applications_screen.dart';
+import 'saved_events_screen.dart';
 import 'payment_history_screen.dart';
 import 'invite_friends_screen.dart';
 import 'help_support_screen.dart';
@@ -27,6 +28,7 @@ class VolunteerProfileScreen extends StatefulWidget {
 class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
   bool loading = true;
   String? errorMessage;
+  bool _handlingUnauthorized = false;
 
   int? _imageCacheBuster;
 
@@ -76,6 +78,11 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
           "Content-Type": "application/json",
         },
       );
+
+      if (response.statusCode == 401) {
+        await _handleUnauthorized();
+        return;
+      }
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -139,6 +146,11 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
         },
       );
 
+      if (response.statusCode == 401) {
+        await _handleUnauthorized();
+        return;
+      }
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
@@ -165,6 +177,22 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
         errorMessage = "Error: $e";
       });
     }
+  }
+
+  Future<void> _handleUnauthorized() async {
+    if (_handlingUnauthorized) return;
+    _handlingUnauthorized = true;
+
+    await TokenService.clearToken();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (_) => false,
+    );
   }
 
   /// ================= LOGOUT =================
@@ -400,131 +428,6 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
     }
   }
 
-  Future<void> _savePreferences({
-    required List<String> skills,
-    required List<String> interests,
-  }) async {
-    try {
-      final token = await TokenService.getToken();
-      if (token == null || token.isEmpty) return;
-
-      final url = Uri.parse("${ApiConfig.baseUrl}/volunteer/preferences");
-      final response = await http.put(
-        url,
-        headers: {
-          "Authorization": "Bearer $token",
-          "Content-Type": "application/json",
-        },
-        body: jsonEncode({
-          "skills": skills,
-          "interests": interests,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        setState(() {
-          _skills = skills;
-          _interests = interests;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Preferences saved ✅")),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Save failed: ${response.body}")),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
-      );
-    }
-  }
-
-  Future<void> _showEditSkillsInterestsSheet() async {
-    final skillsController = TextEditingController(text: _skills.join(", "));
-    final interestsController =
-        TextEditingController(text: _interests.join(", "));
-
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: 16,
-              right: 16,
-              top: 16,
-              bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "Edit Skills & Interests",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: skillsController,
-                  decoration: const InputDecoration(
-                    labelText: "Skills (comma separated)",
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: interestsController,
-                  decoration: const InputDecoration(
-                    labelText: "Interests (comma separated)",
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text("Cancel"),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          final skills = skillsController.text
-                              .split(",")
-                              .map((s) => s.trim())
-                              .where((s) => s.isNotEmpty)
-                              .toList();
-                          final interests = interestsController.text
-                              .split(",")
-                              .map((s) => s.trim())
-                              .where((s) => s.isNotEmpty)
-                              .toList();
-
-                          Navigator.pop(context);
-                          _savePreferences(
-                            skills: skills,
-                            interests: interests,
-                          );
-                        },
-                        child: const Text("Save"),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -732,59 +635,6 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
 
                       const SizedBox(height: 20),
 
-                      /// ================= SKILLS & INTERESTS =================
-                      _sectionHeader(
-                        "Skills & Interests",
-                        onEdit: _showEditSkillsInterestsSheet,
-                      ),
-                      const SizedBox(height: 10),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            ..._skills.map(
-                              (s) => Chip(
-                                label: Text(s),
-                                backgroundColor: const Color(0xFFEFF6FF),
-                              ),
-                            ),
-                            ..._interests.map(
-                              (s) => Chip(
-                                label: Text(s),
-                                backgroundColor: const Color(0xFFECFDF3),
-                              ),
-                            ),
-                            if (_skills.isEmpty && _interests.isEmpty)
-                              const Text("No skills/interests set"),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      /// ================= ACTIVITY TIMELINE =================
-                      _sectionHeader("Recent Activity"),
-                      const SizedBox(height: 10),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Column(
-                          children: [
-                            if (_activity.isEmpty)
-                              const Text("No recent activity"),
-                            ..._activity.map(
-                              (a) => _timelineItem(
-                                a["title"]?.toString() ?? "Event",
-                                a["status"]?.toString() ?? "pending",
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 12),
-
                       /// ================= ACTIVITIES =================
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -799,6 +649,20 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
                                   MaterialPageRoute(
                                     builder: (_) =>
                                         const MyApplicationsScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+
+                            _tile(
+                              Icons.bookmark,
+                              "Saved Events",
+                              () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const SavedEventsScreen(),
                                   ),
                                 );
                               },

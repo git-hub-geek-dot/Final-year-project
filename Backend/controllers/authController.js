@@ -73,7 +73,7 @@ exports.requestOtp = async (req, res) => {
 
     await pool.query(
       `
-      INSERT INTO otp_verifications (identifier, channel, code_hash, expires_at)
+      INSERT INTO otp_verifications (identifier, channel, "codeHash", expires_at)
       VALUES ($1, $2, $3, $4)
       `,
       [normalized, channel, otpHash, expiresAt]
@@ -126,7 +126,7 @@ exports.verifyOtp = async (req, res) => {
       FROM otp_verifications
       WHERE identifier = $1
         AND channel = $2
-        AND code_hash = $3
+        AND "codeHash" = $3
         AND expires_at > NOW()
         AND verified_at IS NULL
       ORDER BY created_at DESC

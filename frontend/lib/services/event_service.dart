@@ -208,4 +208,32 @@ class EventService {
 
     return response.statusCode == 200;
   }
+
+  /// ================= LEADERBOARD =================
+  static Future<List<dynamic>> fetchLeaderboard({
+    required String role,
+    required String period,
+  }) async {
+    final token = await TokenService.getToken();
+    if (token == null) throw Exception("No token");
+
+    final safeRole = role == "volunteers" ? "volunteers" : "organisers";
+    final safePeriod = period == "weekly" ? "weekly" : "monthly";
+
+    final response = await http.get(
+      Uri.parse(
+        "${ApiConfig.baseUrl}/events/leaderboard/$safeRole?period=$safePeriod",
+      ),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception("Failed to load leaderboard");
+    }
+
+    return jsonDecode(response.body);
+  }
 }

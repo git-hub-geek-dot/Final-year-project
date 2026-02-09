@@ -5,6 +5,8 @@ const {
   createEvent,
   getMyEvents,
   getAllEvents,
+  getVolunteerLeaderboard,
+  getOrganiserLeaderboard,
   updateEvent,
 } = require("../controllers/eventController");
 
@@ -19,6 +21,8 @@ const authMiddleware = require("../middleware/auth");
 // ================= ORGANISER =================
 router.post("/events", authMiddleware, createEvent);
 router.get("/events/my-events", authMiddleware, getMyEvents);
+router.get("/events/leaderboard/organisers", authMiddleware, getOrganiserLeaderboard);
+router.get("/events/leaderboard/volunteers", authMiddleware, getVolunteerLeaderboard);
 router.put("/events/:id", authMiddleware, updateEvent);
 router.get(
   "/events/:id/applications",

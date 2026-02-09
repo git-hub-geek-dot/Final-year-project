@@ -19,6 +19,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
   final locationController = TextEditingController();
   final volunteersController = TextEditingController();
   final paymentController = TextEditingController();
+  final responsibilityController = TextEditingController();
 
   final ImagePicker _picker = ImagePicker();
   XFile? bannerImage;
@@ -32,6 +33,31 @@ class _EditEventScreenState extends State<EditEventScreen> {
 
   bool loading = false;
   String eventType = "unpaid";
+
+  final List<String> categories = [
+    "Education",
+    "Healthcare",
+    "Environment",
+    "Animals",
+    "Community",
+    "Charity",
+    "Sports & Fitness",
+    "Arts & Culture",
+    "Technology",
+    "Skill Development",
+    "Social Awareness",
+    "Disaster Relief",
+    "Women & Child Welfare",
+    "Senior Citizen Support",
+    "Cleanliness Drives",
+    "Food & Nutrition",
+    "Fundraising",
+    "Reception & Party Management",
+    "Other",
+  ];
+
+  final List<String> selectedCategories = [];
+  final List<String> responsibilities = [];
 
   @override
   void initState() {
@@ -50,21 +76,63 @@ class _EditEventScreenState extends State<EditEventScreen> {
           e["payment_per_day"]?.toString() ?? "";
     }
 
-    if (e["event_date"] != null) {
-      final d = DateTime.parse(e["event_date"]);
-      eventStartDate = d;
-      eventEndDate = d;
-    }
+    eventStartDate = _parseDate(e["event_date"]);
+    eventEndDate = _parseDate(e["end_date"]) ?? eventStartDate;
+    applicationDeadline = _parseDate(e["application_deadline"]);
+    eventStartTime = _parseTime(e["start_time"]);
+    eventEndTime = _parseTime(e["end_time"]);
 
-    if (e["application_deadline"] != null) {
-      applicationDeadline = DateTime.parse(e["application_deadline"]);
-    }
+    selectedCategories
+      ..clear()
+      ..addAll(
+        (e["categories"] as List?)
+                ?.map((item) => item.toString())
+                .where((item) => item.isNotEmpty) ??
+            const [],
+      );
 
-    existingBanner = e["banner_url"];
+    responsibilities
+      ..clear()
+      ..addAll(
+        (e["responsibilities"] as List?)
+                ?.map((item) => item.toString())
+                .where((item) => item.isNotEmpty) ??
+            const [],
+      );
+
+    existingBanner = e["banner_url"]?.toString();
   }
 
   String _fmtDate(DateTime d) =>
       "${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
+
+  String _fmtTime(TimeOfDay t) =>
+      "${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:00";
+
+  DateTime? _parseDate(dynamic value) {
+    if (value == null) return null;
+    return DateTime.tryParse(value.toString());
+  }
+
+  TimeOfDay? _parseTime(dynamic value) {
+    if (value == null) return null;
+    final text = value.toString().trim();
+    if (text.isEmpty) return null;
+    final parts = text.split(":");
+    if (parts.length < 2) return null;
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) return null;
+    final safeHour = hour < 0 ? 0 : (hour > 23 ? 23 : hour);
+    final safeMinute = minute < 0 ? 0 : (minute > 59 ? 59 : minute);
+    return TimeOfDay(hour: safeHour, minute: safeMinute);
+  }
+
+  int? _parseVolunteers() {
+    final text = volunteersController.text.trim();
+    if (text.isEmpty) return null;
+    return int.tryParse(text);
+  }
 
   void _toast(String msg) {
     ScaffoldMessenger.of(context)
@@ -108,10 +176,54 @@ class _EditEventScreenState extends State<EditEventScreen> {
     if (image != null) setState(() => bannerImage = image);
   }
 
+  void _addResponsibility() {
+    final text = responsibilityController.text.trim();
+    if (text.isEmpty) return;
+    setState(() {
+      responsibilities.add(text);
+      responsibilityController.clear();
+    });
+  }
+
   Future<void> handleUpdateEvent() async {
     if (titleController.text.trim().isEmpty) {
       _toast("Event title is required");
       return;
+    }
+    if (locationController.text.trim().isEmpty) {
+      _toast("Location is required");
+      return;
+    }
+    if (descriptionController.text.trim().isEmpty) {
+      _toast("Description is required");
+      return;
+    }
+    if (_parseVolunteers() == null) {
+      _toast("Enter valid volunteers required");
+      return;
+    }
+    if (eventStartDate == null || eventEndDate == null) {
+      _toast("Select event start and end dates");
+      return;
+    }
+    if (eventStartTime == null || eventEndTime == null) {
+      _toast("Select event start and end time");
+      return;
+    }
+    if (applicationDeadline == null) {
+      _toast("Select application deadline");
+      return;
+    }
+    if (selectedCategories.isEmpty) {
+      _toast("Select at least one category");
+      return;
+    }
+    if (eventType == "paid") {
+      final pay = double.tryParse(paymentController.text);
+      if (pay == null || pay <= 0) {
+        _toast("Enter valid payment per day");
+        return;
+      }
     }
 
     setState(() => loading = true);
@@ -124,20 +236,25 @@ class _EditEventScreenState extends State<EditEventScreen> {
       }
 
       final success = await EventService.updateEvent(
-  id: widget.event["id"],
-  title: titleController.text.trim(),
-  description: descriptionController.text.trim(),
-  location: locationController.text.trim(),
-  eventDate: _fmtDate(eventStartDate ?? DateTime.now()),
-  applicationDeadline: _fmtDate(applicationDeadline ?? DateTime.now()),
-  volunteersRequired: int.parse(volunteersController.text),
-  eventType: eventType,
-  paymentPerDay:
-      eventType == "paid" ? double.parse(paymentController.text) : null,
-  bannerUrl: bannerUrl,
-);
+        id: widget.event["id"],
+        title: titleController.text.trim(),
+        description: descriptionController.text.trim(),
+        location: locationController.text.trim(),
+        eventDate: _fmtDate(eventStartDate!),
+        endDate: _fmtDate(eventEndDate!),
+        applicationDeadline: _fmtDate(applicationDeadline!),
+        volunteersRequired: _parseVolunteers()!,
+        eventType: eventType,
+        paymentPerDay:
+            eventType == "paid" ? double.parse(paymentController.text) : null,
+        bannerUrl: bannerUrl,
+        categories: selectedCategories,
+        responsibilities: responsibilities,
+        startTime: _fmtTime(eventStartTime!),
+        endTime: _fmtTime(eventEndTime!),
+      );
 
-if (success && mounted) Navigator.pop(context, true);
+      if (success && mounted) Navigator.pop(context, true);
 
     } catch (e) {
       _toast("Update failed: $e");
@@ -197,7 +314,7 @@ if (success && mounted) Navigator.pop(context, true);
                 "Application Deadline", applicationDeadline, pickDeadline),
           ]),
 
-          _sectionCard("Event Banner", [
+          _sectionCard("Event Banner (Optional)", [
             InkWell(
               onTap: pickBannerImage,
               child: Container(
@@ -216,9 +333,93 @@ if (success && mounted) Navigator.pop(context, true);
                                 fit: BoxFit.cover),
                       )
                     : existingBanner != null
-                        ? Image.network(existingBanner!, fit: BoxFit.cover)
-                        : const Center(child: Text("Upload Event Banner")),
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child:
+                                Image.network(existingBanner!, fit: BoxFit.cover),
+                          )
+                        : const Center(child: Text("Upload Event Banner (Optional)")),
               ),
+            ),
+          ]),
+
+          _sectionCard("Event Type", [
+            RadioListTile(
+              value: "paid",
+              groupValue: eventType,
+              title: const Text("Paid"),
+              onChanged: (v) => setState(() => eventType = v!),
+            ),
+            RadioListTile(
+              value: "unpaid",
+              groupValue: eventType,
+              title: const Text("Unpaid"),
+              onChanged: (v) => setState(() => eventType = v!),
+            ),
+            if (eventType == "paid")
+              _input("Payment per day", paymentController,
+                  keyboardType: TextInputType.number),
+          ]),
+
+          _sectionCard("Responsibilities", [
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: responsibilityController,
+                    decoration: InputDecoration(
+                      hintText: "Add responsibility",
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onSubmitted: (_) => _addResponsibility(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: _addResponsibility,
+                  icon: const Icon(Icons.add_circle, color: Colors.green),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (responsibilities.isEmpty) const Text("No responsibilities added"),
+            if (responsibilities.isNotEmpty)
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: responsibilities
+                    .map(
+                      (item) => Chip(
+                        label: Text(item),
+                        onDeleted: () {
+                          setState(() => responsibilities.remove(item));
+                        },
+                      ),
+                    )
+                    .toList(),
+              ),
+          ]),
+
+          _sectionCard("Categories", [
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: categories.map((c) {
+                final selected = selectedCategories.contains(c);
+                return ChoiceChip(
+                  label: Text(c),
+                  selected: selected,
+                  selectedColor: const Color(0xFF22C55E),
+                  labelStyle: TextStyle(color: selected ? Colors.white : Colors.black),
+                  onSelected: (v) {
+                    setState(() {
+                      v ? selectedCategories.add(c) : selectedCategories.remove(c);
+                    });
+                  },
+                );
+              }).toList(),
             ),
           ]),
 
@@ -325,5 +526,16 @@ if (success && mounted) Navigator.pop(context, true);
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    titleController.dispose();
+    descriptionController.dispose();
+    locationController.dispose();
+    volunteersController.dispose();
+    paymentController.dispose();
+    responsibilityController.dispose();
+    super.dispose();
   }
 }

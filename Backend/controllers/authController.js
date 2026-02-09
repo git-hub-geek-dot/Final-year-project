@@ -255,7 +255,9 @@ exports.register = async (req, res) => {
         success: false,
         message: "Email already exists",
       });
-        await sendEmail({
+
+    }
+
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -340,11 +342,9 @@ exports.login = async (req, res) => {
     }
 
     // JWT token
-        await sendEmail({
-      { id: user.id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "1d" }
-    );
+    const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, {
+      expiresIn: "1d",
+    });
 
     res.status(200).json({
       success: true,

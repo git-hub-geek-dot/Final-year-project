@@ -40,9 +40,15 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
   @override
   void initState() {
     super.initState();
-    fetchProfile();
-    loadVerificationStatus();
-    loadRatingSummary();
+    _refreshProfile();
+  }
+
+  Future<void> _refreshProfile() async {
+    await Future.wait([
+      fetchProfile(),
+      loadVerificationStatus(),
+      loadRatingSummary(),
+    ]);
   }
 
   Future<void> loadVerificationStatus() async {
@@ -208,20 +214,21 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
     return Scaffold(
       body: loading
           ? const Center(child: CircularProgressIndicator())
-          : errorMessage != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      errorMessage!,
-                      style: const TextStyle(color: Colors.red),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                )
-              : SingleChildScrollView(
-                  child: Column(
-                    children: [
+          : RefreshIndicator(
+              onRefresh: _refreshProfile,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: errorMessage != null
+                    ? Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
+                          errorMessage!,
+                          style: const TextStyle(color: Colors.red),
+                          textAlign: TextAlign.center,
+                        ),
+                      )
+                    : Column(
+                        children: [
                       // 🔷 HEADER
                       Container(
                         padding: const EdgeInsets.fromLTRB(20, 50, 20, 24),
@@ -448,9 +455,10 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
                           ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
+                        ],
+                      ),
+              ),
+            ),
 
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: 2,

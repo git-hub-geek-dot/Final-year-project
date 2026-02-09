@@ -89,9 +89,12 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
       ),
       body: loading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              child: Column(
-                children: [
+          : RefreshIndicator(
+              onRefresh: loadEvents,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Column(
+                  children: [
                   // 📊 STATS HEADER
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -303,8 +306,9 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                         }).toList(),
                       ),
                     ),
-                  const SizedBox(height: 20),
-                ],
+                    const SizedBox(height: 20),
+                  ],
+                ),
               ),
             ),
     );

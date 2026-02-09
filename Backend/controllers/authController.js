@@ -2,7 +2,7 @@ const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const pool = require("../config/db");
-const transporter = require("../config/email");
+const { sendEmail, isConfigured } = require("../config/email");
 
 const OTP_TTL_MINUTES = 10;
 
@@ -66,6 +66,13 @@ exports.requestOtp = async (req, res) => {
       });
     }
 
+    if (!isConfigured()) {
+      return res.status(500).json({
+        success: false,
+        message: "Email service not configured",
+      });
+    }
+
     const normalized = normalizeIdentifier(identifier);
     const otp = generateOtp();
     const otpHash = hashOtp(normalized, otp);
@@ -79,7 +86,7 @@ exports.requestOtp = async (req, res) => {
       [normalized, channel, otpHash, expiresAt]
     );
 
-    await transporter.sendMail({
+    await sendEmail({
       to: normalized,
       subject: "Your VolunteerX verification code",
       text: `Your OTP is ${otp}. It expires in ${OTP_TTL_MINUTES} minutes.`,
@@ -248,7 +255,7 @@ exports.register = async (req, res) => {
         success: false,
         message: "Email already exists",
       });
-    }
+        await sendEmail({
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -333,7 +340,7 @@ exports.login = async (req, res) => {
     }
 
     // JWT token
-    const token = jwt.sign(
+        await sendEmail({
       { id: user.id, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
@@ -502,7 +509,7 @@ exports.forgotPassword = async (req, res) => {
       ? `${resetUrlBase}?token=${encodeURIComponent(token)}`
       : null;
 
-    if (!process.env.SMTP_HOST) {
+    if (!process.env.RESEND_API_KEY) {
       return res.status(500).json({
         success: false,
         message: "Email service not configured",
@@ -510,7 +517,7 @@ exports.forgotPassword = async (req, res) => {
     }
 
     const fromAddress =
-      process.env.EMAIL_FROM || process.env.SMTP_USER || "no-reply@volunteerx";
+      process.env.RESEND_FROM || "onboarding@resend.dev";
 
     const text =
       `Hi ${user.name || ""},\n\n` +
@@ -528,7 +535,7 @@ exports.forgotPassword = async (req, res) => {
       <p>This token expires in 15 minutes. If you did not request this, ignore this email.</p>
     `;
 
-    await transporter.sendMail({
+    await sendEmail({
       from: fromAddress,
       to: user.email,
       subject: "Password Reset - VolunteerX",

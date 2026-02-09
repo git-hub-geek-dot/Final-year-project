@@ -1,16 +1,48 @@
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
+let sgMail = null;
 
-const host = process.env.SMTP_HOST;
-const port = Number(process.env.SMTP_PORT || 587);
-const secure = process.env.SMTP_SECURE === "true";
-const user = process.env.SMTP_USER;
-const pass = process.env.SMTP_PASS;
+const resendApiKey = process.env.RESEND_API_KEY;
+const resendFrom = process.env.RESEND_FROM || "onboarding@resend.dev";
 
-const transporter = nodemailer.createTransport({
-  host,
-  port,
-  secure,
-  auth: user && pass ? { user, pass } : undefined,
-});
+const sendgridApiKey = process.env.SENDGRID_API_KEY;
+const sendgridFrom = process.env.SENDGRID_FROM || process.env.SENDGRID_FROM_EMAIL;
 
-module.exports = transporter;
+const resend = resendApiKey ? new Resend(resendApiKey) : null;
+if (sendgridApiKey) {
+  try {
+    sgMail = require("@sendgrid/mail");
+    sgMail.setApiKey(sendgridApiKey);
+  } catch (err) {
+    console.warn("@sendgrid/mail not installed or failed to initialize", err.message || err);
+    sgMail = null;
+  }
+}
+
+const isConfigured = () => !!(resend || sgMail);
+
+const sendEmail = async ({ to, subject, text, html, from: overrideFrom }) => {
+  if (resend) {
+    return resend.emails.send({
+      from: overrideFrom || resendFrom,
+      to,
+      subject,
+      text,
+      html,
+    });
+  }
+
+  if (sgMail) {
+    const msg = {
+      to,
+      from: overrideFrom || sendgridFrom || resendFrom,
+      subject,
+      text,
+      html,
+    };
+    return sgMail.send(msg);
+  }
+
+  throw new Error("Email service not configured");
+};
+
+module.exports = { sendEmail, isConfigured };

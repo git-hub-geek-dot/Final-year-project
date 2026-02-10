@@ -1,8 +1,7 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:flutter/foundation.dart';
 import '../../services/event_service.dart';
+import '../../widgets/organiser_bottom_nav.dart';
 import 'my_events_screen.dart';
 
 class CreateEventScreen extends StatefulWidget {
@@ -274,13 +273,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                         child: Text("Upload Event Banner (Optional)"))
                     : ClipRRect(
                         borderRadius: BorderRadius.circular(16),
-                        child: kIsWeb
-                            ? Image.network(bannerImage!.path,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const Center(
-                                    child: Icon(Icons.broken_image)))
-                            : Image.file(File(bannerImage!.path),
-                                fit: BoxFit.cover),
+                        child: Image.network(
+                          bannerImage!.path,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              const Center(child: Icon(Icons.broken_image)),
+                        ),
                       ),
               ),
             ),
@@ -370,6 +368,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           loading ? const CircularProgressIndicator() : _actionButtons(),
         ]),
       ),
+      bottomNavigationBar: const OrganiserBottomNav(currentIndex: 0),
     );
   }
 

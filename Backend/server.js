@@ -16,7 +16,8 @@ app.set("trust proxy", 1);
 app.use(cors());
 app.use(express.json());
 
-// Images now served from Cloudinary (no local static serving needed)
+// Serve local uploaded images (used as fallback when Cloudinary is not configured)
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // ================= ROUTES =================
 app.use("/api", require("./routes/authRoutes"));

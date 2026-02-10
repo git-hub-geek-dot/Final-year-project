@@ -1,8 +1,7 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../services/event_service.dart';
+import '../../widgets/organiser_bottom_nav.dart';
 
 class EditEventScreen extends StatefulWidget {
   final Map event;
@@ -320,13 +319,12 @@ class _EditEventScreenState extends State<EditEventScreen> {
                 child: bannerImage != null
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(16),
-                        child: kIsWeb
-                            ? Image.network(bannerImage!.path,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const Center(
-                                    child: Icon(Icons.broken_image)))
-                            : Image.file(File(bannerImage!.path),
-                                fit: BoxFit.cover),
+                        child: Image.network(
+                          bannerImage!.path,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              const Center(child: Icon(Icons.broken_image)),
+                        ),
                       )
                     : existingBanner != null
                         ? ClipRRect(
@@ -426,6 +424,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
           loading ? const CircularProgressIndicator() : _submitButton(),
         ]),
       ),
+      bottomNavigationBar: const OrganiserBottomNav(currentIndex: 0),
     );
   }
 

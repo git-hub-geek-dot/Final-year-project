@@ -30,75 +30,35 @@ class RobustImage extends StatefulWidget {
 }
 
 class _RobustImageState extends State<RobustImage> {
-  bool _isLoading = true;
-  bool _hasError = false;
   int _retryCount = 0;
+  bool _retryScheduled = false;
 
   @override
   void didUpdateWidget(RobustImage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.url != widget.url) {
       setState(() {
-        _isLoading = true;
-        _hasError = false;
         _retryCount = 0;
+        _retryScheduled = false;
       });
     }
   }
 
-  void _retryLoading() {
-    if (_retryCount < widget.maxRetries) {
+  void _scheduleRetry() {
+    if (_retryScheduled || _retryCount >= widget.maxRetries) return;
+    _retryScheduled = true;
+    Future.delayed(widget.retryDelay, () {
+      if (!mounted) return;
       setState(() {
-        _isLoading = true;
-        _hasError = false;
         _retryCount++;
+        _retryScheduled = false;
       });
-    }
+    });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (_hasError && _retryCount >= widget.maxRetries) {
-      return widget.errorWidget ??
-          Container(
-            width: widget.width,
-            height: widget.height,
-            color: Colors.grey[300],
-            child: const Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.image_not_supported,
-                  size: 32,
-                  color: Colors.grey,
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Image unavailable',
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontSize: 10,
-                  ),
-                ),
-              ],
-            ),
-          );
-    }
-
-    Widget imageWidget = Image.network(
-      widget.url,
-      fit: widget.fit,
-      loadingBuilder: (context, child, loadingProgress) {
-        if (loadingProgress == null) {
-          if (mounted) {
-            setState(() {
-              _isLoading = false;
-              _hasError = false;
-            });
-          }
-          return child;
-        }
-        return Container(
+  Widget _loadingWidget() {
+    return widget.placeholder ??
+        Container(
           width: widget.width,
           height: widget.height,
           color: Colors.grey[200],
@@ -110,46 +70,54 @@ class _RobustImageState extends State<RobustImage> {
             ),
           ),
         );
+  }
+
+  Widget _errorWidget() {
+    return widget.errorWidget ??
+        Container(
+          width: widget.width,
+          height: widget.height,
+          color: Colors.grey[300],
+          child: const Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.image_not_supported,
+                size: 32,
+                color: Colors.grey,
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Image unavailable',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
+        );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Widget imageWidget = Image.network(
+      widget.url,
+      key: ValueKey('${widget.url}#$_retryCount'),
+      fit: widget.fit,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) {
+          return child;
+        }
+        return _loadingWidget();
       },
       errorBuilder: (context, error, stackTrace) {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-            _hasError = true;
-          });
-        }
-
         if (_retryCount < widget.maxRetries) {
-          Future.delayed(widget.retryDelay, () {
-            if (mounted) {
-              _retryLoading();
-            }
-          });
-          return Container(
-            width: widget.width,
-            height: widget.height,
-            color: Colors.grey[200],
-            child: const Center(
-              child: SizedBox(
-                width: 12,
-                height: 12,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
-          );
+          _scheduleRetry();
+          return _loadingWidget();
         }
 
-        return widget.errorWidget ??
-            Container(
-              width: widget.width,
-              height: widget.height,
-              color: Colors.grey[300],
-              child: const Icon(
-                Icons.broken_image,
-                color: Colors.grey,
-                size: 20,
-              ),
-            );
+        return _errorWidget();
       },
     );
 
@@ -163,23 +131,7 @@ class _RobustImageState extends State<RobustImage> {
     return SizedBox(
       width: widget.width,
       height: widget.height,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          imageWidget,
-          if (_isLoading && !_hasError)
-            Container(
-              color: Colors.grey[200],
-              child: const Center(
-                child: SizedBox(
-                  width: 12,
-                  height: 12,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-            ),
-        ],
-      ),
+      child: imageWidget,
     );
   }
 }

@@ -7,6 +7,7 @@ class VolunteerEventsScreen extends StatefulWidget {
   final bool loading;
   final List myApplications;
   final Future<void> Function() onRefresh;
+  final String initialTab;
 
   const VolunteerEventsScreen({
     super.key,
@@ -14,6 +15,7 @@ class VolunteerEventsScreen extends StatefulWidget {
     required this.loading,
     required this.myApplications,
     required this.onRefresh,
+    this.initialTab = "all",
   });
 
   @override
@@ -22,9 +24,12 @@ class VolunteerEventsScreen extends StatefulWidget {
 
 class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
   String searchQuery = "";
-  String selectedTab = "upcoming"; // upcoming | active | past
+  String selectedTab = "all"; // all | upcoming | ongoing | past
   String selectedCategory = "All Categories";
   String selectedDate = "Any Date";
+  bool showSearch = false;
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocus = FocusNode();
 
   final List<String> categories = [
     "All Categories",
@@ -56,6 +61,29 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    selectedTab = widget.initialTab;
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocus.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant VolunteerEventsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialTab != widget.initialTab) {
+      setState(() {
+        selectedTab = widget.initialTab;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (widget.loading) {
       return const Center(child: CircularProgressIndicator());
@@ -71,8 +99,6 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
           _searchRow(),
           const SizedBox(height: 12),
           _tabsRow(),
-          const SizedBox(height: 10),
-          _filtersRow(),
           const SizedBox(height: 12),
           if (filtered.isEmpty)
             const Padding(
@@ -88,28 +114,142 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
   Widget _searchRow() {
     return Row(
       children: [
-        Expanded(
-          child: TextField(
-            onChanged: (value) => setState(() => searchQuery = value.toLowerCase()),
-            decoration: InputDecoration(
-              hintText: "Search",
-              prefixIcon: const Icon(Icons.search),
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(22),
-                borderSide: BorderSide.none,
+        if (showSearch)
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              focusNode: _searchFocus,
+              autofocus: true,
+              onChanged: (value) =>
+                  setState(() => searchQuery = value.toLowerCase()),
+              decoration: InputDecoration(
+                hintText: "Search",
+                prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(22),
+                  borderSide: BorderSide.none,
+                ),
               ),
             ),
+          )
+        else
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: const Color(0xFFEAF0FF),
+            child: IconButton(
+              icon: const Icon(Icons.search, color: Color(0xFF2E6BE6)),
+              onPressed: () {
+                setState(() {
+                  showSearch = true;
+                });
+              },
+              tooltip: "Search",
+            ),
           ),
-        ),
         const SizedBox(width: 10),
+        if (!showSearch)
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: _appliedFiltersChips(),
+            ),
+          ),
+        if (!showSearch) const SizedBox(width: 10),
+        if (showSearch)
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: const Color(0xFFEAF0FF),
+            child: IconButton(
+              icon: const Icon(Icons.close, color: Color(0xFF2E6BE6)),
+              onPressed: () {
+                setState(() {
+                  showSearch = false;
+                  searchQuery = "";
+                  _searchController.clear();
+                });
+                _searchFocus.unfocus();
+              },
+              tooltip: "Close search",
+            ),
+          ),
+        if (showSearch) const SizedBox(width: 10),
         CircleAvatar(
           radius: 20,
           backgroundColor: const Color(0xFFEAF0FF),
-          child: const Icon(Icons.person, color: Color(0xFF2E6BE6)),
+          child: IconButton(
+            icon: const Icon(Icons.filter_list, color: Color(0xFF2E6BE6)),
+            onPressed: _openFilterSheet,
+            tooltip: "Filters",
+          ),
         ),
       ],
+    );
+  }
+
+  Widget _appliedFiltersChips() {
+    final chips = <Widget>[];
+
+    if (selectedCategory != "All Categories") {
+      chips.add(
+        _filterChip(
+          selectedCategory,
+          onRemove: () => setState(() => selectedCategory = "All Categories"),
+        ),
+      );
+    }
+
+    if (selectedDate != "Any Date") {
+      chips.add(
+        _filterChip(
+          selectedDate,
+          onRemove: () => setState(() => selectedDate = "Any Date"),
+        ),
+      );
+    }
+
+    if (chips.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Wrap(
+      spacing: 6,
+      runSpacing: 4,
+      children: chips,
+    );
+  }
+
+  Widget _filterChip(String label, {required VoidCallback onRemove}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF0FF),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF2E6BE6),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(width: 6),
+          GestureDetector(
+            onTap: onRemove,
+            child: const Icon(
+              Icons.close,
+              size: 14,
+              color: Color(0xFF2E6BE6),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -129,8 +269,9 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
       ),
       child: Row(
         children: [
+          Expanded(child: _tabButton("All", "all")),
           Expanded(child: _tabButton("Upcoming", "upcoming")),
-          Expanded(child: _tabButton("Active", "active")),
+          Expanded(child: _tabButton("Ongoing", "ongoing")),
           Expanded(child: _tabButton("Past", "past")),
         ],
       ),
@@ -161,62 +302,120 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
     );
   }
 
-  Widget _filtersRow() {
-    return Row(
-      children: [
-        Expanded(
-          child: _dropdown(
-            value: selectedCategory,
-            items: categories,
-            onChanged: (value) {
-              if (value == null) return;
-              setState(() => selectedCategory = value);
-            },
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _dropdown(
-            value: selectedDate,
-            items: dateFilters,
-            onChanged: (value) {
-              if (value == null) return;
-              setState(() => selectedDate = value);
-            },
-          ),
-        ),
-      ],
-    );
-  }
+  void _openFilterSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) {
+        String sheetCategory = selectedCategory;
+        String sheetDate = selectedDate;
 
-  Widget _dropdown({
-    required String value,
-    required List<String> items,
-    required ValueChanged<String?> onChanged,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          icon: const Icon(Icons.keyboard_arrow_down),
-          isExpanded: true,
-          items: items
-              .map(
-                (item) => DropdownMenuItem(
-                  value: item,
-                  child: Text(item, overflow: TextOverflow.ellipsis),
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return SafeArea(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  16,
+                  16,
+                  MediaQuery.of(context).viewInsets.bottom + 24,
                 ),
-              )
-              .toList(),
-          onChanged: onChanged,
-        ),
-      ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Center(
+                      child: Text(
+                        "Filter Events",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      "Category",
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: categories.map((cat) {
+                        final selected = sheetCategory == cat;
+                        return ChoiceChip(
+                          label: Text(cat),
+                          selected: selected,
+                          onSelected: (_) {
+                            setSheetState(() {
+                              sheetCategory = cat;
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      "Date",
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: dateFilters.map((date) {
+                        final selected = sheetDate == date;
+                        return ChoiceChip(
+                          label: Text(date),
+                          selected: selected,
+                          onSelected: (_) {
+                            setSheetState(() {
+                              sheetDate = date;
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              setState(() {
+                                selectedCategory = "All Categories";
+                                selectedDate = "Any Date";
+                              });
+                              Navigator.pop(context);
+                            },
+                            child: const Text("Clear"),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              setState(() {
+                                selectedCategory = sheetCategory;
+                                selectedDate = sheetDate;
+                              });
+                              Navigator.pop(context);
+                            },
+                            child: const Text("Apply"),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -239,13 +438,15 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
       final dateOnly = DateTime(date.year, date.month, date.day);
       final isCompleted = event["computed_status"]?.toString() == "completed";
       final isPast = dateOnly.isBefore(today) || isCompleted;
-      final isActive = dateOnly.isAtSameMomentAs(today) && !isCompleted;
+        final isOngoing = dateOnly.isAtSameMomentAs(today) && !isCompleted;
       final isUpcoming = dateOnly.isAfter(today) && !isCompleted;
 
-      final matchesTab = selectedTab == "past"
-          ? isPast
-          : selectedTab == "active"
-              ? isActive
+        final matchesTab = selectedTab == "all"
+          ? true
+          : selectedTab == "past"
+            ? isPast
+            : selectedTab == "ongoing"
+              ? isOngoing
               : isUpcoming;
 
       final matchesDate = _matchesDateFilter(dateOnly, today);
@@ -452,7 +653,10 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
     if (eventId == null || eventId.isEmpty) return null;
 
     for (final app in widget.myApplications) {
-      final appEventId = app["event_id"]?.toString();
+      final appEventId = app["event_id"]?.toString() ??
+          app["eventId"]?.toString() ??
+          app["event"]?["id"]?.toString() ??
+          app["event"]?["event_id"]?.toString();
       if (appEventId == eventId) {
         return app["status"]?.toString().toLowerCase();
       }

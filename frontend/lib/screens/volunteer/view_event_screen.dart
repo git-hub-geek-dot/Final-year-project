@@ -149,8 +149,10 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body);
+        final nextStatus =
+            (data["status"]?.toString().toLowerCase() ?? "pending");
         setState(() {
-          applicationStatus = data["status"];
+          applicationStatus = nextStatus;
           isApplying = false;
         });
       } else {
@@ -225,8 +227,22 @@ Join on VolunteerX
     );
   }
 
-  Widget _eventBanner() {
-    final imageUrl = widget.event["banner_url"];
+  if (imageUrl == null || imageUrl.isEmpty) {
+    return Container(
+      height: 220,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF0FF),
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(24),
+          bottomRight: Radius.circular(24),
+        ),
+      ),
+      child: const Center(
+        child: Icon(Icons.image, size: 48, color: Color(0xFF2E6BE6)),
+      ),
+    );
+  }
 
     if (imageUrl == null || imageUrl.isEmpty) {
       return const SizedBox.shrink();
@@ -289,13 +305,6 @@ Join on VolunteerX
               widget.event["payment_per_day"],
             ),
           ),
-          if (applicationStatus != null) ...[
-            const SizedBox(height: 16),
-            _statusPill(
-              _statusText(applicationStatus!),
-              _statusColor(applicationStatus!),
-            ),
-          ],
           if ((widget.event["computed_status"] == "completed") &&
               (applicationStatus == "accepted" ||
                   applicationStatus == "completed")) ...[
@@ -512,7 +521,10 @@ Join on VolunteerX
       );
     }
 
-    return const SizedBox.shrink();
+    return _statusPill(
+      _statusText(applicationStatus!),
+      _statusColor(applicationStatus!),
+    );
   }
 
   // ================= HELPERS =================

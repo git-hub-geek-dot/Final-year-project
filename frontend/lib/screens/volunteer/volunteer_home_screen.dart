@@ -9,6 +9,7 @@ import 'volunteer_events_screen.dart';
 import '../../config/api_config.dart';
 import '../../services/saved_events_service.dart';
 import '../../services/token_service.dart';
+import '../../theme/app_colors.dart';
 import '../chat/chat_inbox_screen.dart';
 import '../../widgets/robust_image.dart';
 
@@ -21,6 +22,7 @@ class VolunteerHomeScreen extends StatefulWidget {
 
 class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
   int selectedIndex = 0;
+  String eventsTab = "all"; // all | upcoming | ongoing | past
   List events = [];
   List myApplications = [];
   bool loading = true;
@@ -28,8 +30,21 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
   Set<String> savedEventIds = {};
   String? userName;
 
+  final GlobalKey _introKey = GlobalKey();
+  final GlobalKey _upcomingHeaderKey = GlobalKey();
+  final GlobalKey _recommendedHeaderKey = GlobalKey();
+  final GlobalKey _upcomingCardKey = GlobalKey();
+  final GlobalKey _recommendedCardKey = GlobalKey();
+
+  double? _introHeight;
+  double? _upcomingHeaderHeight;
+  double? _recommendedHeaderHeight;
+  double? _upcomingCardHeight;
+  double? _recommendedCardHeight;
+  
   String searchQuery = "";
   String selectedFeed = "all"; // all | confirmed | pending
+  String selectedTimeline = "upcoming"; // upcoming | ongoing
 
   // 🔹 FILTER UI STATE (UNCHANGED)
   String selectedCategory = "All";
@@ -112,6 +127,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
           "Content-Type": "application/json",
         },
       );
+      debugPrint("MY APPLICATIONS: ${response.body}");
 
       if (!mounted) return;
 
@@ -199,6 +215,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
         events: events,
         loading: loading,
         myApplications: myApplications,
+        initialTab: eventsTab,
         onRefresh: () async {
           await fetchEvents();
           await fetchMyApplications();
@@ -218,8 +235,55 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    final upcomingEvent = _getUpcomingEvent();
+    final upcomingAccepted = _getUpcomingAcceptedEvents();
+    final ongoingAccepted = _getOngoingAcceptedEvents();
+    final isOngoing = selectedTimeline == "ongoing";
+    final primaryEvents = isOngoing ? ongoingAccepted : upcomingAccepted;
     final recommended = _getRecommendedEvents();
+    _scheduleMeasurements();
+
+    final media = MediaQuery.of(context);
+    const listPadding = 16.0 + 24.0;
+    const listSpacing = 16.0 + 8.0 + 16.0 + 8.0;
+    final fixedHeights =
+        (_introHeight ?? 0) +
+        (_upcomingHeaderHeight ?? 0) +
+        (_recommendedHeaderHeight ?? 0) +
+        listPadding +
+        listSpacing;
+    final viewportHeight = media.size.height -
+        media.padding.top -
+        media.padding.bottom -
+        kBottomNavigationBarHeight;
+    var available = viewportHeight - fixedHeights;
+    if (available < 0) {
+      available = 0;
+    }
+
+    final upcomingCardHeight =
+        _upcomingCardHeight ?? _recommendedCardHeight ?? 110;
+    final recommendedCardHeight =
+        _recommendedCardHeight ?? _upcomingCardHeight ?? 110;
+
+    final primaryShown = primaryEvents.isEmpty
+        ? 1
+        : (available / upcomingCardHeight)
+            .floor()
+            .clamp(2, primaryEvents.length);
+    available -= primaryShown * upcomingCardHeight;
+    if (available < 0) {
+      available = 0;
+    }
+
+    final recommendedShown = recommended.isEmpty
+        ? 0
+        : (available / recommendedCardHeight)
+            .floor()
+            .clamp(1, recommended.length);
+    final primaryPreview = primaryEvents.take(primaryShown).toList();
+    final recommendedPreview = recommended.take(recommendedShown).toList();
+    final showUpcomingViewAll = primaryEvents.length > primaryShown;
+    final showRecommendedViewAll = recommended.length > recommendedShown;
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -231,45 +295,192 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: [
-          Text(
-            "Hi, ${(userName ?? "Volunteer").trim()}!",
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
+          Column(
+            key: _introKey,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Hi, ${(userName ?? "Volunteer").trim()}!",
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                "Find your next volunteer event",
+                style: TextStyle(color: Colors.black54),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            key: _upcomingHeaderKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      isOngoing ? "Ongoing Events" : "Upcoming Events",
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (showUpcomingViewAll)
+                      TextButton(
+                        onPressed: () => setState(() {
+                          eventsTab = isOngoing ? "ongoing" : "upcoming";
+                          selectedIndex = 1;
+                        }),
+                        child: const Text("View All"),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: AppColors.primaryBlue.withOpacity(0.15),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      _timelineSegment(
+                        label: "Upcoming",
+                        value: "upcoming",
+                        count: upcomingAccepted.length,
+                      ),
+                      _timelineSegment(
+                        label: "Ongoing",
+                        value: "ongoing",
+                        count: ongoingAccepted.length,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 4),
-          const Text(
-            "Find your next volunteer event",
-            style: TextStyle(color: Colors.black54),
-          ),
+          const SizedBox(height: 8),
+          if (primaryEvents.isEmpty)
+            _upcomingEventCard(
+              null,
+              key: _upcomingCardKey,
+              badgeLabel: isOngoing ? "Ongoing Event" : "Upcoming Event",
+              emptyLabel:
+                  isOngoing ? "No ongoing events yet" : "No upcoming events yet",
+            ),
+          ...primaryPreview.asMap().entries.map(
+                (entry) => _upcomingEventCard(
+                  entry.value,
+                  key: entry.key == 0 ? _upcomingCardKey : null,
+                  badgeLabel: isOngoing ? "Ongoing Event" : "Upcoming Event",
+                ),
+              ),
           const SizedBox(height: 16),
-          _upcomingEventCard(upcomingEvent),
-          const SizedBox(height: 16),
-          Row(
+          Container(
+            key: _recommendedHeaderKey,
+            child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
                 "Recommended for You",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              TextButton(
-                onPressed: () => setState(() => selectedIndex = 1),
-                child: const Text("View All"),
-              ),
+              if (showRecommendedViewAll)
+                TextButton(
+                  onPressed: () => setState(() => selectedIndex = 1),
+                  child: const Text("View All"),
+                ),
             ],
           ),
+          ),
           const SizedBox(height: 8),
-          if (recommended.isEmpty) const Text("No recommendations available"),
-          ...recommended.map(_recommendedCard),
+          if (recommended.isEmpty)
+            const Text("No recommendations available"),
+          ...recommendedPreview.asMap().entries.map(
+                (entry) => _recommendedCard(
+                  entry.value,
+                  key: entry.key == 0 ? _recommendedCardKey : null,
+                ),
+              ),
         ],
       ),
     );
   }
 
-  Map<String, dynamic>? _getUpcomingEvent() {
-    final upcoming = events
-        .where((e) => !_isPastEventDate(e["event_date"]?.toString()))
+  void _scheduleMeasurements() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _updateMeasuredHeight(_introKey, _introHeight, (v) => _introHeight = v);
+      _updateMeasuredHeight(
+        _upcomingHeaderKey,
+        _upcomingHeaderHeight,
+        (v) => _upcomingHeaderHeight = v,
+      );
+      _updateMeasuredHeight(
+        _recommendedHeaderKey,
+        _recommendedHeaderHeight,
+        (v) => _recommendedHeaderHeight = v,
+      );
+      _updateMeasuredHeight(
+        _upcomingCardKey,
+        _upcomingCardHeight,
+        (v) => _upcomingCardHeight = v,
+      );
+      _updateMeasuredHeight(
+        _recommendedCardKey,
+        _recommendedCardHeight,
+        (v) => _recommendedCardHeight = v,
+      );
+    });
+  }
+
+  void _updateMeasuredHeight(
+    GlobalKey key,
+    double? current,
+    void Function(double) assign,
+  ) {
+    final context = key.currentContext;
+    if (context == null) return;
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    final next = box.size.height;
+    if (next <= 0) return;
+    if (current == null || (current - next).abs() > 0.5) {
+      setState(() {
+        assign(next);
+      });
+    }
+  }
+
+  List<Map<String, dynamic>> _getUpcomingAcceptedEvents() {
+    final eventById = {
+      for (final event in events)
+        event["id"]?.toString(): event,
+    };
+
+    final upcoming = myApplications
+        .where((app) {
+          final status = app["status"]?.toString().toLowerCase() ?? "";
+          if (status != "accepted" && status != "approved") {
+            return false;
+          }
+          return true;
+        })
+        .map((app) {
+          final eventId = app["event_id"]?.toString() ??
+              app["event"]?["id"]?.toString();
+          final base = eventById[eventId] ?? app;
+          return Map<String, dynamic>.from(base);
+        })
+        .where(_isUpcomingEvent)
         .toList();
 
     upcoming.sort((a, b) {
@@ -279,21 +490,134 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
       return aDate.compareTo(bDate);
     });
 
-    if (upcoming.isEmpty) return null;
-    return Map<String, dynamic>.from(upcoming.first);
+    return upcoming;
+  }
+
+  List<Map<String, dynamic>> _getOngoingAcceptedEvents() {
+    final eventById = {
+      for (final event in events)
+        event["id"]?.toString(): event,
+    };
+
+    final ongoing = myApplications
+        .where((app) {
+          final status = app["status"]?.toString().toLowerCase() ?? "";
+          if (status != "accepted" && status != "approved") {
+            return false;
+          }
+          return true;
+        })
+        .map((app) {
+          final eventId = app["event_id"]?.toString() ??
+              app["event"]?["id"]?.toString();
+          final base = eventById[eventId] ?? app;
+          return Map<String, dynamic>.from(base);
+        })
+        .where(_isOngoingEvent)
+        .toList();
+
+    ongoing.sort((a, b) {
+      final aDate = DateTime.tryParse(a["event_date"]?.toString() ?? "");
+      final bDate = DateTime.tryParse(b["event_date"]?.toString() ?? "");
+      if (aDate == null || bDate == null) return 0;
+      return aDate.compareTo(bDate);
+    });
+
+    return ongoing;
+  }
+
+  DateTime? _parseEventDate(String? rawDate) {
+    if (rawDate == null || rawDate.isEmpty) return null;
+    return DateTime.tryParse(rawDate);
+  }
+
+  DateTime _dateWithTime(DateTime date, String? rawTime) {
+    final text = rawTime?.toString() ?? "";
+    if (text.isEmpty) {
+      return DateTime(date.year, date.month, date.day);
+    }
+
+    final parts = text.split(":");
+    final hour = parts.isNotEmpty ? int.tryParse(parts[0]) ?? 0 : 0;
+    final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+    final second = parts.length > 2 ? int.tryParse(parts[2]) ?? 0 : 0;
+    return DateTime(date.year, date.month, date.day, hour, minute, second);
+  }
+
+  bool _isUpcomingEvent(Map<String, dynamic> event) {
+    final startDate = _parseEventDate(event["event_date"]?.toString());
+    if (startDate == null) return false;
+    final startDateTime =
+        _dateWithTime(startDate, event["start_time"]?.toString());
+    final now = DateTime.now();
+    return startDateTime.isAfter(now);
+  }
+
+  bool _isOngoingEvent(Map<String, dynamic> event) {
+    final startDate = _parseEventDate(event["event_date"]?.toString());
+    if (startDate == null) return false;
+    final endDate = _parseEventDate(event["end_date"]?.toString()) ?? startDate;
+    final startDateTime =
+        _dateWithTime(startDate, event["start_time"]?.toString());
+    var endDateTime = _dateWithTime(endDate, event["end_time"]?.toString());
+    if (endDateTime.isBefore(startDateTime)) {
+      endDateTime = startDateTime;
+    }
+    final now = DateTime.now();
+    return !now.isBefore(startDateTime) && !now.isAfter(endDateTime);
   }
 
   List<Map<String, dynamic>> _getRecommendedEvents() {
-    return events
-        .where((e) => !_isPastEventDate(e["event_date"]?.toString()))
-        .take(3)
+    final statusByEventId = <String, String>{
+      for (final app in myApplications)
+        (app["event_id"]?.toString() ?? app["event"]?["id"]?.toString() ?? ""):
+            (app["status"]?.toString().toLowerCase() ?? ""),
+    };
+
+    int rankForStatus(String status) {
+      if (status.isEmpty) return 0; // Apply
+      if (status == "pending") return 1;
+      if (status == "accepted" || status == "approved") return 2;
+      if (status == "rejected") return 3;
+      return 4;
+    }
+
+    final upcoming = events
+        .where((e) {
+          if (_isPastEventDate(e["event_date"]?.toString())) {
+            return false;
+          }
+          final status =
+              statusByEventId[e["id"]?.toString() ?? ""] ?? "";
+          return status.isEmpty || status == "rejected";
+        })
         .map((e) => Map<String, dynamic>.from(e))
         .toList();
+
+    upcoming.sort((a, b) {
+      final aStatus = statusByEventId[a["id"]?.toString() ?? ""] ?? "";
+      final bStatus = statusByEventId[b["id"]?.toString() ?? ""] ?? "";
+      final rankDiff = rankForStatus(aStatus).compareTo(rankForStatus(bStatus));
+      if (rankDiff != 0) return rankDiff;
+
+      final aDate = DateTime.tryParse(a["event_date"]?.toString() ?? "");
+      final bDate = DateTime.tryParse(b["event_date"]?.toString() ?? "");
+      if (aDate == null || bDate == null) return 0;
+      return aDate.compareTo(bDate);
+    });
+
+    return upcoming;
   }
 
-  Widget _upcomingEventCard(Map<String, dynamic>? event) {
+  Widget _upcomingEventCard(
+    Map<String, dynamic>? event, {
+    Key? key,
+    String badgeLabel = "Upcoming Event",
+    String emptyLabel = "No upcoming events yet",
+  }) {
     if (event == null) {
       return Container(
+        key: key,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -306,7 +630,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
             ),
           ],
         ),
-        child: const Text("No upcoming events yet"),
+        child: Text(emptyLabel),
       );
     }
 
@@ -315,6 +639,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
         "${_formatTime(event["start_time"])} - ${_formatTime(event["end_time"])}";
 
     return GestureDetector(
+      key: key,
       onTap: () async {
         await Navigator.push(
           context,
@@ -358,9 +683,9 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                       ),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Text(
-                      "Upcoming Event",
-                      style: TextStyle(
+                    child: Text(
+                      badgeLabel,
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -438,7 +763,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     );
   }
 
-  Widget _recommendedCard(Map<String, dynamic> event) {
+  Widget _recommendedCard(Map<String, dynamic> event, {Key? key}) {
     final date = _formatDate(event["event_date"]?.toString());
     final time =
         "${_formatTime(event["start_time"])} - ${_formatTime(event["end_time"])}";
@@ -446,6 +771,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     final actionState = _actionState(rawStatus);
 
     return GestureDetector(
+      key: key,
       onTap: () async {
         await Navigator.push(
           context,
@@ -532,7 +858,10 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     if (eventId == null || eventId.isEmpty) return null;
 
     for (final app in myApplications) {
-      final appEventId = app["event_id"]?.toString();
+      final appEventId = app["event_id"]?.toString() ??
+          app["eventId"]?.toString() ??
+          app["event"]?["id"]?.toString() ??
+          app["event"]?["event_id"]?.toString();
       if (appEventId == eventId) {
         return app["status"]?.toString().toLowerCase();
       }
@@ -748,6 +1077,63 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
       final location = (app["location"] ?? "").toString().toLowerCase();
       return title.contains(searchQuery) || location.contains(searchQuery);
     }).toList();
+  }
+
+  Widget _timelineSegment({
+    required String label,
+    required String value,
+    required int count,
+  }) {
+    final selected = selectedTimeline == value;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            selectedTimeline = value;
+            eventsTab = value == "ongoing" ? "ongoing" : "upcoming";
+          });
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          decoration: BoxDecoration(
+            color: selected ? null : Colors.transparent,
+            gradient: selected ? AppColors.primaryGradient : null,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: selected ? Colors.white : Colors.black87,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? Colors.white.withOpacity(0.2)
+                      : AppColors.primaryBlue.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  count.toString(),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: selected ? Colors.white : Colors.black87,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _feedSegment({

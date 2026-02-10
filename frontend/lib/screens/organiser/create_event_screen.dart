@@ -175,15 +175,18 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         description: descriptionController.text.trim().isEmpty
             ? null
             : descriptionController.text.trim(),
-        location:
-            locationController.text.trim().isEmpty ? null : locationController.text.trim(),
+        location: locationController.text.trim().isEmpty
+            ? null
+            : locationController.text.trim(),
         eventDate: eventStartDate == null ? null : _fmtDate(eventStartDate!),
         endDate: eventEndDate == null ? null : _fmtDate(eventEndDate!),
         applicationDeadline:
             applicationDeadline == null ? null : _fmtDate(applicationDeadline!),
         volunteersRequired: _parseVolunteers(),
         eventType: eventType,
-        paymentPerDay: eventType == "paid" ? double.tryParse(paymentController.text) : null,
+        paymentPerDay: eventType == "paid"
+            ? double.tryParse(paymentController.text)
+            : null,
         bannerUrl: bannerUrl,
         categories: selectedCategories,
         responsibilities: responsibilities,
@@ -231,29 +234,32 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             _input("Volunteers Required", volunteersController,
                 keyboardType: TextInputType.number),
           ]),
-
           _sectionCard("Schedule", [
             Row(children: [
               Expanded(
-                child: _dateTile("Start Date", eventStartDate, () => pickDate(true)),
+                child: _dateTile(
+                    "Start Date", eventStartDate, () => pickDate(true)),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _dateTile("End Date", eventEndDate, () => pickDate(false)),
+                child:
+                    _dateTile("End Date", eventEndDate, () => pickDate(false)),
               ),
             ]),
             Row(children: [
               Expanded(
-                child: _timeTile("Start Time", eventStartTime, () => pickTime(true)),
+                child: _timeTile(
+                    "Start Time", eventStartTime, () => pickTime(true)),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _timeTile("End Time", eventEndTime, () => pickTime(false)),
+                child:
+                    _timeTile("End Time", eventEndTime, () => pickTime(false)),
               ),
             ]),
-            _dateTile("Application Deadline", applicationDeadline, pickDeadline),
+            _dateTile(
+                "Application Deadline", applicationDeadline, pickDeadline),
           ]),
-
           _sectionCard("Event Banner (Optional)", [
             InkWell(
               onTap: pickBannerImage,
@@ -264,17 +270,21 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   border: Border.all(color: Colors.grey),
                 ),
                 child: bannerImage == null
-                    ? const Center(child: Text("Upload Event Banner (Optional)"))
+                    ? const Center(
+                        child: Text("Upload Event Banner (Optional)"))
                     : ClipRRect(
                         borderRadius: BorderRadius.circular(16),
                         child: kIsWeb
-                            ? Image.network(bannerImage!.path, fit: BoxFit.cover)
-                            : Image.file(File(bannerImage!.path), fit: BoxFit.cover),
+                            ? Image.network(bannerImage!.path,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => const Center(
+                                    child: Icon(Icons.broken_image)))
+                            : Image.file(File(bannerImage!.path),
+                                fit: BoxFit.cover),
                       ),
               ),
             ),
           ]),
-
           _sectionCard("Event Type", [
             RadioListTile(
               value: "paid",
@@ -292,7 +302,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
               _input("Payment per day", paymentController,
                   keyboardType: TextInputType.number),
           ]),
-
           _sectionCard("Responsibilities", [
             Row(
               children: [
@@ -316,7 +325,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
               ],
             ),
             const SizedBox(height: 8),
-            if (responsibilities.isEmpty) const Text("No responsibilities added"),
+            if (responsibilities.isEmpty)
+              const Text("No responsibilities added"),
             if (responsibilities.isNotEmpty)
               Wrap(
                 spacing: 8,
@@ -333,7 +343,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                     .toList(),
               ),
           ]),
-
           _sectionCard("Categories", [
             Wrap(
               spacing: 8,
@@ -344,19 +353,20 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   label: Text(c),
                   selected: selected,
                   selectedColor: const Color(0xFF22C55E),
-                  labelStyle: TextStyle(color: selected ? Colors.white : Colors.black),
+                  labelStyle:
+                      TextStyle(color: selected ? Colors.white : Colors.black),
                   onSelected: (v) {
                     setState(() {
-                      v ? selectedCategories.add(c) : selectedCategories.remove(c);
+                      v
+                          ? selectedCategories.add(c)
+                          : selectedCategories.remove(c);
                     });
                   },
                 );
               }).toList(),
             ),
           ]),
-
           const SizedBox(height: 24),
-
           loading ? const CircularProgressIndicator() : _actionButtons(),
         ]),
       ),
@@ -374,14 +384,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           BoxShadow(color: Colors.black12, blurRadius: 6),
         ],
       ),
-      child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            ...children,
-          ]),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(title,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12),
+        ...children,
+      ]),
     );
   }
 
@@ -413,7 +421,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 child: const Center(
                   child: Text(
                     "Create Event",
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -439,11 +448,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   }
 
   Widget _dateTile(String title, DateTime? value, VoidCallback onTap) {
-    return _tile(Icons.calendar_today, value == null ? title : _fmtDate(value), onTap);
+    return _tile(
+        Icons.calendar_today, value == null ? title : _fmtDate(value), onTap);
   }
 
   Widget _timeTile(String title, TimeOfDay? value, VoidCallback onTap) {
-    return _tile(Icons.access_time, value == null ? title : value.format(context), onTap);
+    return _tile(Icons.access_time,
+        value == null ? title : value.format(context), onTap);
   }
 
   Widget _tile(IconData icon, String text, VoidCallback onTap) {

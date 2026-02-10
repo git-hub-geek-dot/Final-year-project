@@ -67,13 +67,11 @@ class _EditEventScreenState extends State<EditEventScreen> {
     titleController.text = e["title"] ?? "";
     descriptionController.text = e["description"] ?? "";
     locationController.text = e["location"] ?? "";
-    volunteersController.text =
-        e["volunteers_required"]?.toString() ?? "";
+    volunteersController.text = e["volunteers_required"]?.toString() ?? "";
 
     eventType = e["event_type"] ?? "unpaid";
     if (eventType == "paid") {
-      paymentController.text =
-          e["payment_per_day"]?.toString() ?? "";
+      paymentController.text = e["payment_per_day"]?.toString() ?? "";
     }
 
     eventStartDate = _parseDate(e["event_date"]);
@@ -135,8 +133,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
   }
 
   void _toast(String msg) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   Future<void> pickDate(bool isStart) async {
@@ -255,7 +252,6 @@ class _EditEventScreenState extends State<EditEventScreen> {
       );
 
       if (success && mounted) Navigator.pop(context, true);
-
     } catch (e) {
       _toast("Update failed: $e");
     } finally {
@@ -286,7 +282,6 @@ class _EditEventScreenState extends State<EditEventScreen> {
             _input("Volunteers Required", volunteersController,
                 keyboardType: TextInputType.number),
           ]),
-
           _sectionCard("Schedule", [
             Row(children: [
               Expanded(
@@ -313,7 +308,6 @@ class _EditEventScreenState extends State<EditEventScreen> {
             _dateTile(
                 "Application Deadline", applicationDeadline, pickDeadline),
           ]),
-
           _sectionCard("Event Banner (Optional)", [
             InkWell(
               onTap: pickBannerImage,
@@ -328,21 +322,25 @@ class _EditEventScreenState extends State<EditEventScreen> {
                         borderRadius: BorderRadius.circular(16),
                         child: kIsWeb
                             ? Image.network(bannerImage!.path,
-                                fit: BoxFit.cover)
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => const Center(
+                                    child: Icon(Icons.broken_image)))
                             : Image.file(File(bannerImage!.path),
                                 fit: BoxFit.cover),
                       )
                     : existingBanner != null
                         ? ClipRRect(
                             borderRadius: BorderRadius.circular(16),
-                            child:
-                                Image.network(existingBanner!, fit: BoxFit.cover),
+                            child: Image.network(existingBanner!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => const Center(
+                                    child: Icon(Icons.broken_image))),
                           )
-                        : const Center(child: Text("Upload Event Banner (Optional)")),
+                        : const Center(
+                            child: Text("Upload Event Banner (Optional)")),
               ),
             ),
           ]),
-
           _sectionCard("Event Type", [
             RadioListTile(
               value: "paid",
@@ -360,7 +358,6 @@ class _EditEventScreenState extends State<EditEventScreen> {
               _input("Payment per day", paymentController,
                   keyboardType: TextInputType.number),
           ]),
-
           _sectionCard("Responsibilities", [
             Row(
               children: [
@@ -384,7 +381,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
               ],
             ),
             const SizedBox(height: 8),
-            if (responsibilities.isEmpty) const Text("No responsibilities added"),
+            if (responsibilities.isEmpty)
+              const Text("No responsibilities added"),
             if (responsibilities.isNotEmpty)
               Wrap(
                 spacing: 8,
@@ -401,7 +399,6 @@ class _EditEventScreenState extends State<EditEventScreen> {
                     .toList(),
               ),
           ]),
-
           _sectionCard("Categories", [
             Wrap(
               spacing: 8,
@@ -412,19 +409,20 @@ class _EditEventScreenState extends State<EditEventScreen> {
                   label: Text(c),
                   selected: selected,
                   selectedColor: const Color(0xFF22C55E),
-                  labelStyle: TextStyle(color: selected ? Colors.white : Colors.black),
+                  labelStyle:
+                      TextStyle(color: selected ? Colors.white : Colors.black),
                   onSelected: (v) {
                     setState(() {
-                      v ? selectedCategories.add(c) : selectedCategories.remove(c);
+                      v
+                          ? selectedCategories.add(c)
+                          : selectedCategories.remove(c);
                     });
                   },
                 );
               }).toList(),
             ),
           ]),
-
           const SizedBox(height: 24),
-
           loading ? const CircularProgressIndicator() : _submitButton(),
         ]),
       ),
@@ -468,8 +466,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
           ),
           child: const Center(
             child: Text("Update Event",
-                style:
-                    TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ),
       );
@@ -484,8 +482,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
         keyboardType: keyboardType,
         decoration: InputDecoration(
           hintText: hint,
-          border:
-              OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
     );

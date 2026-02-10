@@ -10,18 +10,16 @@ import '../../config/api_config.dart';
 import '../../services/saved_events_service.dart';
 import '../../services/token_service.dart';
 import '../chat/chat_inbox_screen.dart';
-
+import '../../widgets/robust_image.dart';
 
 class VolunteerHomeScreen extends StatefulWidget {
   const VolunteerHomeScreen({super.key});
 
   @override
   State<VolunteerHomeScreen> createState() => _VolunteerHomeScreenState();
-  
 }
 
 class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
-  
   int selectedIndex = 0;
   List events = [];
   List myApplications = [];
@@ -29,10 +27,9 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
   bool loadingApplications = true;
   Set<String> savedEventIds = {};
   String? userName;
-  
+
   String searchQuery = "";
   String selectedFeed = "all"; // all | confirmed | pending
-
 
   // 🔹 FILTER UI STATE (UNCHANGED)
   String selectedCategory = "All";
@@ -146,9 +143,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     if (!mounted) return;
 
     setState(() {
-      savedEventIds = saved
-          .map((event) => event["id"].toString())
-          .toSet();
+      savedEventIds = saved.map((event) => event["id"].toString()).toSet();
     });
   }
 
@@ -168,34 +163,32 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
 
   // ================= LOGIC UNCHANGED =================
   Future<void> fetchEvents() async {
-  try {
-   final response =
-    await http.get(Uri.parse("${ApiConfig.baseUrl}/events"));
+    try {
+      final response = await http.get(Uri.parse("${ApiConfig.baseUrl}/events"));
 
+      debugPrint("==== EVENTS API CALL ====");
+      debugPrint("STATUS CODE: ${response.statusCode}");
+      debugPrint("RAW BODY: ${response.body}");
 
-    debugPrint("==== EVENTS API CALL ====");
-    debugPrint("STATUS CODE: ${response.statusCode}");
-    debugPrint("RAW BODY: ${response.body}");
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
 
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
+        debugPrint("DECODED TYPE: ${decoded.runtimeType}");
+        debugPrint("DECODED LENGTH: ${decoded.length}");
 
-      debugPrint("DECODED TYPE: ${decoded.runtimeType}");
-      debugPrint("DECODED LENGTH: ${decoded.length}");
-
-      setState(() {
-        events = decoded;
-        loading = false;
-      });
-    } else {
-      debugPrint("NON-200 RESPONSE");
+        setState(() {
+          events = decoded;
+          loading = false;
+        });
+      } else {
+        debugPrint("NON-200 RESPONSE");
+        setState(() => loading = false);
+      }
+    } catch (e) {
+      debugPrint("FETCH EVENTS ERROR: $e");
       setState(() => loading = false);
     }
-  } catch (e) {
-    debugPrint("FETCH EVENTS ERROR: $e");
-    setState(() => loading = false);
   }
-}
 
   // ================= TAB BODY =================
   Widget getBody() {
@@ -267,8 +260,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          if (recommended.isEmpty)
-            const Text("No recommendations available"),
+          if (recommended.isEmpty) const Text("No recommendations available"),
           ...recommended.map(_recommendedCard),
         ],
       ),
@@ -319,7 +311,8 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     }
 
     final date = _formatDate(event["event_date"]?.toString());
-    final time = "${_formatTime(event["start_time"])} - ${_formatTime(event["end_time"])}";
+    final time =
+        "${_formatTime(event["start_time"])} - ${_formatTime(event["end_time"])}";
 
     return GestureDetector(
       onTap: () async {
@@ -447,7 +440,8 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
 
   Widget _recommendedCard(Map<String, dynamic> event) {
     final date = _formatDate(event["event_date"]?.toString());
-    final time = "${_formatTime(event["start_time"])} - ${_formatTime(event["end_time"])}";
+    final time =
+        "${_formatTime(event["start_time"])} - ${_formatTime(event["end_time"])}";
     final rawStatus = _applicationStatusForEvent(event);
     final actionState = _actionState(rawStatus);
 
@@ -481,7 +475,8 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
             CircleAvatar(
               radius: 22,
               backgroundColor: const Color(0xFFEAF0FF),
-              child: const Icon(Icons.volunteer_activism, color: Color(0xFF2E6BE6)),
+              child: const Icon(Icons.volunteer_activism,
+                  color: Color(0xFF2E6BE6)),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -621,12 +616,13 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
         color: const Color(0xFFEAF0FF),
         child: url == null || url.isEmpty
             ? const Icon(Icons.image, color: Color(0xFF2E6BE6))
-            : Image.network(
-                url,
+            : RobustImage(
+                url: url,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) {
-                  return const Icon(Icons.image, color: Color(0xFF2E6BE6));
-                },
+                errorWidget: Container(
+                  color: const Color(0xFFEAF0FF),
+                  child: const Icon(Icons.image, color: Color(0xFF2E6BE6)),
+                ),
               ),
       ),
     );
@@ -687,8 +683,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     }
 
     final eventById = {
-      for (final event in events)
-        event["id"]?.toString(): event,
+      for (final event in events) event["id"]?.toString(): event,
     };
 
     final merged = apps.map((app) {
@@ -706,10 +701,9 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
       itemBuilder: (context, index) {
         final event = list[index];
 
-        final eventId = event["id"]?.toString() ??
-            event["event_id"]?.toString();
-        final isSaved =
-            eventId != null && savedEventIds.contains(eventId);
+        final eventId =
+            event["id"]?.toString() ?? event["event_id"]?.toString();
+        final isSaved = eventId != null && savedEventIds.contains(eventId);
 
         return GestureDetector(
           onTap: () async {
@@ -725,10 +719,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
           child: _eventCard(
             title: event["title"] ?? "",
             location: event["location"] ?? "",
-            date: event["event_date"]
-                    ?.toString()
-                    .split("T")[0] ??
-                "",
+            date: event["event_date"]?.toString().split("T")[0] ?? "",
             slotsLeft: event["volunteers_required"] ?? 0,
             isSaved: isSaved,
             onToggleSaved: () => _toggleSaved(event),
@@ -839,112 +830,99 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     return eventDateOnly.isBefore(today);
   }
 
-
   // ================= FILTER BOTTOM SHEET (UNCHANGED) =================
   void _openFilterSheet() {
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true, // ✅ FIX 1: forces visible height
-    backgroundColor: Colors.white, // ✅ FIX 2: avoids transparent sheet
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
-    builder: (_) {
-      return StatefulBuilder(
-        builder: (context, setSheetState) {
-          return SafeArea( // ✅ FIX 3: prevents zero-height rendering
-            child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                16,
-                16,
-                MediaQuery.of(context).viewInsets.bottom + 24,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Center(
-                    child: Text(
-                      "Filter Events",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true, // ✅ FIX 1: forces visible height
+      backgroundColor: Colors.white, // ✅ FIX 2: avoids transparent sheet
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return SafeArea(
+              // ✅ FIX 3: prevents zero-height rendering
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  16,
+                  16,
+                  MediaQuery.of(context).viewInsets.bottom + 24,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Center(
+                      child: Text(
+                        "Filter Events",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  const Text(
-                    "Compensation",
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-
-                  CheckboxListTile(
-                    title: const Text("Paid"),
-                    value: filterPaid,
-                    onChanged: (v) =>
-                        setSheetState(() => filterPaid = v!),
-                    controlAffinity: ListTileControlAffinity.leading,
-                  ),
-
-                  CheckboxListTile(
-                    title: const Text("Unpaid"),
-                    value: filterUnpaid,
-                    onChanged: (v) =>
-                        setSheetState(() => filterUnpaid = v!),
-                    controlAffinity: ListTileControlAffinity.leading,
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  const Text(
-                    "Categories",
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: eventCategories
-                        .where((c) => c != "All")
-                        .map(
-                          (cat) => ChoiceChip(
-                            label: Text(cat),
-                            selected: selectedCategory == cat,
-                            onSelected: (_) {
-                              setSheetState(() {
-                                selectedCategory = cat;
-                              });
-                            },
-                          ),
-                        )
-                        .toList(),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text("Apply Filters"),
+                    const SizedBox(height: 20),
+                    const Text(
+                      "Compensation",
+                      style: TextStyle(fontWeight: FontWeight.w600),
                     ),
-                  ),
-                ],
+                    CheckboxListTile(
+                      title: const Text("Paid"),
+                      value: filterPaid,
+                      onChanged: (v) => setSheetState(() => filterPaid = v!),
+                      controlAffinity: ListTileControlAffinity.leading,
+                    ),
+                    CheckboxListTile(
+                      title: const Text("Unpaid"),
+                      value: filterUnpaid,
+                      onChanged: (v) => setSheetState(() => filterUnpaid = v!),
+                      controlAffinity: ListTileControlAffinity.leading,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      "Categories",
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: eventCategories
+                          .where((c) => c != "All")
+                          .map(
+                            (cat) => ChoiceChip(
+                              label: Text(cat),
+                              selected: selectedCategory == cat,
+                              onSelected: (_) {
+                                setSheetState(() {
+                                  selectedCategory = cat;
+                                });
+                              },
+                            ),
+                          )
+                          .toList(),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text("Apply Filters"),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          );
-        },
-      );
-    },
-  );
-}
-
+            );
+          },
+        );
+      },
+    );
+  }
 
   // ================= MAIN BUILD =================
   @override
@@ -996,16 +974,16 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
   }
 }
 
-  // ================= EVENT CARD (HOME) =================
-  Widget _eventCard({
-    required String title,
-    required String location,
-    required String date,
-    required int slotsLeft,
-    required bool isSaved,
-    required VoidCallback onToggleSaved,
-  }) {
-    return Container(
+// ================= EVENT CARD (HOME) =================
+Widget _eventCard({
+  required String title,
+  required String location,
+  required String date,
+  required int slotsLeft,
+  required bool isSaved,
+  required VoidCallback onToggleSaved,
+}) {
+  return Container(
     margin: const EdgeInsets.only(bottom: 16),
     decoration: BoxDecoration(
       borderRadius: BorderRadius.circular(20),
@@ -1057,8 +1035,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Text(location,
-                    style: const TextStyle(color: Colors.grey)),
+                Text(location, style: const TextStyle(color: Colors.grey)),
                 const SizedBox(height: 4),
                 Text(date, style: const TextStyle(color: Colors.grey)),
               ],

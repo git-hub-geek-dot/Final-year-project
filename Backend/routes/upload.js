@@ -29,9 +29,20 @@ router.post("/upload", upload.single("image"), async (req, res) => {
 
     // Cloudinary provides the URL directly
     const url = req.file.path; // This is the Cloudinary URL
+    console.log('Upload successful! Cloudinary URL:', url);
     res.json({ url });
   } catch (err) {
     console.error("Upload error:", err);
+    console.error("Error details:", err.message);
+
+    // Check if it's a Cloudinary configuration error
+    if (err.message && err.message.includes('Invalid Signature')) {
+      return res.status(500).json({
+        error: "Cloudinary configuration error. Please check your API credentials.",
+        details: "Invalid API secret or key. Verify your Cloudinary environment variables."
+      });
+    }
+
     return res.status(400).json({ error: "Invalid image or upload failed" });
   }
 });

@@ -7,11 +7,14 @@ const resendFrom = process.env.RESEND_FROM || "onboarding@resend.dev";
 const sendgridApiKey = process.env.SENDGRID_API_KEY;
 const sendgridFrom = process.env.SENDGRID_FROM || process.env.SENDGRID_FROM_EMAIL;
 
+console.log('SendGrid API Key loaded:', sendgridApiKey ? 'Yes (' + sendgridApiKey.substring(0, 10) + '...)' : 'No');
+
 const resend = resendApiKey ? new Resend(resendApiKey) : null;
 if (sendgridApiKey) {
   try {
     sgMail = require("@sendgrid/mail");
     sgMail.setApiKey(sendgridApiKey);
+    console.log('SendGrid initialized successfully');
   } catch (err) {
     console.warn("@sendgrid/mail not installed or failed to initialize", err.message || err);
     sgMail = null;

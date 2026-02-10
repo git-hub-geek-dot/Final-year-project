@@ -42,16 +42,12 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
   String? _lastProfilePictureUrl;
   bool _pendingAvatarSuccess = false;
 
-  late final AnimationController _avatarSuccessController;
-  late final Animation<double> _avatarGlow;
-
-  List<String> _skills = [];
-  List<String> _interests = [];
   String _impactEvents = '0';
   String _impactRating = '0';
   String _ratingCount = '0';
-  Map<String, dynamic>? _upcomingEvent;
-  List<Map<String, dynamic>> _activity = [];
+
+  late AnimationController _avatarSuccessController;
+  late Animation<double> _avatarGlow;
 
   @override
   void initState() {
@@ -112,12 +108,6 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
         setState(() {
           _impactEvents = (impact["events"] ?? 0).toString();
           _impactRating = (impact["rating"] ?? "0").toString();
-          _upcomingEvent = data["upcomingEvent"];
-          _skills = List<String>.from(data["skills"] ?? []);
-          _interests = List<String>.from(data["interests"] ?? []);
-          _activity = List<Map<String, dynamic>>.from(
-            data["activity"] ?? [],
-          );
         });
       }
     } catch (_) {
@@ -355,14 +345,14 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
                 height: glowSize,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.green.withOpacity(glowOpacity * 0.6),
+                  color: Colors.green.withValues(alpha: glowOpacity * 0.6),
                   border: Border.all(
-                    color: Colors.green.withOpacity(glowOpacity),
+                    color: Colors.green.withValues(alpha: glowOpacity),
                     width: 3,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.green.withOpacity(glowOpacity),
+                      color: Colors.green.withValues(alpha: glowOpacity),
                       blurRadius: 32 * (1 - glow),
                       spreadRadius: 6,
                     ),
@@ -877,16 +867,6 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
           ],
         ),
       ),
-    );
-  }
-
-  Widget _timelineItem(String title, String subtitle) {
-    return ListTile(
-      dense: true,
-      leading: const Icon(Icons.circle, size: 10, color: Color(0xFF2ECC71)),
-      title: Text(title, style: const TextStyle(fontSize: 14)),
-      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
-      contentPadding: EdgeInsets.zero,
     );
   }
 }

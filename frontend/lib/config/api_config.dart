@@ -1,5 +1,5 @@
-import 'dart:io';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 class ApiConfig {
   static const bool useCloud = false; // false = local, true = Render
 
@@ -13,8 +13,10 @@ class ApiConfig {
 
     if (kIsWeb) {
       return localWeb;
-    } else if (Platform.isAndroid) {
+    } else if (defaultTargetPlatform == TargetPlatform.android) {
       return localAndroid;
+    } else if (defaultTargetPlatform == TargetPlatform.iOS) {
+      return localMobile;
     } else {
       return localWeb;
     }

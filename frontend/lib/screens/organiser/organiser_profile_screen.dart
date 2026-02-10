@@ -7,12 +7,12 @@ import '../../config/api_config.dart';
 import '../../services/token_service.dart';
 import '../../services/verification_service.dart';
 import '../../services/rating_service.dart';
+import '../../widgets/organiser_bottom_nav.dart';
 import 'account_settings_screen.dart';
 import 'help_support_screen.dart';
 import 'about_volunteerx_screen.dart';
 import 'edit_profile_screen.dart';
 import 'get_verified_screen.dart';
-import 'leaderboard_screen.dart';
 import 'organiser_activity_screen.dart';
 import 'my_events_screen.dart';
 
@@ -245,8 +245,8 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
                             Row(
                               mainAxisAlignment:
                                   MainAxisAlignment.spaceBetween,
-                              children: const [
-                                Text(
+                              children: [
+                                const Text(
                                   "Volunteerx",
                                   style: TextStyle(
                                     color: Colors.white,
@@ -254,8 +254,21 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                                Icon(Icons.notifications,
-                                    color: Colors.white),
+                                IconButton(
+                                  onPressed: () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Notifications screen coming soon.',
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(
+                                    Icons.notifications,
+                                    color: Colors.white,
+                                  ),
+                                ),
                               ],
                             ),
                             const SizedBox(height: 20),
@@ -383,18 +396,40 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
                                   : verificationStatus == "approved"
                                       ? "Verified"
                                       : "Get Verified",
-                              onTap: verificationStatus == "pending" ||
-                                      verificationStatus == "approved"
-                                  ? null
-                                  : () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) =>
-                                              const OrganiserGetVerifiedScreen(),
-                                        ),
-                                      );
-                                    },
+                              onTap: () {
+                                final status =
+                                    (verificationStatus ?? '').toLowerCase();
+
+                                if (status == 'approved') {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        "Your account is already verified.",
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                if (status == 'pending') {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        "Your verification request is under review.",
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const OrganiserGetVerifiedScreen(),
+                                  ),
+                                );
+                              },
                             ),
                             _profileOption(
   context: context,
@@ -460,31 +495,7 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
               ),
             ),
 
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 2,
-        selectedItemColor: const Color(0xFF22C55E),
-        unselectedItemColor: Colors.grey,
-        onTap: (index) {
-          if (index == 0) {
-            Navigator.pushReplacementNamed(context, '/organiser-home');
-          } else if (index == 1) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const LeaderboardScreen(),
-              ),
-            );
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(
-              icon: Icon(Icons.home), label: "Home"),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.leaderboard), label: "Leaderboard"),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.person), label: "Profile"),
-        ],
-      ),
+      bottomNavigationBar: const OrganiserBottomNav(currentIndex: 2),
     );
   }
 }

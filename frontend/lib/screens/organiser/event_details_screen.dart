@@ -1,8 +1,8 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../services/event_service.dart';
+import '../../widgets/organiser_bottom_nav.dart';
 import 'edit_event_screen.dart';
 import 'review_application_screen.dart';
 import '../../widgets/robust_image.dart';
@@ -108,19 +108,13 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                             fit: BoxFit.cover,
                             errorWidget: _fallbackBanner(),
                           )
-                        : (bannerUrl.toString().startsWith("http")
-                            ? RobustImage(
-                                url: bannerUrl,
-                                width: double.infinity,
-                                height: 200,
-                                fit: BoxFit.cover,
-                                errorWidget: _fallbackBanner(),
-                              )
-                            : Image.file(
-                                File(bannerUrl),
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => _fallbackBanner(),
-                              ))
+                        : RobustImage(
+                            url: bannerUrl,
+                            width: double.infinity,
+                            height: 200,
+                            fit: BoxFit.cover,
+                            errorWidget: _fallbackBanner(),
+                          )
                     : _fallbackBanner(),
               ),
               const SizedBox(height: 16),
@@ -241,6 +235,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
           ),
         ),
       ),
+      bottomNavigationBar: const OrganiserBottomNav(currentIndex: 0),
     );
   }
 

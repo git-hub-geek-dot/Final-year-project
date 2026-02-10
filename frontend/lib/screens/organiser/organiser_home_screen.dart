@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/event_service.dart';
 import '../../services/token_service.dart';
+import '../../widgets/organiser_bottom_nav.dart';
 import 'create_event_screen.dart';
-import 'leaderboard_screen.dart';
 import 'review_application_screen.dart';
 import 'event_details_screen.dart';
 import '../chat/chat_inbox_screen.dart';
@@ -17,14 +17,12 @@ class OrganiserHomeScreen extends StatefulWidget {
 }
 
 class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
-  static const String _cacheMyEventsKey = "cached_organiser_my_events";
-  static const String _cacheAllEventsKey = "cached_organiser_all_events";
+  static const String _cacheEventsKey = "cached_organiser_events";
 
   bool loading = true;
   List events = [];
   int? userId;
   int _selectedTab = 0; // 0: Ongoing, 1: Upcoming, 2: Completed, 3: Draft
-  bool showAllEvents = false;
   String? loadError;
 
   @override
@@ -36,8 +34,7 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
 
   Future<void> _loadCachedEvents() async {
     final prefs = await SharedPreferences.getInstance();
-    final cacheKey = showAllEvents ? _cacheAllEventsKey : _cacheMyEventsKey;
-    final cached = prefs.getString(cacheKey);
+    final cached = prefs.getString(_cacheEventsKey);
     if (cached == null || cached.isEmpty) return;
 
     try {
@@ -61,9 +58,7 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
 
     try {
       final id = await TokenService.getUserId();
-      final data = showAllEvents
-          ? await EventService.fetchAllEvents()
-          : await EventService.fetchMyEvents();
+      final data = await EventService.fetchMyEvents();
       if (!mounted) return;
       setState(() {
         userId = id;
@@ -72,8 +67,7 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
         loadError = null;
       });
       final prefs = await SharedPreferences.getInstance();
-      final cacheKey = showAllEvents ? _cacheAllEventsKey : _cacheMyEventsKey;
-      await prefs.setString(cacheKey, jsonEncode(data));
+      await prefs.setString(_cacheEventsKey, jsonEncode(data));
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -146,7 +140,21 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
                         color: Colors.white,
                       ),
                     ),
-                    const Icon(Icons.notifications, color: Colors.white),
+                    IconButton(
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Notifications screen coming soon.',
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(
+                        Icons.notifications,
+                        color: Colors.white,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -186,20 +194,9 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
           const SizedBox(height: 20),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                _eventScopeButton('My Events', !showAllEvents, () {
-                  if (!showAllEvents) return;
-                  setState(() => showAllEvents = false);
-                  loadEvents();
-                }),
-                const SizedBox(width: 10),
-                _eventScopeButton('All Events', showAllEvents, () {
-                  if (showAllEvents) return;
-                  setState(() => showAllEvents = true);
-                  loadEvents();
-                }),
-              ],
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: _eventScopeButton('Events', true, () {}),
             ),
           ),
           const SizedBox(height: 12),
@@ -297,29 +294,7 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
           const SizedBox(height: 10),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 0,
-        selectedItemColor: const Color(0xFF22C55E),
-        unselectedItemColor: Colors.grey,
-        onTap: (index) {
-          if (index == 1) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const LeaderboardScreen()),
-            );
-          } else if (index == 2) {
-            Navigator.pushNamed(context, '/organiser-profile');
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.leaderboard),
-            label: 'Leaderboard',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-        ],
-      ),
+      bottomNavigationBar: const OrganiserBottomNav(currentIndex: 0),
     );
   }
 

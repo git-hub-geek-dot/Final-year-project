@@ -1,6 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
@@ -142,9 +140,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   radius: 40,
                   backgroundColor: Colors.grey.shade200,
                   backgroundImage: _selectedImage != null
-                      ? (kIsWeb
-                          ? NetworkImage(_selectedImage!.path) as ImageProvider
-                          : FileImage(File(_selectedImage!.path)))
+                      ? NetworkImage(_selectedImage!.path) as ImageProvider
                       : (_profilePictureUrl != null
                           ? NetworkImage(_profilePictureUrl!)
                           : null),

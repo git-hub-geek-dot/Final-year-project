@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
@@ -8,7 +7,7 @@ class UserService {
   /// Upload profile picture and return the image URL
   static Future<String?> uploadProfilePicture(
     String token,
-    dynamic imageFile, // Can be File (mobile) or XFile (web/mobile)
+    dynamic imageFile, // Expected XFile from image_picker
   ) async {
     try {
       final url = Uri.parse("${ApiConfig.baseUrl}/profile/picture/upload");
@@ -21,9 +20,8 @@ class UserService {
         "Authorization": "Bearer $token",
       });
 
-      // Handle both File and XFile
+      // Handle XFile for both web and mobile
       if (imageFile is XFile) {
-        // XFile from image_picker
         final bytes = await imageFile.readAsBytes();
         final fileName =
             imageFile.name.isNotEmpty ? imageFile.name : 'photo.jpg';
@@ -32,14 +30,6 @@ class UserService {
             'image',
             bytes,
             filename: fileName,
-          ),
-        );
-      } else if (imageFile is File) {
-        // File from dart:io
-        request.files.add(
-          await http.MultipartFile.fromPath(
-            'image',
-            imageFile.path,
           ),
         );
       } else {

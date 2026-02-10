@@ -1,10 +1,11 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../services/event_service.dart';
+import '../../widgets/organiser_bottom_nav.dart';
 import 'edit_event_screen.dart';
 import 'review_application_screen.dart';
+import '../../widgets/robust_image.dart';
 
 class EventDetailsScreen extends StatefulWidget {
   final Map event;
@@ -64,15 +65,17 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
   Widget build(BuildContext context) {
     final event = widget.event;
     final bannerUrl = event["banner_url"];
-    final status =
-        (event["computed_status"] ?? event["status"] ?? "upcoming").toString().toUpperCase();
+    final status = (event["computed_status"] ?? event["status"] ?? "upcoming")
+        .toString()
+        .toUpperCase();
     final eventDateText = _fmtDate(event["event_date"]);
     final endDateText = _fmtDate(event["end_date"]);
     final deadlineText = _fmtDate(event["application_deadline"]);
     final startTimeText = _fmtTime(event["start_time"]);
     final endTimeText = _fmtTime(event["end_time"]);
     final responsibilities =
-        (event["responsibilities"] as List?)?.whereType<String>().toList() ?? [];
+        (event["responsibilities"] as List?)?.whereType<String>().toList() ??
+            [];
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FB),
@@ -93,134 +96,146 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           child: Column(
             children: [
-            SizedBox(
-              width: double.infinity,
-              height: 200,
-              child: bannerUrl != null && bannerUrl.toString().isNotEmpty
-                  ? kIsWeb
-                      ? Image.network(
-                          bannerUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _fallbackBanner(),
-                        )
-                      : (bannerUrl.toString().startsWith("http")
-                          ? Image.network(
-                              bannerUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => _fallbackBanner(),
-                            )
-                          : Image.file(
-                              File(bannerUrl),
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => _fallbackBanner(),
-                            ))
-                  : _fallbackBanner(),
-            ),
-            const SizedBox(height: 16),
-            _card(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    event["title"] ?? "Untitled Event",
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      _statusChip(status),
-                      const SizedBox(width: 10),
-                      Text(
-                        eventDateText,
-                        style: const TextStyle(color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  _actionButtons(event),
-                ],
+              SizedBox(
+                width: double.infinity,
+                height: 200,
+                child: bannerUrl != null && bannerUrl.toString().isNotEmpty
+                    ? kIsWeb
+                        ? RobustImage(
+                            url: bannerUrl,
+                            width: double.infinity,
+                            height: 200,
+                            fit: BoxFit.cover,
+                            errorWidget: _fallbackBanner(),
+                          )
+                        : RobustImage(
+                            url: bannerUrl,
+                            width: double.infinity,
+                            height: 200,
+                            fit: BoxFit.cover,
+                            errorWidget: _fallbackBanner(),
+                          )
+                    : _fallbackBanner(),
               ),
-            ),
-            _card(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "Event Overview",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 14),
-                  loadingStats
-                      ? const Center(child: CircularProgressIndicator())
-                      : Row(
-                          children: [
-                            _statBox("Applied", applied.toString(), Icons.person),
-                            _statBox("Approved", approved.toString(), Icons.check_circle),
-                            _statBox("Pending", pending.toString(), Icons.hourglass_bottom),
-                            _statBox("Rejected", rejected.toString(), Icons.cancel),
-                          ],
-                        ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text("Volunteers Needed: ${event["volunteers_required"] ?? 0}"),
-                      Text(
-                        "Slots Remaining: ${(event["volunteers_required"] ?? 0) - approved}",
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            _card(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "Event Info",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-                  _infoRow(Icons.location_on, event["location"]),
-                  _infoRow(Icons.category, event["event_type"]),
-                  _infoRow(Icons.calendar_today, "Start: $eventDateText"),
-                  _infoRow(Icons.event, "End: $endDateText"),
-                  _infoRow(Icons.access_time, "Time: $startTimeText - $endTimeText"),
-                  _infoRow(Icons.timer, "Application Deadline: $deadlineText"),
-                ],
-              ),
-            ),
-            _card(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "Responsibilities",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-                  if (responsibilities.isEmpty) const Text("No responsibilities added"),
-                  if (responsibilities.isNotEmpty)
-                    ...responsibilities.map(
-                      (item) => Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.check_circle, color: Colors.green, size: 18),
-                            const SizedBox(width: 8),
-                            Expanded(child: Text(item)),
-                          ],
-                        ),
-                      ),
+              const SizedBox(height: 16),
+              _card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      event["title"] ?? "Untitled Event",
+                      style: const TextStyle(
+                          fontSize: 20, fontWeight: FontWeight.bold),
                     ),
-                ],
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        _statusChip(status),
+                        const SizedBox(width: 10),
+                        Text(
+                          eventDateText,
+                          style: const TextStyle(color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _actionButtons(event),
+                  ],
+                ),
               ),
-            ),
+              _card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Event Overview",
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 14),
+                    loadingStats
+                        ? const Center(child: CircularProgressIndicator())
+                        : Row(
+                            children: [
+                              _statBox(
+                                  "Applied", applied.toString(), Icons.person),
+                              _statBox("Approved", approved.toString(),
+                                  Icons.check_circle),
+                              _statBox("Pending", pending.toString(),
+                                  Icons.hourglass_bottom),
+                              _statBox("Rejected", rejected.toString(),
+                                  Icons.cancel),
+                            ],
+                          ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                            "Volunteers Needed: ${event["volunteers_required"] ?? 0}"),
+                        Text(
+                          "Slots Remaining: ${(event["volunteers_required"] ?? 0) - approved}",
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              _card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Event Info",
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    _infoRow(Icons.location_on, event["location"]),
+                    _infoRow(Icons.category, event["event_type"]),
+                    _infoRow(Icons.calendar_today, "Start: $eventDateText"),
+                    _infoRow(Icons.event, "End: $endDateText"),
+                    _infoRow(Icons.access_time,
+                        "Time: $startTimeText - $endTimeText"),
+                    _infoRow(
+                        Icons.timer, "Application Deadline: $deadlineText"),
+                  ],
+                ),
+              ),
+              _card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Responsibilities",
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    if (responsibilities.isEmpty)
+                      const Text("No responsibilities added"),
+                    if (responsibilities.isNotEmpty)
+                      ...responsibilities.map(
+                        (item) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.check_circle,
+                                  color: Colors.green, size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(child: Text(item)),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
       ),
+      bottomNavigationBar: const OrganiserBottomNav(currentIndex: 0),
     );
   }
 
@@ -297,7 +312,8 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
   static Widget _fallbackBanner() {
     return Container(
       decoration: const BoxDecoration(
-        gradient: LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF22C55E)]),
+        gradient:
+            LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF22C55E)]),
       ),
       child: const Center(
         child: Icon(Icons.image, size: 40, color: Colors.white),

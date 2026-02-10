@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../../config/api_config.dart';
 import '../../services/token_service.dart';
+import '../../widgets/organiser_bottom_nav.dart';
 import '../chat/chat_screen.dart';
 import '../../services/chat_service.dart';
 import '../rating/rating_screen.dart';
@@ -302,7 +303,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                         ),
                       ),
 
-                      const Spacer(),
+                      const SizedBox(height: 20),
 
                       SizedBox(
                         width: double.infinity,
@@ -360,6 +361,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                     ),
                   ),
                 ),
+      bottomNavigationBar: const OrganiserBottomNav(currentIndex: 0),
     );
   }
 }

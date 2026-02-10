@@ -1,6 +1,5 @@
 const pool = require("../config/db");
-const fs = require("fs");
-const path = require("path");
+// Removed fs and path imports - no longer needed for local file operations
 
 // ================= UPLOAD PROFILE PICTURE =================
 exports.uploadProfilePicture = async (req, res) => {
@@ -10,16 +9,9 @@ exports.uploadProfilePicture = async (req, res) => {
     console.log("UPLOAD PROFILE PICTURE - userId:", userId, "file:", req.file?.filename);
 
     if (!userId) {
-      if (req.file) {
-        try {
-          fs.unlinkSync(path.join(__dirname, "..", "uploads", req.file.filename));
-        } catch (e) {
-          console.log("Could not delete file:", e.message);
-        }
-      }
-      return res.status(401).json({ 
-        success: false, 
-        error: "Unauthorized" 
+      return res.status(401).json({
+        success: false,
+        error: "Unauthorized"
       });
     }
 
@@ -59,34 +51,13 @@ exports.uploadProfilePicture = async (req, res) => {
 
       if (result.rowCount === 0) {
         console.log("User not found for id:", userId);
-        // Delete uploaded file if user not found
-        if (req.file) {
-          try {
-            fs.unlinkSync(path.join(__dirname, "..", "uploads", req.file.filename));
-          } catch (e) {
-            console.log("Could not delete file:", e.message);
-          }
-        }
-        return res.status(404).json({ 
-          success: false, 
-          error: "User not found" 
+        return res.status(404).json({
+          success: false,
+          error: "User not found"
         });
       }
 
-      // Delete old profile picture file if it exists
-      if (oldPictureUrl) {
-        try {
-          const oldFilename = oldPictureUrl.split("/").pop();
-          const oldFilePath = path.join(__dirname, "..", "uploads", oldFilename);
-          if (fs.existsSync(oldFilePath)) {
-            fs.unlinkSync(oldFilePath);
-            console.log("Old profile picture deleted:", oldFilePath);
-          }
-        } catch (err) {
-          console.log("Could not delete old profile picture:", err.message);
-        }
-      }
-
+      // Old profile picture will remain in Cloudinary (can be cleaned up later if needed)
       console.log("Profile picture uploaded successfully for user:", userId);
       return res.status(200).json({
         success: true,
@@ -95,28 +66,12 @@ exports.uploadProfilePicture = async (req, res) => {
       });
     } catch (dbErr) {
       console.error("DATABASE ERROR:", dbErr);
-      // Delete uploaded file on DB error
-      if (req.file) {
-        try {
-          fs.unlinkSync(path.join(__dirname, "..", "uploads", req.file.filename));
-        } catch (e) {
-          console.log("Could not delete file:", e.message);
-        }
-      }
       throw dbErr;
     }
   } catch (err) {
     console.error("UPLOAD PROFILE PICTURE ERROR:", err);
-    // Delete uploaded file on error
-    if (req.file) {
-      try {
-        fs.unlinkSync(path.join(__dirname, "..", "uploads", req.file.filename));
-      } catch (e) {
-        console.log("Could not delete file:", e.message);
-      }
-    }
-    return res.status(500).json({ 
-      success: false, 
+    return res.status(500).json({
+      success: false,
       error: "Internal server error",
       details: err.message
     });
@@ -152,19 +107,7 @@ exports.deleteProfilePicture = async (req, res) => {
 
     const profilePictureUrl = userResult.rows[0]?.profile_picture_url;
 
-    // Delete the file from uploads folder
-    if (profilePictureUrl) {
-      try {
-        const filename = profilePictureUrl.split("/").pop();
-        const filePath = path.join(__dirname, "..", "uploads", filename);
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-          console.log("Profile picture file deleted:", filePath);
-        }
-      } catch (err) {
-        console.log("Could not delete file from uploads:", err.message);
-      }
-    }
+    // Profile picture remains in Cloudinary (can be cleaned up later if needed)
 
     // Clear profile picture URL from database
     const result = await pool.query(

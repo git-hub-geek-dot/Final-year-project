@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:frontend/widgets/app_background.dart';
 import '../../services/admin_service.dart';
 import 'package:flutter/widgets.dart';
+import '../../widgets/robust_image.dart';
 
 class AdminVerificationScreen extends StatefulWidget {
   const AdminVerificationScreen({super.key});
@@ -9,6 +10,153 @@ class AdminVerificationScreen extends StatefulWidget {
   @override
   State<AdminVerificationScreen> createState() =>
       _AdminVerificationScreenState();
+}
+
+// Custom widget for robust image loading with retry logic
+class _RobustImage extends StatefulWidget {
+  final String url;
+  final double? width;
+  final double? height;
+  final BoxFit fit;
+  final BorderRadius? borderRadius;
+  final Widget? placeholder;
+  final Widget? errorWidget;
+
+  const _RobustImage({
+    required this.url,
+    this.width,
+    this.height,
+    this.fit = BoxFit.cover,
+    this.borderRadius,
+    this.placeholder,
+    this.errorWidget,
+  });
+
+  @override
+  State<_RobustImage> createState() => _RobustImageState();
+}
+
+class _RobustImageState extends State<_RobustImage> {
+  bool _isLoading = true;
+  bool _hasError = false;
+  int _retryCount = 0;
+  static const int _maxRetries = 3;
+
+  @override
+  void didUpdateWidget(_RobustImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url) {
+      setState(() {
+        _isLoading = true;
+        _hasError = false;
+        _retryCount = 0;
+      });
+    }
+  }
+
+  void _retryLoading() {
+    if (_retryCount < _maxRetries) {
+      setState(() {
+        _isLoading = true;
+        _hasError = false;
+        _retryCount++;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Widget imageWidget = Image.network(
+      widget.url,
+      fit: widget.fit,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) {
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+              _hasError = false;
+            });
+          }
+          return child;
+        }
+        return Container(
+          color: Colors.grey[200],
+          child: const Center(
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+        );
+      },
+      errorBuilder: (context, error, stackTrace) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _hasError = true;
+          });
+        }
+
+        if (_retryCount < _maxRetries) {
+          Future.delayed(const Duration(seconds: 1), () {
+            if (mounted) {
+              _retryLoading();
+            }
+          });
+          return Container(
+            color: Colors.grey[200],
+            child: const Center(
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          );
+        }
+
+        return widget.errorWidget ??
+            Container(
+              color: Colors.grey[300],
+              child: const Icon(
+                Icons.broken_image,
+                color: Colors.grey,
+                size: 24,
+              ),
+            );
+      },
+    );
+
+    if (widget.borderRadius != null) {
+      imageWidget = ClipRRect(
+        borderRadius: widget.borderRadius!,
+        child: imageWidget,
+      );
+    }
+
+    return SizedBox(
+      width: widget.width,
+      height: widget.height,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          imageWidget,
+          if (_isLoading && !_hasError)
+            Container(
+              color: Colors.grey[200],
+              child: const Center(
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _AdminVerificationScreenState extends State<AdminVerificationScreen> {
@@ -52,8 +200,7 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen> {
             child: const Text("Cancel"),
           ),
           TextButton(
-            onPressed: () =>
-                Navigator.pop(context, controller.text.trim()),
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
             child: const Text(
               "Reject",
               style: TextStyle(color: Colors.red),
@@ -77,7 +224,8 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen> {
         final user = r["user"];
         final idType = r["idType"] ?? r["id_type"] ?? "-";
         final idNumber = r["idNumber"] ?? r["id_number"] ?? "-";
-        final organisationName = r["organisationName"] ?? r["organisation_name"];
+        final organisationName =
+            r["organisationName"] ?? r["organisation_name"];
         final eventProofUrl = r["eventProofUrl"] ?? r["event_proof_url"];
         final websiteLink = r["websiteLink"] ?? r["website_link"];
 
@@ -87,7 +235,9 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(user["name"] ?? "Unnamed", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                Text(user["name"] ?? "Unnamed",
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 6),
                 Text(user["email"] ?? ""),
                 const SizedBox(height: 6),
@@ -95,40 +245,50 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen> {
                 const SizedBox(height: 4),
                 Text("Status: ${r["status"]}"),
                 const Divider(height: 18),
-
                 Text("ID Type: $idType"),
                 const SizedBox(height: 4),
                 Text("ID Number: $idNumber"),
                 const SizedBox(height: 8),
-
-                if (organisationName != null && organisationName.toString().isNotEmpty) ...[
+                if (organisationName != null &&
+                    organisationName.toString().isNotEmpty) ...[
                   Text("Organisation: $organisationName"),
                   const SizedBox(height: 8),
                 ],
-
-                if (websiteLink != null && websiteLink.toString().isNotEmpty) ...[
+                if (websiteLink != null &&
+                    websiteLink.toString().isNotEmpty) ...[
                   SelectableText("Website: $websiteLink"),
                   const SizedBox(height: 8),
                 ],
-
                 if (eventProofUrl != null) ...[
-                  const Text("Event proof:", style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text("Event proof:",
+                      style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 6),
-                  SizedBox(height: 120, width: double.infinity, child: _buildPreviewImage(eventProofUrl)),
+                  SizedBox(
+                      height: 120,
+                      width: double.infinity,
+                      child: _buildPreviewImage(eventProofUrl)),
                   const SizedBox(height: 8),
                 ],
-
                 if ((r["idDocumentUrl"] ?? r["id_document_url"]) != null) ...[
-                  const Text("ID Proof:", style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text("ID Proof:",
+                      style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 6),
-                  SizedBox(height: 150, width: double.infinity, child: _buildPreviewImage(r["idDocumentUrl"] ?? r["id_document_url"])),
+                  SizedBox(
+                      height: 150,
+                      width: double.infinity,
+                      child: _buildPreviewImage(
+                          r["idDocumentUrl"] ?? r["id_document_url"])),
                   const SizedBox(height: 8),
                 ],
-
                 if ((r["selfieUrl"] ?? r["selfie_url"]) != null) ...[
-                  const Text("Selfie with ID:", style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text("Selfie with ID:",
+                      style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 6),
-                  SizedBox(height: 150, width: double.infinity, child: _buildPreviewImage(r["selfieUrl"] ?? r["selfie_url"])),
+                  SizedBox(
+                      height: 150,
+                      width: double.infinity,
+                      child: _buildPreviewImage(
+                          r["selfieUrl"] ?? r["selfie_url"])),
                   const SizedBox(height: 8),
                 ],
               ],
@@ -145,7 +305,8 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen> {
                   Navigator.of(context).pop();
                   await _reject(r["id"]);
                 },
-                child: const Text("Reject", style: TextStyle(color: Colors.red)),
+                child:
+                    const Text("Reject", style: TextStyle(color: Colors.red)),
               ),
               ElevatedButton(
                 onPressed: () async {
@@ -177,7 +338,8 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen> {
 
             if (snapshot.hasError) {
               return Center(
-                child: Text("Failed to load verification requests: ${snapshot.error}"),
+                child: Text(
+                    "Failed to load verification requests: ${snapshot.error}"),
               );
             }
 
@@ -185,18 +347,23 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen> {
 
             // Apply client-side filters
             final filtered = requests.where((r) {
-              final role = (r["role"] ?? r["user"]?['role'])?.toString().toLowerCase();
-              final status = (r["status"] ?? r["status"])?.toString().toLowerCase();
+              final role =
+                  (r["role"] ?? r["user"]?['role'])?.toString().toLowerCase();
+              final status =
+                  (r["status"] ?? r["status"])?.toString().toLowerCase();
 
-              final roleOk = _filterRole == 'all' || (role != null && role == _filterRole);
-              final statusOk = _filterStatus == 'all' || (status != null && status == _filterStatus);
+              final roleOk =
+                  _filterRole == 'all' || (role != null && role == _filterRole);
+              final statusOk = _filterStatus == 'all' ||
+                  (status != null && status == _filterStatus);
               return roleOk && statusOk;
             }).toList();
 
             return Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   child: Row(
                     children: [
                       Expanded(
@@ -204,35 +371,45 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen> {
                           value: _filterRole,
                           decoration: const InputDecoration(labelText: 'Role'),
                           items: const [
-                            DropdownMenuItem(value: 'all', child: Text('All Roles')),
-                            DropdownMenuItem(value: 'volunteer', child: Text('Volunteer')),
-                            DropdownMenuItem(value: 'organiser', child: Text('Organiser')),
+                            DropdownMenuItem(
+                                value: 'all', child: Text('All Roles')),
+                            DropdownMenuItem(
+                                value: 'volunteer', child: Text('Volunteer')),
+                            DropdownMenuItem(
+                                value: 'organiser', child: Text('Organiser')),
                           ],
-                          onChanged: (v) => setState(() => _filterRole = v ?? 'all'),
+                          onChanged: (v) =>
+                              setState(() => _filterRole = v ?? 'all'),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: DropdownButtonFormField<String>(
                           value: _filterStatus,
-                          decoration: const InputDecoration(labelText: 'Status'),
+                          decoration:
+                              const InputDecoration(labelText: 'Status'),
                           items: const [
-                            DropdownMenuItem(value: 'all', child: Text('All Statuses')),
-                            DropdownMenuItem(value: 'pending', child: Text('Pending')),
-                            DropdownMenuItem(value: 'approved', child: Text('Approved')),
-                            DropdownMenuItem(value: 'rejected', child: Text('Rejected')),
+                            DropdownMenuItem(
+                                value: 'all', child: Text('All Statuses')),
+                            DropdownMenuItem(
+                                value: 'pending', child: Text('Pending')),
+                            DropdownMenuItem(
+                                value: 'approved', child: Text('Approved')),
+                            DropdownMenuItem(
+                                value: 'rejected', child: Text('Rejected')),
                           ],
-                          onChanged: (v) => setState(() => _filterStatus = v ?? 'all'),
+                          onChanged: (v) =>
+                              setState(() => _filterStatus = v ?? 'all'),
                         ),
                       ),
                     ],
                   ),
                 ),
-
                 if (filtered.isEmpty)
                   const Expanded(
                     child: Center(
-                      child: Text("No verification requests match the filters."),
+                      child:
+                          Text("No verification requests match the filters."),
                     ),
                   )
                 else
@@ -253,18 +430,12 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen> {
                           margin: const EdgeInsets.only(bottom: 8),
                           child: ListTile(
                             onTap: () => _showDetailsModal(r),
-                            leading: thumb != null
-                                ? SizedBox(
+                            leading: thumb != null && thumb.isNotEmpty
+                                ? RobustImage(
+                                    url: thumb,
                                     width: 56,
                                     height: 56,
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(6),
-                                      child: Image.network(
-                                        thumb,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
-                                      ),
-                                    ),
+                                    borderRadius: BorderRadius.circular(6),
                                   )
                                 : const CircleAvatar(child: Icon(Icons.person)),
                             title: Text(user["name"] ?? "Unnamed"),
@@ -273,7 +444,8 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen> {
                               children: [
                                 Text(user["email"] ?? ""),
                                 const SizedBox(height: 4),
-                                Text("Role: ${r["role"]} • Status: ${r["status"]}"),
+                                Text(
+                                    "Role: ${r["role"]} • Status: ${r["status"]}"),
                               ],
                             ),
                             trailing: IconButton(
@@ -292,7 +464,7 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen> {
       ),
     );
   }
-  
+
   // Helper to build tappable preview images that open full-screen
   Widget _buildPreviewImage(String url) {
     return GestureDetector(
@@ -301,21 +473,42 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen> {
           context: context,
           builder: (context) => Dialog(
             child: InteractiveViewer(
-              child: Image.network(
-                url,
+              child: RobustImage(
+                url: url,
                 fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
+                errorWidget: Container(
+                  padding: const EdgeInsets.all(20),
+                  child: const Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.broken_image,
+                        size: 48,
+                        color: Colors.grey,
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        'Image not available',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
         );
       },
-      child: ClipRRect(
+      child: RobustImage(
+        url: url,
         borderRadius: BorderRadius.circular(8),
-        child: Image.network(
-          url,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image)),
+        errorWidget: Container(
+          color: Colors.grey[300],
+          child: const Icon(
+            Icons.broken_image,
+            color: Colors.grey,
+            size: 32,
+          ),
         ),
       ),
     );

@@ -7,7 +7,7 @@ import '../../services/saved_events_service.dart';
 import 'view_organiser_profile_screen.dart';
 import 'package:share_plus/share_plus.dart';
 import '../rating/rating_screen.dart';
-
+import '../../widgets/robust_image.dart';
 
 class ViewEventScreen extends StatefulWidget {
   final Map<String, dynamic> event;
@@ -36,7 +36,8 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
   }
 
   Future<void> _loadOrganiserPhoto() async {
-    final eventPhoto = widget.event["organiser_profile_picture_url"]?.toString();
+    final eventPhoto =
+        widget.event["organiser_profile_picture_url"]?.toString();
     final normalisedEventPhoto = _normalizeImageUrl(eventPhoto);
     if (normalisedEventPhoto != null) {
       setState(() {
@@ -112,8 +113,7 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() {
-          applicationStatus =
-              data["applied"] == true ? data["status"] : null;
+          applicationStatus = data["applied"] == true ? data["status"] : null;
           isLoadingStatus = false;
         });
       } else {
@@ -174,17 +174,17 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
-  title: const Text("Event Details"),
-  actions: [
-    IconButton(
-      icon: Icon(isSaved ? Icons.bookmark : Icons.bookmark_border),
-      onPressed: _toggleSaved,
-      tooltip: isSaved ? "Remove from saved" : "Save event",
-    ),
-    IconButton(
-      icon: const Icon(Icons.share),
-      onPressed: () {
-        final text = """
+        title: const Text("Event Details"),
+        actions: [
+          IconButton(
+            icon: Icon(isSaved ? Icons.bookmark : Icons.bookmark_border),
+            onPressed: _toggleSaved,
+            tooltip: isSaved ? "Remove from saved" : "Save event",
+          ),
+          IconButton(
+            icon: const Icon(Icons.share),
+            onPressed: () {
+              final text = """
 ${widget.event["title"]}
 Location: ${widget.event["location"]}
 Date: ${widget.event["event_date"].toString().split("T")[0]}
@@ -193,22 +193,20 @@ Date: ${widget.event["event_date"].toString().split("T")[0]}
 Join on VolunteerX
 """;
 
-        Share.share(text);
-      },
-    ),
-  ],
-),
-
+              Share.share(text);
+            },
+          ),
+        ],
+      ),
       body: Stack(
         children: [
           SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
             child: Column(
-  children: [
-    _eventBanner(),
-    const SizedBox(height: 16),
-    _eventHeaderCard(),
-
+              children: [
+                _eventBanner(),
+                const SizedBox(height: 16),
+                _eventHeaderCard(),
                 const SizedBox(height: 16),
                 _aboutCard(),
                 const SizedBox(height: 16),
@@ -228,8 +226,6 @@ Join on VolunteerX
       ),
     );
   }
-Widget _eventBanner() {
-  final imageUrl = widget.event["banner_url"];
 
   if (imageUrl == null || imageUrl.isEmpty) {
     return Container(
@@ -248,34 +244,23 @@ Widget _eventBanner() {
     );
   }
 
-  return ClipRRect(
-    borderRadius: const BorderRadius.only(
-      bottomLeft: Radius.circular(24),
-      bottomRight: Radius.circular(24),
-    ),
-    child: Image.network(
-      imageUrl,
-      height: 220,
-      width: double.infinity,
-      fit: BoxFit.cover,
-      loadingBuilder: (context, child, loadingProgress) {
-        if (loadingProgress == null) return child;
-        return Container(
-          height: 220,
-          color: Colors.grey.shade200,
-          child: const Center(child: CircularProgressIndicator()),
-        );
-      },
-      errorBuilder: (_, __, ___) {
-        return Container(
-          height: 220,
-          color: Colors.grey.shade300,
-          child: const Icon(Icons.image, size: 48),
-        );
-      },
-    ),
-  );
-}
+    if (imageUrl == null || imageUrl.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return ClipRRect(
+      borderRadius: const BorderRadius.only(
+        bottomLeft: Radius.circular(24),
+        bottomRight: Radius.circular(24),
+      ),
+      child: RobustImage(
+        url: imageUrl,
+        height: 220,
+        width: double.infinity,
+        fit: BoxFit.cover,
+      ),
+    );
+  }
 
   // ================= HEADER =================
   Widget _eventHeaderCard() {
@@ -389,8 +374,7 @@ Widget _eventBanner() {
           const SizedBox(height: 12),
           if (items.isEmpty)
             const Text("No responsibilities provided by organiser."),
-          if (items.isNotEmpty)
-            ...items.map(_checkItem),
+          if (items.isNotEmpty) ...items.map(_checkItem),
         ],
       ),
     );
@@ -456,18 +440,16 @@ Widget _eventBanner() {
     }
 
     return ClipOval(
-      child: Image.network(
-        imageUrl,
+      child: RobustImage(
+        url: imageUrl,
         width: size,
         height: size,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) {
-          return const CircleAvatar(
-            radius: 22,
-            backgroundColor: Colors.green,
-            child: Icon(Icons.eco, color: Colors.white),
-          );
-        },
+        errorWidget: const CircleAvatar(
+          radius: 22,
+          backgroundColor: Colors.green,
+          child: Icon(Icons.eco, color: Colors.white),
+        ),
       ),
     );
   }
@@ -596,57 +578,55 @@ Widget _eventBanner() {
   }
 
   Widget _card({required Widget child}) {
-  return Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(18),
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(22),
-      gradient: LinearGradient(
-        colors: [
-          Colors.white,
-          const Color(0xFFF7FAFF),
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.06),
-          blurRadius: 18,
-          offset: const Offset(0, 8),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        gradient: LinearGradient(
+          colors: [
+            Colors.white,
+            const Color(0xFFF7FAFF),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-      ],
-    ),
-    child: child,
-  );
-}
-
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
 
   Widget _iconRow(IconData icon, String text) {
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 10),
-    child: Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: Colors.green.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(8),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: Colors.green.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 16, color: Colors.green),
           ),
-          child: Icon(icon, size: 16, color: Colors.green),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(fontWeight: FontWeight.w500),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
           ),
-        ),
-      ],
-    ),
-  );
-}
-
+        ],
+      ),
+    );
+  }
 
   Widget _checkItem(String text) {
     return Padding(
@@ -662,31 +642,30 @@ Widget _eventBanner() {
   }
 
   Widget _statusPill(String text, Color color) {
-  return Container(
-    height: 52,
-    width: double.infinity,
-    decoration: BoxDecoration(
-      gradient: LinearGradient(
-        colors: [
-          color.withOpacity(0.15),
-          color.withOpacity(0.25),
-        ],
+    return Container(
+      height: 52,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            color.withOpacity(0.15),
+            color.withOpacity(0.25),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(30),
       ),
-      borderRadius: BorderRadius.circular(30),
-    ),
-    child: Center(
-      child: Text(
-        text,
-        style: TextStyle(
-          color: color,
-          fontWeight: FontWeight.w600,
-          fontSize: 15,
+      child: Center(
+        child: Text(
+          text,
+          style: TextStyle(
+            color: color,
+            fontWeight: FontWeight.w600,
+            fontSize: 15,
+          ),
         ),
       ),
-    ),
-  );
-}
-
+    );
+  }
 
   Color _statusColor(String status) {
     switch (status) {
@@ -715,83 +694,83 @@ Widget _eventBanner() {
   }
 
   void _snack(String msg) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   // ================= TERMS =================
   void _showTerms(BuildContext context) {
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
-    builder: (_) {
-      bool agreed = false;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) {
+        bool agreed = false;
 
-      return StatefulBuilder(
-        builder: (context, setState) {
-          return Padding(
-            padding: EdgeInsets.fromLTRB(
-              16,
-              16,
-              16,
-              MediaQuery.of(context).viewInsets.bottom + 16,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Center(
-                  child: Text(
-                    "Volunteer Terms & Conditions",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                MediaQuery.of(context).viewInsets.bottom + 16,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Center(
+                    child: Text(
+                      "Volunteer Terms & Conditions",
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-
-                const Text("• Participation is voluntary and does not constitute employment."),
-                const SizedBox(height: 8),
-                const Text("• Volunteers must follow organiser instructions and maintain respectful conduct."),
-                const SizedBox(height: 8),
-                const Text("• Volunteers are responsible for their own safety during the event."),
-                const SizedBox(height: 8),
-                const Text("• Accurate profile and contact information must be maintained at all times."),
-                const SizedBox(height: 8),
-                const Text(
-                  "• VolunteerX is not responsible for any payments, donations, reimbursements, or financial matters related to events; all such transactions are solely between the volunteer and the organiser.",
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-
-                const SizedBox(height: 16),
-
-                CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
-                  value: agreed,
-                  onChanged: (v) => setState(() => agreed = v!),
-                  title: const Text("I agree to the Terms & Conditions"),
-                ),
-
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: agreed
-                        ? () {
-                            Navigator.pop(context);
-                            _applyToEvent();
-                          }
-                        : null,
-                    child: const Text("Confirm & Apply"),
+                  const SizedBox(height: 16),
+                  const Text(
+                      "• Participation is voluntary and does not constitute employment."),
+                  const SizedBox(height: 8),
+                  const Text(
+                      "• Volunteers must follow organiser instructions and maintain respectful conduct."),
+                  const SizedBox(height: 8),
+                  const Text(
+                      "• Volunteers are responsible for their own safety during the event."),
+                  const SizedBox(height: 8),
+                  const Text(
+                      "• Accurate profile and contact information must be maintained at all times."),
+                  const SizedBox(height: 8),
+                  const Text(
+                    "• VolunteerX is not responsible for any payments, donations, reimbursements, or financial matters related to events; all such transactions are solely between the volunteer and the organiser.",
+                    style: TextStyle(fontWeight: FontWeight.w600),
                   ),
-                ),
-              ],
-            ),
-          );
-        },
-      );
-    },
-  );
+                  const SizedBox(height: 16),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: agreed,
+                    onChanged: (v) => setState(() => agreed = v!),
+                    title: const Text("I agree to the Terms & Conditions"),
+                  ),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: agreed
+                          ? () {
+                              Navigator.pop(context);
+                              _applyToEvent();
+                            }
+                          : null,
+                      child: const Text("Confirm & Apply"),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 }

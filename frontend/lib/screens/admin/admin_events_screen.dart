@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:frontend/widgets/app_background.dart';
 import 'package:frontend/widgets/error_state.dart';
 import '../../services/admin_service.dart';
+import 'admin_event_details_screen.dart';
 
 class AdminEventsScreen extends StatefulWidget {
   const AdminEventsScreen({super.key});
@@ -51,8 +52,8 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
                     children: [
                       Checkbox(
                         value: confirmHardDelete,
-                        onChanged: (value) =>
-                            setDialogState(() => confirmHardDelete = value ?? false),
+                        onChanged: (value) => setDialogState(
+                            () => confirmHardDelete = value ?? false),
                       ),
                       const Expanded(
                         child: Text(
@@ -148,139 +149,154 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
       body: AppBackground(
         child: loading
             ? const Center(child: CircularProgressIndicator())
-          : errorMessage != null
-            ? ErrorState(
-              message: errorMessage!,
-              onRetry: () => _fetchEvents(reset: true),
-              )
-            : Builder(
-                builder: (context) {
-                  final filtered = events.where((e) {
-                    return e["title"]
-                        .toString()
-                        .toLowerCase()
-                        .contains(search.toLowerCase());
-                  }).toList()
-                    ..sort((a, b) => _compareEvents(a, b));
+            : errorMessage != null
+                ? ErrorState(
+                    message: errorMessage!,
+                    onRetry: () => _fetchEvents(reset: true),
+                  )
+                : Builder(
+                    builder: (context) {
+                      final filtered = events.where((e) {
+                        return e["title"]
+                            .toString()
+                            .toLowerCase()
+                            .contains(search.toLowerCase());
+                      }).toList()
+                        ..sort((a, b) => _compareEvents(a, b));
 
-                  return Column(
-                    children: [
-                      // 🔍 Search
-                      Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: TextField(
-                          decoration: const InputDecoration(
-                            hintText: "Search event title",
-                            prefixIcon: Icon(Icons.search),
+                      return Column(
+                        children: [
+                          // 🔍 Search
+                          Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: TextField(
+                              decoration: const InputDecoration(
+                                hintText: "Search event title",
+                                prefixIcon: Icon(Icons.search),
+                              ),
+                              onChanged: (v) => setState(() => search = v),
+                            ),
                           ),
-                          onChanged: (v) => setState(() => search = v),
-                        ),
-                      ),
 
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: Row(
-                          children: [
-                            DropdownButton<String>(
-                              value: sortField,
-                              items: const [
-                                DropdownMenuItem(
-                                    value: "event_date", child: Text("Event Date")),
-                                DropdownMenuItem(
-                                    value: "title", child: Text("Title")),
-                                DropdownMenuItem(
-                                    value: "status", child: Text("Status")),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Row(
+                              children: [
+                                DropdownButton<String>(
+                                  value: sortField,
+                                  items: const [
+                                    DropdownMenuItem(
+                                        value: "event_date",
+                                        child: Text("Event Date")),
+                                    DropdownMenuItem(
+                                        value: "title", child: Text("Title")),
+                                    DropdownMenuItem(
+                                        value: "status", child: Text("Status")),
+                                  ],
+                                  onChanged: (v) =>
+                                      setState(() => sortField = v!),
+                                ),
+                                IconButton(
+                                  icon: Icon(
+                                    sortAsc
+                                        ? Icons.arrow_upward
+                                        : Icons.arrow_downward,
+                                  ),
+                                  onPressed: () =>
+                                      setState(() => sortAsc = !sortAsc),
+                                ),
                               ],
-                              onChanged: (v) =>
-                                  setState(() => sortField = v!),
                             ),
-                            IconButton(
-                              icon: Icon(
-                                sortAsc
-                                    ? Icons.arrow_upward
-                                    : Icons.arrow_downward,
-                              ),
-                              onPressed: () =>
-                                  setState(() => sortAsc = !sortAsc),
-                            ),
-                          ],
-                        ),
-                      ),
+                          ),
 
-                      Expanded(
-                        child: filtered.isEmpty
-                            ? const Center(child: Text("No events found"))
-                            : ListView.builder(
-                                itemCount: filtered.length + 1,
-                                itemBuilder: (context, i) {
-                                  if (i == filtered.length) {
-                                    final canLoadMore = page <= totalPages;
-                                    return Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 12),
-                                      child: Center(
-                                        child: canLoadMore
-                                            ? ElevatedButton(
-                                                onPressed: loadingMore
-                                                    ? null
-                                                    : () => _fetchEvents(),
-                                                child: loadingMore
-                                                    ? const SizedBox(
-                                                        width: 18,
-                                                        height: 18,
-                                                        child:
-                                                            CircularProgressIndicator(strokeWidth: 2),
-                                                      )
-                                                    : const Text("Load More"),
-                                              )
-                                            : const Text("No more events"),
-                                      ),
-                                    );
-                                  }
+                          Expanded(
+                            child: filtered.isEmpty
+                                ? const Center(child: Text("No events found"))
+                                : ListView.builder(
+                                    itemCount: filtered.length + 1,
+                                    itemBuilder: (context, i) {
+                                      if (i == filtered.length) {
+                                        final canLoadMore = page <= totalPages;
+                                        return Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 12),
+                                          child: Center(
+                                            child: canLoadMore
+                                                ? ElevatedButton(
+                                                    onPressed: loadingMore
+                                                        ? null
+                                                        : () => _fetchEvents(),
+                                                    child: loadingMore
+                                                        ? const SizedBox(
+                                                            width: 18,
+                                                            height: 18,
+                                                            child:
+                                                                CircularProgressIndicator(
+                                                                    strokeWidth:
+                                                                        2),
+                                                          )
+                                                        : const Text(
+                                                            "Load More"),
+                                                  )
+                                                : const Text("No more events"),
+                                          ),
+                                        );
+                                      }
 
-                                  final event = filtered[i];
-                                  final isDeleted =
-                                      event["status"] == "deleted";
+                                      final event = filtered[i];
+                                      final isDeleted =
+                                          event["status"] == "deleted";
 
-                                  return Opacity(
-                                    opacity: isDeleted ? 0.4 : 1.0,
-                                    child: Card(
-                                      child: ListTile(
-                                        title: Text(
-                                          isDeleted
-                                              ? "${event["title"]} (Deleted)"
-                                              : event["title"],
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            decoration: isDeleted
-                                                ? TextDecoration.lineThrough
-                                                : null,
+                                      return Opacity(
+                                        opacity: isDeleted ? 0.4 : 1.0,
+                                        child: Card(
+                                          child: ListTile(
+                                            onTap: () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (_) =>
+                                                      AdminEventDetailsScreen(
+                                                          event: event),
+                                                ),
+                                              );
+                                            },
+                                            title: Text(
+                                              isDeleted
+                                                  ? "${event["title"]} (Deleted)"
+                                                  : event["title"],
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                decoration: isDeleted
+                                                    ? TextDecoration.lineThrough
+                                                    : null,
+                                              ),
+                                            ),
+                                            subtitle: Text(
+                                              "Organiser: ${event["organiser_name"] ?? "N/A"}",
+                                            ),
+                                            trailing: IconButton(
+                                              icon: const Icon(
+                                                Icons.delete,
+                                                color: Colors.red,
+                                              ),
+                                              onPressed: isDeleted
+                                                  ? null
+                                                  : () async {
+                                                      await _confirmDelete(
+                                                          event);
+                                                    },
+                                            ),
                                           ),
                                         ),
-                                        subtitle: Text(
-                                          "Organiser: ${event["organiser_name"] ?? "N/A"}",
-                                        ),
-                                        trailing: IconButton(
-                                          icon: const Icon(
-                                            Icons.delete,
-                                            color: Colors.red,
-                                          ),
-                                          onPressed: isDeleted
-                                              ? null
-                                              : () async {
-                                                  await _confirmDelete(event);
-                                                },
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                      ),
-                    ],
-                  );
-                },
-              ),
+                                      );
+                                    },
+                                  ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
       ),
     );
   }
@@ -289,23 +305,24 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
     int result;
     switch (sortField) {
       case "title":
-        result = (a["title"] ?? "").toString().toLowerCase().compareTo(
-            (b["title"] ?? "").toString().toLowerCase());
+        result = (a["title"] ?? "")
+            .toString()
+            .toLowerCase()
+            .compareTo((b["title"] ?? "").toString().toLowerCase());
         break;
       case "status":
-        result = (a["status"] ?? "").toString().compareTo(
-            (b["status"] ?? "").toString());
+        result = (a["status"] ?? "")
+            .toString()
+            .compareTo((b["status"] ?? "").toString());
         break;
       case "event_date":
       default:
         final aDate = DateTime.tryParse((a["event_date"] ?? "").toString());
         final bDate = DateTime.tryParse((b["event_date"] ?? "").toString());
-        result = (aDate ?? DateTime(1970))
-            .compareTo(bDate ?? DateTime(1970));
+        result = (aDate ?? DateTime(1970)).compareTo(bDate ?? DateTime(1970));
         break;
     }
 
     return sortAsc ? result : -result;
   }
-
 }

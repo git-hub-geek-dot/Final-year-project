@@ -155,7 +155,7 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Compensation Status")),
+      appBar: AppBar(title: const Text("Payment Status")),
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : errorMessage != null

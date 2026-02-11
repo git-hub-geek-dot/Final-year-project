@@ -14,5 +14,10 @@ router.get(
 	authMiddleware,
 	ratingController.getRatingSummary
 );
+router.get(
+	"/ratings/:id/events",
+	authMiddleware,
+	ratingController.getEventRatings
+);
 
 module.exports = router;

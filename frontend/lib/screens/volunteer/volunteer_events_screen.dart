@@ -90,6 +90,11 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
     }
 
     final filtered = _filteredEvents();
+    final isSplitTab = selectedTab != "all";
+    final split = isSplitTab ? _splitByApplication(filtered) : null;
+    final openEvents = split?.open ?? const <Map<String, dynamic>>[];
+    final appliedEvents = split?.applied ?? const <Map<String, dynamic>>[];
+    final hasAny = filtered.isNotEmpty;
 
     return RefreshIndicator(
       onRefresh: widget.onRefresh,
@@ -100,12 +105,32 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
           const SizedBox(height: 12),
           _tabsRow(),
           const SizedBox(height: 12),
-          if (filtered.isEmpty)
+          if (!hasAny)
             const Padding(
               padding: EdgeInsets.only(top: 24),
               child: Center(child: Text("No events found")),
-            ),
-          ...filtered.map(_eventCard),
+            )
+          else if (!isSplitTab) ...[
+            ...filtered.map(_eventCard),
+          ] else ...[
+            if (appliedEvents.isEmpty && selectedTab == "past")
+              const Padding(
+                padding: EdgeInsets.only(top: 24),
+                child: Center(child: Text("No volunteer history yet")),
+              ),
+            if (appliedEvents.isNotEmpty) ...[
+              _sectionHeader("Applied Events"),
+              const SizedBox(height: 8),
+              ...appliedEvents.map(_eventCard),
+              if (openEvents.isNotEmpty && selectedTab != "past")
+                const SizedBox(height: 8),
+            ],
+            if (openEvents.isNotEmpty && selectedTab != "past") ...[
+              _sectionHeader("Open Events"),
+              const SizedBox(height: 8),
+              ...openEvents.map(_eventCard),
+            ],
+          ],
         ],
       ),
     );
@@ -455,6 +480,32 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
     }).toList();
 
     list.sort((a, b) {
+      // For "all" tab, prioritize unapplied events
+      if (selectedTab == "all") {
+        final aStatus = _applicationStatusForEvent(a) ??
+            (a["application_status"] ??
+                    a["applicationStatus"] ??
+                    a["my_application_status"] ??
+                    "")
+                .toString()
+                .toLowerCase();
+        final bStatus = _applicationStatusForEvent(b) ??
+            (b["application_status"] ??
+                    b["applicationStatus"] ??
+                    b["my_application_status"] ??
+                    "")
+                .toString()
+                .toLowerCase();
+        
+        final aIsUnapplied = aStatus.isEmpty;
+        final bIsUnapplied = bStatus.isEmpty;
+        
+        // Unapplied events come first
+        if (aIsUnapplied && !bIsUnapplied) return -1;
+        if (!aIsUnapplied && bIsUnapplied) return 1;
+      }
+      
+      // Then sort by date
       final aDate = DateTime.tryParse(a["event_date"]?.toString() ?? "");
       final bDate = DateTime.tryParse(b["event_date"]?.toString() ?? "");
       if (aDate == null || bDate == null) return 0;
@@ -462,6 +513,41 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
     });
 
     return list;
+  }
+
+  _SplitEvents _splitByApplication(List<Map<String, dynamic>> events) {
+    final open = <Map<String, dynamic>>[];
+    final applied = <Map<String, dynamic>>[];
+
+    for (final event in events) {
+      final status = _applicationStatusForEvent(event) ??
+          (event["application_status"] ??
+                  event["applicationStatus"] ??
+                  event["my_application_status"] ??
+                  "")
+              .toString()
+              .toLowerCase();
+      if (status.isEmpty) {
+        open.add(event);
+      } else {
+        applied.add(event);
+      }
+    }
+
+    return _SplitEvents(open: open, applied: applied);
+  }
+
+  Widget _sectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 4),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
   }
 
   bool _matchesDateFilter(DateTime eventDate, DateTime today) {
@@ -684,16 +770,22 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
   }
 
   Widget _eventImage(String? url) {
+    // Normalize localhost to 10.0.2.2 for Android emulator
+    String? normalizedUrl = url;
+    if (normalizedUrl != null && normalizedUrl.contains("localhost")) {
+      normalizedUrl = normalizedUrl.replaceAll("localhost", "10.0.2.2");
+    }
+    
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
       child: Container(
         width: 72,
         height: 72,
         color: const Color(0xFFEAF0FF),
-        child: url == null || url.isEmpty
+        child: normalizedUrl == null || normalizedUrl.isEmpty
             ? const Icon(Icons.image, color: Color(0xFF2E6BE6))
             : Image.network(
-                url,
+                normalizedUrl,
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) {
                   return const Icon(Icons.image, color: Color(0xFF2E6BE6));
@@ -775,4 +867,11 @@ class _ActionState {
   final Color color;
 
   const _ActionState(this.label, this.isEnabled, this.color);
+}
+
+class _SplitEvents {
+  final List<Map<String, dynamic>> open;
+  final List<Map<String, dynamic>> applied;
+
+  const _SplitEvents({required this.open, required this.applied});
 }

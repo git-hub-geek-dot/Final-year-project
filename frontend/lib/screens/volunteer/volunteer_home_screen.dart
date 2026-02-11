@@ -7,6 +7,7 @@ import 'leaderboard_screen.dart';
 import 'view_event_screen.dart';
 import 'volunteer_events_screen.dart';
 import '../../config/api_config.dart';
+import '../../config/goa_cities.dart';
 import '../../services/saved_events_service.dart';
 import '../../services/token_service.dart';
 import '../../theme/app_colors.dart';
@@ -29,6 +30,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
   bool loadingApplications = true;
   Set<String> savedEventIds = {};
   String? userName;
+  String? userCity;
 
   final GlobalKey _introKey = GlobalKey();
   final GlobalKey _upcomingHeaderKey = GlobalKey();
@@ -102,6 +104,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
         final data = jsonDecode(response.body);
         setState(() {
           userName = data["name"]?.toString();
+          userCity = data["city"]?.toString();
         });
       }
     } catch (_) {
@@ -253,20 +256,26 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
 
     final primaryShown = primaryEvents.isEmpty
         ? 1
-        : (available / upcomingCardHeight).floor().clamp(
-              primaryEvents.length >= 2 ? 2 : 1,
-              primaryEvents.length,
-            );
+        : primaryEvents.length.clamp(1, 2);
     available -= primaryShown * upcomingCardHeight;
     if (available < 0) {
       available = 0;
     }
 
     final recommendedShown = recommended.isEmpty
-        ? 0
-        : (available / recommendedCardHeight)
-            .floor()
-            .clamp(1, recommended.length);
+      ? 0
+      : (() {
+        final computed =
+          (available / recommendedCardHeight).floor().clamp(1, recommended.length);
+        final minShown = 3;
+        final maxShownWhenNoPrimary = 5;
+        final base = primaryEvents.isEmpty
+          ? computed.clamp(minShown, maxShownWhenNoPrimary)
+          : computed < minShown
+            ? minShown
+            : computed;
+        return base.clamp(1, recommended.length);
+        })();
     final primaryPreview = primaryEvents.take(primaryShown).toList();
     final recommendedPreview = recommended.take(recommendedShown).toList();
     final showUpcomingViewAll = primaryEvents.length > primaryShown;
@@ -310,20 +319,14 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      isOngoing ? "Ongoing Events" : "Upcoming Events",
+                      isOngoing
+                          ? "My Ongoing Events"
+                          : "My Upcoming Events",
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    if (showUpcomingViewAll)
-                      TextButton(
-                        onPressed: () => setState(() {
-                          eventsTab = isOngoing ? "ongoing" : "upcoming";
-                          selectedIndex = 1;
-                        }),
-                        child: const Text("View All"),
-                      ),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -359,7 +362,6 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
             _upcomingEventCard(
               null,
               key: _upcomingCardKey,
-              badgeLabel: isOngoing ? "Ongoing Event" : "Upcoming Event",
               emptyLabel:
                   isOngoing ? "No ongoing events yet" : "No upcoming events yet",
             ),
@@ -367,9 +369,19 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                 (entry) => _upcomingEventCard(
                   entry.value,
                   key: entry.key == 0 ? _upcomingCardKey : null,
-                  badgeLabel: isOngoing ? "Ongoing Event" : "Upcoming Event",
                 ),
               ),
+          if (showUpcomingViewAll)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => setState(() {
+                  eventsTab = isOngoing ? "ongoing" : "upcoming";
+                  selectedIndex = 1;
+                }),
+                child: const Text("View All"),
+              ),
+            ),
           const SizedBox(height: 16),
           Container(
             key: _recommendedHeaderKey,
@@ -380,11 +392,6 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                 "Recommended for You",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              if (showRecommendedViewAll)
-                TextButton(
-                  onPressed: () => setState(() => selectedIndex = 1),
-                  child: const Text("View All"),
-                ),
             ],
           ),
           ),
@@ -397,6 +404,14 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                   key: entry.key == 0 ? _recommendedCardKey : null,
                 ),
               ),
+          if (showRecommendedViewAll)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => setState(() => selectedIndex = 1),
+                child: const Text("View All"),
+              ),
+            ),
         ],
       ),
     );
@@ -456,10 +471,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     final upcoming = myApplications
         .where((app) {
           final status = app["status"]?.toString().toLowerCase() ?? "";
-          if (status != "accepted" && status != "approved") {
-            return false;
-          }
-          return true;
+          return status == "accepted" || status == "approved";
         })
         .map((app) {
           final eventId = app["event_id"]?.toString() ??
@@ -489,10 +501,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     final ongoing = myApplications
         .where((app) {
           final status = app["status"]?.toString().toLowerCase() ?? "";
-          if (status != "accepted" && status != "approved") {
-            return false;
-          }
-          return true;
+          return status == "accepted" || status == "approved";
         })
         .map((app) {
           final eventId = app["event_id"]?.toString() ??
@@ -561,12 +570,17 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
             (app["status"]?.toString().toLowerCase() ?? ""),
     };
 
-    int rankForStatus(String status) {
-      if (status.isEmpty) return 0; // Apply
-      if (status == "pending") return 1;
-      if (status == "accepted" || status == "approved") return 2;
-      if (status == "rejected") return 3;
-      return 4;
+    // Extract categories from events user has applied to
+    final Set<String> interestedCategories = {};
+    for (final app in myApplications) {
+      final categories = app["categories"];
+      if (categories is List) {
+        for (final cat in categories) {
+          if (cat != null) {
+            interestedCategories.add(cat.toString().toLowerCase().trim());
+          }
+        }
+      }
     }
 
     final upcoming = events
@@ -576,22 +590,55 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
           }
           final status =
               statusByEventId[e["id"]?.toString() ?? ""] ?? "";
-          return status.isEmpty || status == "rejected";
+          return status.isEmpty; // only unapplied events
         })
         .map((e) => Map<String, dynamic>.from(e))
         .toList();
 
-    upcoming.sort((a, b) {
-      final aStatus = statusByEventId[a["id"]?.toString() ?? ""] ?? "";
-      final bStatus = statusByEventId[b["id"]?.toString() ?? ""] ?? "";
-      final rankDiff = rankForStatus(aStatus).compareTo(rankForStatus(bStatus));
-      if (rankDiff != 0) return rankDiff;
-
-      final aDate = DateTime.tryParse(a["event_date"]?.toString() ?? "");
-      final bDate = DateTime.tryParse(b["event_date"]?.toString() ?? "");
-      if (aDate == null || bDate == null) return 0;
-      return aDate.compareTo(bDate);
-    });
+    // Priority sorting: Categories > Distance > Date
+    if (interestedCategories.isNotEmpty) {
+      // User has applied to events, prioritize by category match
+      upcoming.sort((a, b) {
+        // Check if events match user's interested categories
+        final aCategories = a["categories"] is List ? a["categories"] as List : [];
+        final bCategories = b["categories"] is List ? b["categories"] as List : [];
+        
+        final aHasMatch = aCategories.any((cat) => 
+          interestedCategories.contains(cat?.toString().toLowerCase().trim() ?? ""));
+        final bHasMatch = bCategories.any((cat) => 
+          interestedCategories.contains(cat?.toString().toLowerCase().trim() ?? ""));
+        
+        // Category match comes first
+        if (aHasMatch && !bHasMatch) return -1;
+        if (!aHasMatch && bHasMatch) return 1;
+        
+        // If both match or both don't match, sort by distance
+        if (userCity != null && userCity!.isNotEmpty && GoaCities.isKnownCity(userCity!)) {
+          final aLocation = a["location"]?.toString() ?? "";
+          final bLocation = b["location"]?.toString() ?? "";
+          
+          final aDistance = GoaCities.calculateDistance(userCity!, aLocation);
+          final bDistance = GoaCities.calculateDistance(userCity!, bLocation);
+          
+          final distanceCompare = aDistance.compareTo(bDistance);
+          if (distanceCompare != 0) return distanceCompare;
+        }
+        
+        // If same category match and distance, sort by date
+        final aDate = DateTime.tryParse(a["event_date"]?.toString() ?? "");
+        final bDate = DateTime.tryParse(b["event_date"]?.toString() ?? "");
+        if (aDate == null || bDate == null) return 0;
+        return aDate.compareTo(bDate);
+      });
+    } else {
+      // No applications yet, fallback to date-based sorting
+      upcoming.sort((a, b) {
+        final aDate = DateTime.tryParse(a["event_date"]?.toString() ?? "");
+        final bDate = DateTime.tryParse(b["event_date"]?.toString() ?? "");
+        if (aDate == null || bDate == null) return 0;
+        return aDate.compareTo(bDate);
+      });
+    }
 
     return upcoming;
   }
@@ -599,7 +646,6 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
   Widget _upcomingEventCard(
     Map<String, dynamic>? event, {
     Key? key,
-    String badgeLabel = "Upcoming Event",
     String emptyLabel = "No upcoming events yet",
   }) {
     if (event == null) {
@@ -661,25 +707,6 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF2E6BE6), Color(0xFF2ECC71)],
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      badgeLabel,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
                   Text(
                     event["title"] ?? "",
                     style: const TextStyle(
@@ -924,16 +951,22 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
   }
 
   Widget _eventImage(String? url) {
+    // Normalize localhost to 10.0.2.2 for Android emulator
+    String? normalizedUrl = url;
+    if (normalizedUrl != null && normalizedUrl.contains("localhost")) {
+      normalizedUrl = normalizedUrl.replaceAll("localhost", "10.0.2.2");
+    }
+    
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: Container(
         width: 92,
         height: 92,
         color: const Color(0xFFEAF0FF),
-        child: url == null || url.isEmpty
+        child: normalizedUrl == null || normalizedUrl.isEmpty
             ? const Icon(Icons.image, color: Color(0xFF2E6BE6))
             : RobustImage(
-                url: url,
+                url: normalizedUrl,
                 fit: BoxFit.cover,
                 errorWidget: Container(
                   color: const Color(0xFFEAF0FF),

@@ -118,10 +118,17 @@ exports.getMyApplications = async (req, res) => {
         e.location,
         e.event_date,
         e.event_type,
-        e.payment_per_day
+        e.payment_per_day,
+        COALESCE(
+          array_agg(DISTINCT c.name) FILTER (WHERE c.name IS NOT NULL),
+          '{}'
+        ) AS categories
       FROM applications a
       JOIN events e ON e.id = a.event_id
+      LEFT JOIN event_categories ec ON ec.event_id = e.id
+      LEFT JOIN categories c ON c.id = ec.category_id
       WHERE a.volunteer_id = $1
+      GROUP BY a.id, a.status, a.applied_at, a.compensation_status, e.id, e.title, e.location, e.event_date, e.event_type, e.payment_per_day
       ORDER BY a.applied_at DESC
       `,
       [volunteerId]

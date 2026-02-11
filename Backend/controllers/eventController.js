@@ -249,9 +249,13 @@ exports.getAllEvents = async (req, res) => {
         u.name AS organiser_name,
         u.profile_picture_url AS organiser_profile_picture_url,
         COALESCE(
-          array_agg(er.responsibility) FILTER (WHERE er.responsibility IS NOT NULL),
+          array_agg(DISTINCT er.responsibility) FILTER (WHERE er.responsibility IS NOT NULL),
           '{}'
         ) AS responsibilities,
+        COALESCE(
+          array_agg(DISTINCT c.name) FILTER (WHERE c.name IS NOT NULL),
+          '{}'
+        ) AS categories,
         CASE
           WHEN NOW() < (event_date + COALESCE(start_time, TIME '00:00:00')) THEN 'upcoming'
           WHEN NOW() BETWEEN (event_date + COALESCE(start_time, TIME '00:00:00'))
@@ -261,6 +265,8 @@ exports.getAllEvents = async (req, res) => {
       FROM events e
       JOIN users u ON e.organiser_id = u.id
       LEFT JOIN event_responsibilities er ON er.event_id = e.id
+      LEFT JOIN event_categories ec ON ec.event_id = e.id
+      LEFT JOIN categories c ON c.id = ec.category_id
       WHERE e.status = 'open'
       GROUP BY e.id, u.name, u.profile_picture_url
       ORDER BY event_date ASC

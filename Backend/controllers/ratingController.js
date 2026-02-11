@@ -121,11 +121,13 @@ const getRatingsForUser = async (req, res) => {
     const ratings = await pool.query(
       `
       SELECT r.id, r.event_id, r.rater_id, r.ratee_id, r.score, r.comment, r.created_at,
-             u.name AS rater_name
+             u.name AS rater_name,
+             e.title AS event_title
       FROM ratings r
       LEFT JOIN users u ON u.id = r.rater_id
+      LEFT JOIN events e ON e.id = r.event_id
       WHERE r.ratee_id = $1
-      ORDER BY r.created_at DESC
+      ORDER BY r.score DESC, r.created_at DESC
       `,
       [userId]
     );
@@ -141,13 +143,21 @@ const getRatingSummary = async (req, res) => {
   try {
     const userId = req.params.id;
 
+    // Calculate average rating per event, then average those
     const result = await pool.query(
       `
+      WITH event_averages AS (
+        SELECT
+          event_id,
+          AVG(score) AS event_avg_rating
+        FROM ratings
+        WHERE ratee_id = $1
+        GROUP BY event_id
+      )
       SELECT
-        COALESCE(AVG(score), 0) AS avg_rating,
-        COUNT(*)::int AS review_count
-      FROM ratings
-      WHERE ratee_id = $1
+        COALESCE(AVG(event_avg_rating), 0) AS avg_rating,
+        (SELECT COUNT(*)::int FROM ratings WHERE ratee_id = $1) AS review_count
+      FROM event_averages
       `,
       [userId]
     );
@@ -164,8 +174,39 @@ const getRatingSummary = async (req, res) => {
   }
 };
 
+const getEventRatings = async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    const result = await pool.query(
+      `
+      SELECT
+        e.id AS event_id,
+        e.title AS event_title,
+        e.event_date,
+        COALESCE(AVG(r.score), 0) AS avg_rating,
+        COUNT(r.id)::int AS review_count
+      FROM events e
+      LEFT JOIN ratings r ON r.event_id = e.id AND r.ratee_id = $1
+      WHERE e.organiser_id = $1
+      GROUP BY e.id, e.title, e.event_date
+      HAVING COUNT(r.id) > 0
+      ORDER BY e.event_date DESC
+      LIMIT 5
+      `,
+      [userId]
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("GET EVENT RATINGS ERROR:", err);
+    res.status(500).json({ error: "Failed to fetch event ratings" });
+  }
+};
+
 module.exports = {
   giveRating,
   getRatingsForUser,
   getRatingSummary,
+  getEventRatings,
 };

@@ -274,6 +274,49 @@ exports.getAllEvents = async (req, res) => {
 };
 
 // =======================================================
+// PUBLIC: SINGLE EVENT DETAILS
+// =======================================================
+exports.getEventById = async (req, res) => {
+  try {
+    const eventId = req.params.id;
+
+    const result = await pool.query(
+      `
+      SELECT
+        e.*,
+        u.name AS organiser_name,
+        u.profile_picture_url AS organiser_profile_picture_url,
+        COALESCE(
+          array_agg(er.responsibility) FILTER (WHERE er.responsibility IS NOT NULL),
+          '{}'
+        ) AS responsibilities,
+        CASE
+          WHEN NOW() < (event_date + COALESCE(start_time, TIME '00:00:00')) THEN 'upcoming'
+          WHEN NOW() BETWEEN (event_date + COALESCE(start_time, TIME '00:00:00'))
+                          AND (COALESCE(end_date, event_date) + COALESCE(end_time, TIME '23:59:59')) THEN 'ongoing'
+          ELSE 'completed'
+        END AS computed_status
+      FROM events e
+      JOIN users u ON e.organiser_id = u.id
+      LEFT JOIN event_responsibilities er ON er.event_id = e.id
+      WHERE e.id = $1 AND e.status != 'deleted'
+      GROUP BY e.id, u.name, u.profile_picture_url
+      `,
+      [eventId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("GET EVENT ERROR:", err);
+    res.status(500).json({ error: "Failed to fetch event" });
+  }
+};
+
+// =======================================================
 // LEADERBOARD (AUTHENTICATED)
 // =======================================================
 exports.getVolunteerLeaderboard = async (req, res) => {

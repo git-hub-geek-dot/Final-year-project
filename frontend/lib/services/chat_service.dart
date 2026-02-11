@@ -82,4 +82,29 @@ class ChatService {
 
     throw Exception("Failed to fetch threads");
   }
+
+  static Future<Map<String, dynamic>> sendMessage({
+    required int threadId,
+    required String message,
+  }) async {
+    final token = await TokenService.getToken();
+    if (token == null || token.isEmpty) {
+      throw Exception("Token not found");
+    }
+
+    final response = await http.post(
+      Uri.parse("${ApiConfig.baseUrl}/chat/thread/$threadId/messages"),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({"message": message}),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+
+    throw Exception("Failed to send message");
+  }
 }

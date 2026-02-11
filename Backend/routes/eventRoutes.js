@@ -5,6 +5,7 @@ const {
   createEvent,
   getMyEvents,
   getAllEvents,
+  getEventById,
   getVolunteerLeaderboard,
   getOrganiserLeaderboard,
   updateEvent,
@@ -39,6 +40,7 @@ router.get(
 );
 
 // ================= PUBLIC =================
+router.get("/events/:id", getEventById);
 router.get("/events", getAllEvents);
 
 module.exports = router;

@@ -4,8 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../../config/api_config.dart';
 import '../../services/token_service.dart';
-import '../../services/chat_service.dart';
-import '../chat/chat_screen.dart';
+import 'view_event_screen.dart';
 
 class MyApplicationsScreen extends StatefulWidget {
   const MyApplicationsScreen({super.key});
@@ -92,6 +91,40 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
     }
   }
 
+  Future<void> openEventDetails(int eventId) async {
+    try {
+      final response = await http.get(
+        Uri.parse("${ApiConfig.baseUrl}/events/$eventId"),
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final event = data is Map<String, dynamic>
+            ? data
+            : Map<String, dynamic>.from(data as Map);
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ViewEventScreen(event: event),
+          ),
+        );
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to load event details")),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to load event details")),
+      );
+    }
+  }
+
   Color statusColor(String status) {
     switch (status.toLowerCase()) {
       case "accepted":
@@ -159,32 +192,12 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                             title: Text(title),
                             subtitle: Text(location),
                             onTap: () async {
-                              try {
-                                final eventId = app["event_id"]; 
-                                if (eventId == null) return;
-
-                                final thread = await ChatService.getOrCreateThread(
-                                  eventId: eventId,
-                                );
-
-                                if (!context.mounted) return;
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ChatScreen(
-                                      threadId: thread["id"],
-                                      title: "Chat",
-                                    ),
-                                  ),
-                                );
-                              } catch (_) {
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text("Failed to open chat"),
-                                  ),
-                                );
-                              }
+                              final raw = app["event_id"];
+                              final eventId = raw is int
+                                  ? raw
+                                  : int.tryParse(raw?.toString() ?? "");
+                              if (eventId == null) return;
+                              await openEventDetails(eventId);
                             },
                             trailing: Chip(
                               label: Text(status.toString().toUpperCase()),

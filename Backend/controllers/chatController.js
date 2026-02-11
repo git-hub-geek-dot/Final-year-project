@@ -68,32 +68,25 @@ exports.getOrCreateThread = async (req, res) => {
     let organiserId;
     let resolvedVolunteerId;
 
-    if (role === "organiser") {
-      if (!volunteerId) {
-        return res.status(400).json({ error: "volunteerId is required" });
-      }
-      organiserId = userId;
-      resolvedVolunteerId = volunteerId;
+    if (role !== "organiser") {
+      return res
+        .status(403)
+        .json({ error: "Only organisers can start a chat" });
+    }
 
-      const eventCheck = await pool.query(
-        "SELECT id FROM events WHERE id = $1 AND organiser_id = $2",
-        [eventId, organiserId]
-      );
-      if (eventCheck.rows.length === 0) {
-        return res.status(403).json({ error: "Not your event" });
-      }
-    } else if (role === "volunteer") {
-      resolvedVolunteerId = userId;
-      const eventResult = await pool.query(
-        "SELECT organiser_id FROM events WHERE id = $1",
-        [eventId]
-      );
-      if (eventResult.rows.length === 0) {
-        return res.status(404).json({ error: "Event not found" });
-      }
-      organiserId = eventResult.rows[0].organiser_id;
-    } else {
-      return res.status(403).json({ error: "Role not allowed" });
+    if (!volunteerId) {
+      return res.status(400).json({ error: "volunteerId is required" });
+    }
+
+    organiserId = userId;
+    resolvedVolunteerId = volunteerId;
+
+    const eventCheck = await pool.query(
+      "SELECT id FROM events WHERE id = $1 AND organiser_id = $2",
+      [eventId, organiserId]
+    );
+    if (eventCheck.rows.length === 0) {
+      return res.status(403).json({ error: "Not your event" });
     }
 
     const existing = await pool.query(
@@ -158,8 +151,13 @@ exports.sendMessage = async (req, res) => {
     const threadId = parseInt(req.params.threadId, 10);
     const { message } = req.body;
 
-    if (!message || message.trim().isEmpty) {
+    const text = message ? String(message).trim() : "";
+    if (!text) {
       return res.status(400).json({ error: "Message is required" });
+    }
+
+    if (text.length > 1000) {
+      return res.status(400).json({ error: "Message too long" });
     }
 
     const thread = await getThreadForUser(threadId, userId);
@@ -173,7 +171,7 @@ exports.sendMessage = async (req, res) => {
       VALUES ($1, $2, $3)
       RETURNING id, thread_id, sender_id, message, created_at
       `,
-      [threadId, userId, message.trim()]
+      [threadId, userId, text]
     );
 
     const recipientId =
@@ -184,7 +182,7 @@ exports.sendMessage = async (req, res) => {
     try {
       await notifyUser(recipientId, {
         title: "New message",
-        body: message.trim(),
+        body: text,
         data: { type: "chat_message", threadId: String(threadId) },
       });
     } catch (notifyErr) {

@@ -75,7 +75,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                         ),
                       ),
                       title: Text(peerName.toString()),
-                      subtitle: Text("$eventTitle · $lastMessage"),
+                      subtitle: Text("$eventTitle - $lastMessage"),
                       onTap: () {
                         Navigator.push(
                           context,

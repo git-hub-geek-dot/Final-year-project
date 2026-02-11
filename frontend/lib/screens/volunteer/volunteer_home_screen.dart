@@ -253,9 +253,10 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
 
     final primaryShown = primaryEvents.isEmpty
         ? 1
-        : (available / upcomingCardHeight)
-            .floor()
-            .clamp(2, primaryEvents.length);
+        : (available / upcomingCardHeight).floor().clamp(
+              primaryEvents.length >= 2 ? 2 : 1,
+              primaryEvents.length,
+            );
     available -= primaryShown * upcomingCardHeight;
     if (available < 0) {
       available = 0;

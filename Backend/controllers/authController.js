@@ -207,6 +207,13 @@ exports.register = async (req, res) => {
       });
     }
 
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters",
+      });
+    }
+
     const finalRole = role ?? "volunteer";
 
     // Allowed roles
@@ -495,57 +502,47 @@ exports.forgotPassword = async (req, res) => {
     }
 
     const user = result.rows[0];
-    const resetSecret =
-      process.env.RESET_PASSWORD_SECRET || process.env.JWT_SECRET;
+    const normalized = normalizeIdentifier(email);
+    const otp = generateOtp();
+    const otpHash = hashOtp(normalized, otp);
+    const expiresAt = getExpiryDate();
 
-    const token = jwt.sign(
-      { id: user.id, email: user.email },
-      resetSecret,
-      { expiresIn: "15m" }
+    await pool.query(
+      `
+      INSERT INTO otp_verifications (identifier, channel, "codeHash", expires_at)
+      VALUES ($1, $2, $3, $4)
+      `,
+      [normalized, "email", otpHash, expiresAt]
     );
 
-    const resetUrlBase = process.env.RESET_PASSWORD_URL || "";
-    const resetUrl = resetUrlBase
-      ? `${resetUrlBase}?token=${encodeURIComponent(token)}`
-      : null;
-
-    if (!process.env.RESEND_API_KEY) {
-      return res.status(500).json({
-        success: false,
-        message: "Email service not configured",
-      });
-    }
-
     const fromAddress =
-      process.env.RESEND_FROM || "onboarding@resend.dev";
+      process.env.SENDGRID_FROM || process.env.SENDGRID_FROM_EMAIL || "noreply@volunteerx.com";
 
     const text =
       `Hi ${user.name || ""},\n\n` +
       "We received a request to reset your password.\n" +
-      "Use the token below in the app to reset your password.\n\n" +
-      `Reset Token: ${token}\n\n` +
-      (resetUrl ? `Or open this link: ${resetUrl}\n\n` : "") +
-      "This token expires in 15 minutes. If you did not request this, ignore this email.";
+      "Use the OTP below in the app to reset your password.\n\n" +
+      `Reset OTP: ${otp}\n\n` +
+      "This OTP expires in 10 minutes. If you did not request this, ignore this email.";
 
     const html = `
       <p>Hi ${user.name || ""},</p>
       <p>We received a request to reset your password.</p>
-      <p><strong>Reset Token:</strong> ${token}</p>
-      ${resetUrl ? `<p><a href="${resetUrl}">Reset Password</a></p>` : ""}
-      <p>This token expires in 15 minutes. If you did not request this, ignore this email.</p>
+      <p><strong>Reset OTP:</strong> ${otp}</p>
+      <p>This OTP expires in 10 minutes. If you did not request this, ignore this email.</p>
     `;
 
     await sendEmail({
       from: fromAddress,
       to: user.email,
-      subject: "Password Reset - VolunteerX",
+      subject: "Password Reset OTP - VolunteerX",
       text,
       html,
     });
 
     return res.status(200).json({
       success: true,
-      message: "If the email exists, a reset link has been sent.",
+      message: "If the email exists, a reset OTP has been sent.",
     });
   } catch (err) {
     console.error("FORGOT PASSWORD ERROR:", err);
@@ -559,12 +556,12 @@ exports.forgotPassword = async (req, res) => {
 // ================= RESET PASSWORD =================
 exports.resetPassword = async (req, res) => {
   try {
-    const { token, password } = req.body;
+    const { email, otp, password } = req.body;
 
-    if (!token || !password) {
+    if (!email || !otp || !password) {
       return res.status(400).json({
         success: false,
-        message: "Token and new password are required",
+        message: "Email, OTP and new password are required",
       });
     }
 
@@ -575,37 +572,75 @@ exports.resetPassword = async (req, res) => {
       });
     }
 
-    const resetSecret =
-      process.env.RESET_PASSWORD_SECRET || process.env.JWT_SECRET;
+    const normalized = normalizeIdentifier(email);
+    const otpHash = hashOtp(normalized, otp);
 
-    let payload;
-    try {
-      payload = jwt.verify(token, resetSecret);
-    } catch (err) {
+    // Verify OTP
+    const otpResult = await pool.query(
+      `
+      SELECT id
+      FROM otp_verifications
+      WHERE identifier = $1
+        AND channel = $2
+        AND "codeHash" = $3
+        AND expires_at > NOW()
+        AND verified_at IS NULL
+      ORDER BY created_at DESC
+      LIMIT 1
+      `,
+      [normalized, "email", otpHash]
+    );
+
+    if (otpResult.rows.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Invalid or expired token",
+        message: "Invalid or expired OTP",
       });
     }
 
+    // Get user by email
+    const userResult = await pool.query(
+      "SELECT id, email FROM users WHERE email = $1",
+      [email]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const user = userResult.rows[0];
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const result = await pool.query(
+    // Update password
+    const updateResult = await pool.query(
       `
       UPDATE users
       SET password = $1
       WHERE id = $2
       RETURNING id, email
       `,
-      [hashedPassword, payload.id]
+      [hashedPassword, user.id]
     );
 
-    if (result.rows.length === 0) {
+    if (updateResult.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: "User not found",
       });
     }
+
+    // Mark OTP as verified
+    await pool.query(
+      `
+      UPDATE otp_verifications
+      SET verified_at = NOW()
+      WHERE id = $1
+      `,
+      [otpResult.rows[0].id]
+    );
 
     return res.status(200).json({
       success: true,

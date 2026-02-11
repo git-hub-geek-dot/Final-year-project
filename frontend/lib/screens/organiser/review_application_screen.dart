@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/event_service.dart';
+import '../../widgets/organiser_bottom_nav.dart';
 import 'view_application_screen.dart';
 
 class ReviewApplicationsScreen extends StatefulWidget {
@@ -66,8 +67,8 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: const [
-                Text(
+              children: [
+                const Text(
                   "Volunteerx",
                   style: TextStyle(
                     color: Colors.white,
@@ -75,7 +76,16 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                Icon(Icons.notifications, color: Colors.white),
+                IconButton(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Notifications screen coming soon.'),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.notifications, color: Colors.white),
+                ),
               ],
             ),
           ),
@@ -126,6 +136,7 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
           ),
         ],
       ),
+      bottomNavigationBar: const OrganiserBottomNav(currentIndex: 0),
     );
   }
 }

@@ -4,7 +4,9 @@ import 'package:frontend/widgets/app_background.dart';
 import 'package:frontend/widgets/error_state.dart';
 
 class AdminApplicationsScreen extends StatefulWidget {
-  const AdminApplicationsScreen({super.key});
+  final int? eventId; // Optional: if provided, filter by this event
+
+  const AdminApplicationsScreen({super.key, this.eventId});
 
   @override
   State<AdminApplicationsScreen> createState() =>
@@ -20,7 +22,8 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
   String? errorMessage;
   String statusFilter = "all";
   String search = "";
-  String sortField = "applied_at"; // applied_at | event_date | status | volunteer_name
+  String sortField =
+      "applied_at"; // applied_at | event_date | status | volunteer_name
   bool sortAsc = false;
 
   @override
@@ -82,219 +85,255 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Applications'),
+        title: Text(
+            widget.eventId != null ? 'Event Applications' : 'All Applications'),
       ),
       body: AppBackground(
         child: loading
             ? const Center(child: CircularProgressIndicator())
-          : errorMessage != null
-            ? ErrorState(
-              message: errorMessage!,
-              onRetry: () => _fetchApplications(reset: true),
-              )
-            : Builder(
-                builder: (context) {
-                    final filtered = apps.where((a) {
-              final matchStatus =
-                  statusFilter == "all" || a["status"] == statusFilter;
+            : errorMessage != null
+                ? ErrorState(
+                    message: errorMessage!,
+                    onRetry: () => _fetchApplications(reset: true),
+                  )
+                : Builder(
+                    builder: (context) {
+                      final filtered = apps.where((a) {
+                        final matchStatus = statusFilter == "all" ||
+                            a["status"] == statusFilter;
 
-              final searchText = search.toLowerCase();
-              final volunteerName =
-                  (a["volunteer_name"] ?? "").toString().toLowerCase();
-              final volunteerEmail =
-                  (a["volunteer_email"] ?? "").toString().toLowerCase();
-              final eventTitle =
-                  (a["event_title"] ?? "").toString().toLowerCase();
-              final organiserName =
-                  (a["organiser_name"] ?? "").toString().toLowerCase();
+                        // Filter by event if eventId is provided
+                        final matchEvent = widget.eventId == null ||
+                            a["event_id"] == widget.eventId;
 
-              final matchSearch = searchText.isEmpty ||
-                  volunteerName.contains(searchText) ||
-                  volunteerEmail.contains(searchText) ||
-                  eventTitle.contains(searchText) ||
-                  organiserName.contains(searchText);
+                        final searchText = search.toLowerCase();
+                        final volunteerName = (a["volunteer_name"] ?? "")
+                            .toString()
+                            .toLowerCase();
+                        final volunteerEmail = (a["volunteer_email"] ?? "")
+                            .toString()
+                            .toLowerCase();
+                        final eventTitle =
+                            (a["event_title"] ?? "").toString().toLowerCase();
+                        final organiserName = (a["organiser_name"] ?? "")
+                            .toString()
+                            .toLowerCase();
 
-              return matchStatus && matchSearch;
-            }).toList()
-                    ..sort((a, b) => _compareApps(a, b));
+                        final matchSearch = searchText.isEmpty ||
+                            volunteerName.contains(searchText) ||
+                            volunteerEmail.contains(searchText) ||
+                            eventTitle.contains(searchText) ||
+                            organiserName.contains(searchText);
 
-                  return Column(
-                    children: [
-                      // 🔍 Search
-                      Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: TextField(
-                          decoration: const InputDecoration(
-                            hintText: "Search volunteer or event",
-                            prefixIcon: Icon(Icons.search),
+                        return matchStatus && matchSearch && matchEvent;
+                      }).toList()
+                        ..sort((a, b) => _compareApps(a, b));
+
+                      return Column(
+                        children: [
+                          // 🔍 Search
+                          Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: TextField(
+                              decoration: const InputDecoration(
+                                hintText: "Search volunteer or event",
+                                prefixIcon: Icon(Icons.search),
+                              ),
+                              onChanged: (v) => setState(() => search = v),
+                            ),
                           ),
-                          onChanged: (v) => setState(() => search = v),
-                        ),
-                      ),
 
-                      // 🔽 Status filter
-                      Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Row(
-                          children: [
-                            DropdownButton<String>(
-                              value: statusFilter,
-                              items: const [
-                                DropdownMenuItem(
-                                    value: "all", child: Text("All Applications")),
-                                DropdownMenuItem(
-                                    value: "pending", child: Text("Pending")),
-                                DropdownMenuItem(
-                                    value: "accepted", child: Text("Accepted")),
-                                DropdownMenuItem(
-                                    value: "rejected", child: Text("Rejected")),
-                                DropdownMenuItem(
-                                    value: "cancelled", child: Text("Cancelled")),
+                          // 🔽 Status filter
+                          Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Row(
+                              children: [
+                                DropdownButton<String>(
+                                  value: statusFilter,
+                                  items: const [
+                                    DropdownMenuItem(
+                                        value: "all",
+                                        child: Text("All Applications")),
+                                    DropdownMenuItem(
+                                        value: "pending",
+                                        child: Text("Pending")),
+                                    DropdownMenuItem(
+                                        value: "accepted",
+                                        child: Text("Accepted")),
+                                    DropdownMenuItem(
+                                        value: "rejected",
+                                        child: Text("Rejected")),
+                                    DropdownMenuItem(
+                                        value: "cancelled",
+                                        child: Text("Cancelled")),
+                                  ],
+                                  onChanged: (v) =>
+                                      setState(() => statusFilter = v!),
+                                ),
+                                const SizedBox(width: 16),
+                                DropdownButton<String>(
+                                  value: sortField,
+                                  items: const [
+                                    DropdownMenuItem(
+                                        value: "applied_at",
+                                        child: Text("Applied")),
+                                    DropdownMenuItem(
+                                        value: "event_date",
+                                        child: Text("Event Date")),
+                                    DropdownMenuItem(
+                                        value: "status", child: Text("Status")),
+                                    DropdownMenuItem(
+                                        value: "volunteer_name",
+                                        child: Text("Volunteer")),
+                                  ],
+                                  onChanged: (v) =>
+                                      setState(() => sortField = v!),
+                                ),
+                                IconButton(
+                                  icon: Icon(
+                                    sortAsc
+                                        ? Icons.arrow_upward
+                                        : Icons.arrow_downward,
+                                  ),
+                                  onPressed: () =>
+                                      setState(() => sortAsc = !sortAsc),
+                                ),
                               ],
-                              onChanged: (v) => setState(() => statusFilter = v!),
                             ),
-                            const SizedBox(width: 16),
-                            DropdownButton<String>(
-                              value: sortField,
-                              items: const [
-                                DropdownMenuItem(
-                                    value: "applied_at", child: Text("Applied")),
-                                DropdownMenuItem(
-                                    value: "event_date", child: Text("Event Date")),
-                                DropdownMenuItem(
-                                    value: "status", child: Text("Status")),
-                                DropdownMenuItem(
-                                    value: "volunteer_name", child: Text("Volunteer")),
-                              ],
-                              onChanged: (v) => setState(() => sortField = v!),
-                            ),
-                            IconButton(
-                              icon: Icon(
-                                sortAsc
-                                    ? Icons.arrow_upward
-                                    : Icons.arrow_downward,
-                              ),
-                              onPressed: () =>
-                                  setState(() => sortAsc = !sortAsc),
-                            ),
-                          ],
-                        ),
-                      ),
+                          ),
 
-                      Expanded(
-                        child: filtered.isEmpty
-                            ? const Center(child: Text("No applications found"))
-                            : ListView.builder(
-                                itemCount: filtered.length + 1,
-                                itemBuilder: (context, i) {
-                                  if (i == filtered.length) {
-                                    final canLoadMore = page <= totalPages;
-                                    return Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 12),
-                                      child: Center(
-                                        child: canLoadMore
-                                            ? ElevatedButton(
-                                                onPressed: loadingMore
-                                                    ? null
-                                                    : () => _fetchApplications(),
-                                                child: loadingMore
-                                                    ? const SizedBox(
-                                                        width: 18,
-                                                        height: 18,
-                                                        child:
-                                                            CircularProgressIndicator(strokeWidth: 2),
-                                                      )
-                                                    : const Text("Load More"),
-                                              )
-                                            : const Text("No more applications"),
-                                      ),
-                                    );
-                                  }
-
-                                  final app = filtered[i];
-                                  final isCancelled =
-                                      app["status"] == "cancelled";
-                                  final eventDate = _fmtDate(app["event_date"]);
-                                  final organiserName =
-                                      app["organiser_name"] ?? "-";
-
-                                  return Card(
-                                    child: ListTile(
-                                      title: Text(app["event_title"]),
-                                      subtitle: Text(
-                                        "${app["volunteer_name"]} • ${app["status"]}\nOrganiser: $organiserName • Date: $eventDate",
-                                      ),
-                                      isThreeLine: true,
-                                      onTap: () => _showDetails(context, app),
-                                      trailing: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          // Status badge
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 10, vertical: 4),
-                                            decoration: BoxDecoration(
-                                              color: statusColor(app["status"]),
-                                              borderRadius: BorderRadius.circular(12),
-                                            ),
-                                            child: Text(
-                                              app["status"],
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 12,
-                                              ),
-                                            ),
+                          Expanded(
+                            child: filtered.isEmpty
+                                ? const Center(
+                                    child: Text("No applications found"))
+                                : ListView.builder(
+                                    itemCount: filtered.length + 1,
+                                    itemBuilder: (context, i) {
+                                      if (i == filtered.length) {
+                                        final canLoadMore = page <= totalPages;
+                                        return Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 12),
+                                          child: Center(
+                                            child: canLoadMore
+                                                ? ElevatedButton(
+                                                    onPressed: loadingMore
+                                                        ? null
+                                                        : () =>
+                                                            _fetchApplications(),
+                                                    child: loadingMore
+                                                        ? const SizedBox(
+                                                            width: 18,
+                                                            height: 18,
+                                                            child:
+                                                                CircularProgressIndicator(
+                                                                    strokeWidth:
+                                                                        2),
+                                                          )
+                                                        : const Text(
+                                                            "Load More"),
+                                                  )
+                                                : const Text(
+                                                    "No more applications"),
                                           ),
+                                        );
+                                      }
 
-                                          // ❌ Cancel button (only if not cancelled)
-                                          if (!isCancelled)
-                                            IconButton(
-                                              icon: const Icon(Icons.cancel,
-                                                  color: Colors.red),
-                                              onPressed: () async {
-                                                final confirm =
-                                                    await showDialog<bool>(
-                                                  context: context,
-                                                  builder: (ctx) => AlertDialog(
-                                                    title: const Text(
-                                                        "Cancel Application"),
-                                                    content: const Text(
-                                                        "Are you sure you want to cancel this application?"),
-                                                    actions: [
-                                                      TextButton(
-                                                        onPressed: () =>
-                                                            Navigator.pop(ctx, false),
-                                                        child: const Text("No"),
-                                                      ),
-                                                      TextButton(
-                                                        onPressed: () =>
-                                                            Navigator.pop(ctx, true),
-                                                        child: const Text("Yes"),
-                                                      ),
-                                                    ],
+                                      final app = filtered[i];
+                                      final isCancelled =
+                                          app["status"] == "cancelled";
+                                      final eventDate =
+                                          _fmtDate(app["event_date"]);
+                                      final organiserName =
+                                          app["organiser_name"] ?? "-";
+
+                                      return Card(
+                                        child: ListTile(
+                                          title: Text(app["event_title"]),
+                                          subtitle: Text(
+                                            "${app["volunteer_name"]} • ${app["status"]}\nOrganiser: $organiserName • Date: $eventDate",
+                                          ),
+                                          isThreeLine: true,
+                                          onTap: () =>
+                                              _showDetails(context, app),
+                                          trailing: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              // Status badge
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 10,
+                                                        vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color: statusColor(
+                                                      app["status"]),
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                ),
+                                                child: Text(
+                                                  app["status"],
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 12,
                                                   ),
-                                                );
+                                                ),
+                                              ),
 
-                                                if (confirm == true) {
-                                                  await AdminService
-                                                      .cancelApplication(
-                                                          app["id"]);
-                                                  _fetchApplications(reset: true);
-                                                }
-                                              },
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                      ),
-                    ],
-                  );
-                },
-              ),
+                                              // ❌ Cancel button (only if not cancelled)
+                                              if (!isCancelled)
+                                                IconButton(
+                                                  icon: const Icon(Icons.cancel,
+                                                      color: Colors.red),
+                                                  onPressed: () async {
+                                                    final confirm =
+                                                        await showDialog<bool>(
+                                                      context: context,
+                                                      builder: (ctx) =>
+                                                          AlertDialog(
+                                                        title: const Text(
+                                                            "Cancel Application"),
+                                                        content: const Text(
+                                                            "Are you sure you want to cancel this application?"),
+                                                        actions: [
+                                                          TextButton(
+                                                            onPressed: () =>
+                                                                Navigator.pop(
+                                                                    ctx, false),
+                                                            child: const Text(
+                                                                "No"),
+                                                          ),
+                                                          TextButton(
+                                                            onPressed: () =>
+                                                                Navigator.pop(
+                                                                    ctx, true),
+                                                            child: const Text(
+                                                                "Yes"),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    );
+
+                                                    if (confirm == true) {
+                                                      await AdminService
+                                                          .cancelApplication(
+                                                              app["id"]);
+                                                      _fetchApplications(
+                                                          reset: true);
+                                                    }
+                                                  },
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
       ),
     );
   }
@@ -378,29 +417,29 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
     int result;
     switch (sortField) {
       case "volunteer_name":
-        result = (a["volunteer_name"] ?? "").toString().toLowerCase().compareTo(
-            (b["volunteer_name"] ?? "").toString().toLowerCase());
+        result = (a["volunteer_name"] ?? "")
+            .toString()
+            .toLowerCase()
+            .compareTo((b["volunteer_name"] ?? "").toString().toLowerCase());
         break;
       case "status":
-        result = (a["status"] ?? "").toString().compareTo(
-            (b["status"] ?? "").toString());
+        result = (a["status"] ?? "")
+            .toString()
+            .compareTo((b["status"] ?? "").toString());
         break;
       case "event_date":
         final aDate = DateTime.tryParse((a["event_date"] ?? "").toString());
         final bDate = DateTime.tryParse((b["event_date"] ?? "").toString());
-        result = (aDate ?? DateTime(1970))
-            .compareTo(bDate ?? DateTime(1970));
+        result = (aDate ?? DateTime(1970)).compareTo(bDate ?? DateTime(1970));
         break;
       case "applied_at":
       default:
         final aDate = DateTime.tryParse((a["applied_at"] ?? "").toString());
         final bDate = DateTime.tryParse((b["applied_at"] ?? "").toString());
-        result = (aDate ?? DateTime(1970))
-            .compareTo(bDate ?? DateTime(1970));
+        result = (aDate ?? DateTime(1970)).compareTo(bDate ?? DateTime(1970));
         break;
     }
 
     return sortAsc ? result : -result;
   }
-
 }

@@ -191,6 +191,7 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
           loading = false;
         });
 
+
         _lastProfilePictureUrl = normalizedUrl;
         if (normalizedUrl != null && normalizedUrl.isNotEmpty) {
           if (_pendingAvatarSuccess || normalizedUrl != previousUrl) {
@@ -211,6 +212,7 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
       });
     }
   }
+
 
   void _triggerAvatarSuccess({bool delay = false}) {
     if (_avatarSuccessController.isAnimating) return;
@@ -686,35 +688,6 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
 
                       const SizedBox(height: 20),
 
-                      /// ================= UPCOMING COMMITMENT =================
-                      _sectionHeader("Upcoming Commitment"),
-                      const SizedBox(height: 10),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Card(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: ListTile(
-                            leading: const Icon(Icons.calendar_month),
-                            title: Text(
-                              _upcomingEvent == null
-                                  ? "No upcoming events"
-                                  : (_upcomingEvent!["title"] ?? "Upcoming Event"),
-                            ),
-                            subtitle: Text(
-                              _upcomingEvent == null
-                                  ? ""
-                                  : "${_upcomingEvent!["event_date"] ?? ""} • ${_upcomingEvent!["start_time"] ?? ""} • ${_upcomingEvent!["location"] ?? ""}",
-                            ),
-                            trailing: const Icon(Icons.chevron_right),
-                            onTap: () {},
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 20),
-
                       /// ================= ACTIVITIES =================
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -772,7 +745,7 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
 
                             _tile(
                               Icons.payments,
-                              "Compensation Status",
+                              "Payment Status",
                               () {
                                 Navigator.push(
                                   context,

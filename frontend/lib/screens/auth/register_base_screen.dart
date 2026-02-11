@@ -66,6 +66,11 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
       return;
     }
 
+    if (passwordController.text.length < 6) {
+      showError("Password must be at least 6 characters");
+      return;
+    }
+
     if (widget.role == "organiser" &&
         contactController.text.trim().isEmpty) {
       showError("Contact number is required for organiser");

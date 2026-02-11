@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/widgets/app_background.dart';
 import '../../services/admin_service.dart';
-import 'package:flutter/widgets.dart';
 import '../../widgets/robust_image.dart';
 
 class AdminVerificationScreen extends StatefulWidget {
@@ -10,153 +9,6 @@ class AdminVerificationScreen extends StatefulWidget {
   @override
   State<AdminVerificationScreen> createState() =>
       _AdminVerificationScreenState();
-}
-
-// Custom widget for robust image loading with retry logic
-class _RobustImage extends StatefulWidget {
-  final String url;
-  final double? width;
-  final double? height;
-  final BoxFit fit;
-  final BorderRadius? borderRadius;
-  final Widget? placeholder;
-  final Widget? errorWidget;
-
-  const _RobustImage({
-    required this.url,
-    this.width,
-    this.height,
-    this.fit = BoxFit.cover,
-    this.borderRadius,
-    this.placeholder,
-    this.errorWidget,
-  });
-
-  @override
-  State<_RobustImage> createState() => _RobustImageState();
-}
-
-class _RobustImageState extends State<_RobustImage> {
-  bool _isLoading = true;
-  bool _hasError = false;
-  int _retryCount = 0;
-  static const int _maxRetries = 3;
-
-  @override
-  void didUpdateWidget(_RobustImage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.url != widget.url) {
-      setState(() {
-        _isLoading = true;
-        _hasError = false;
-        _retryCount = 0;
-      });
-    }
-  }
-
-  void _retryLoading() {
-    if (_retryCount < _maxRetries) {
-      setState(() {
-        _isLoading = true;
-        _hasError = false;
-        _retryCount++;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    Widget imageWidget = Image.network(
-      widget.url,
-      fit: widget.fit,
-      loadingBuilder: (context, child, loadingProgress) {
-        if (loadingProgress == null) {
-          if (mounted) {
-            setState(() {
-              _isLoading = false;
-              _hasError = false;
-            });
-          }
-          return child;
-        }
-        return Container(
-          color: Colors.grey[200],
-          child: const Center(
-            child: SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          ),
-        );
-      },
-      errorBuilder: (context, error, stackTrace) {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-            _hasError = true;
-          });
-        }
-
-        if (_retryCount < _maxRetries) {
-          Future.delayed(const Duration(seconds: 1), () {
-            if (mounted) {
-              _retryLoading();
-            }
-          });
-          return Container(
-            color: Colors.grey[200],
-            child: const Center(
-              child: SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
-          );
-        }
-
-        return widget.errorWidget ??
-            Container(
-              color: Colors.grey[300],
-              child: const Icon(
-                Icons.broken_image,
-                color: Colors.grey,
-                size: 24,
-              ),
-            );
-      },
-    );
-
-    if (widget.borderRadius != null) {
-      imageWidget = ClipRRect(
-        borderRadius: widget.borderRadius!,
-        child: imageWidget,
-      );
-    }
-
-    return SizedBox(
-      width: widget.width,
-      height: widget.height,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          imageWidget,
-          if (_isLoading && !_hasError)
-            Container(
-              color: Colors.grey[200],
-              child: const Center(
-                child: SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
 }
 
 class _AdminVerificationScreenState extends State<AdminVerificationScreen> {
@@ -368,7 +220,7 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen> {
                     children: [
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: _filterRole,
+                          initialValue: _filterRole,
                           decoration: const InputDecoration(labelText: 'Role'),
                           items: const [
                             DropdownMenuItem(
@@ -385,7 +237,7 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: _filterStatus,
+                          initialValue: _filterStatus,
                           decoration:
                               const InputDecoration(labelText: 'Status'),
                           items: const [

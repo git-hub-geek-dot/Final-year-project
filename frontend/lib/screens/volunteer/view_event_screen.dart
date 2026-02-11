@@ -227,25 +227,24 @@ Join on VolunteerX
     );
   }
 
-  if (imageUrl == null || imageUrl.isEmpty) {
-    return Container(
-      height: 220,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: const Color(0xFFEAF0FF),
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(24),
-          bottomRight: Radius.circular(24),
-        ),
-      ),
-      child: const Center(
-        child: Icon(Icons.image, size: 48, color: Color(0xFF2E6BE6)),
-      ),
-    );
-  }
+  Widget _eventBanner() {
+    final imageUrl = widget.event["image_url"]?.toString();
 
     if (imageUrl == null || imageUrl.isEmpty) {
-      return const SizedBox.shrink();
+      return Container(
+        height: 220,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: const Color(0xFFEAF0FF),
+          borderRadius: const BorderRadius.only(
+            bottomLeft: Radius.circular(24),
+            bottomRight: Radius.circular(24),
+          ),
+        ),
+        child: const Center(
+          child: Icon(Icons.image, size: 48, color: Color(0xFF2E6BE6)),
+        ),
+      );
     }
 
     return ClipRRect(

@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:frontend/widgets/app_background.dart';
 import 'package:frontend/widgets/error_state.dart';
@@ -369,7 +371,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                                         onChanged: canSelect
                                                             ? (_) =>
                                                                 _toggleSelected(
-                                                                    userId!)
+                                                                    userId)
                                                             : null,
                                                       ),
                                                       _buildProfileAvatar(
@@ -384,13 +386,13 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                           ),
                                           onTap: () {
                                             if (_selectionMode && canSelect) {
-                                              _toggleSelected(userId!);
+                                              _toggleSelected(userId);
                                               return;
                                             }
                                             _showUserDetails(context, u);
                                           },
                                           onLongPress: canSelect
-                                              ? () => _toggleSelected(userId!)
+                                              ? () => _toggleSelected(userId)
                                               : null,
                                           trailing: Row(
                                             mainAxisSize: MainAxisSize.min,

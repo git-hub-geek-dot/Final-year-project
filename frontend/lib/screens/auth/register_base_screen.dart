@@ -20,6 +20,7 @@ abstract class RegisterBaseScreen extends StatefulWidget {
 }
 
 class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
+  static const bool enablePhoneOtp = false;
   final nameController = TextEditingController();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
@@ -65,6 +66,11 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
       return;
     }
 
+    if (passwordController.text.length < 6) {
+      showError("Password must be at least 6 characters");
+      return;
+    }
+
     if (widget.role == "organiser" &&
         contactController.text.trim().isEmpty) {
       showError("Contact number is required for organiser");
@@ -77,7 +83,7 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
     }
 
     final phoneValue = contactController.text.trim();
-    if (phoneValue.isNotEmpty && !phoneVerified) {
+    if (enablePhoneOtp && phoneValue.isNotEmpty && !phoneVerified) {
       showError("Please verify your phone number");
       return;
     }
@@ -305,7 +311,7 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
   }
 
   Widget _phoneOtpSection() {
-    if (contactController.text.trim().isEmpty) {
+    if (!enablePhoneOtp || contactController.text.trim().isEmpty) {
       return const SizedBox.shrink();
     }
 

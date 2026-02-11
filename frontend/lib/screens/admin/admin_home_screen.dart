@@ -203,7 +203,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                   borderRadius: BorderRadius.circular(16.0),
                                   gradient: LinearGradient(
                                     colors: [
-                                      item.color.withOpacity(0.7),
+                                      item.color.withValues(alpha: 0.7),
                                       item.color
                                     ],
                                     begin: Alignment.topLeft,
@@ -268,7 +268,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             children: [
               CircleAvatar(
                 radius: 18,
-                backgroundColor: color.withOpacity(0.12),
+                backgroundColor: color.withValues(alpha: 0.12),
                 child: Icon(icon, color: color, size: 20),
               ),
               const SizedBox(width: 12),

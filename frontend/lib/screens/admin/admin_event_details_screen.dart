@@ -4,184 +4,6 @@ import '../../services/admin_service.dart';
 import 'admin_applications_screen.dart';
 import '../../widgets/robust_image.dart';
 
-// Custom widget for robust image loading with retry logic
-class _RobustImage extends StatefulWidget {
-  final String url;
-  final double? width;
-  final double? height;
-  final BoxFit fit;
-  final Widget? placeholder;
-  final Widget? errorWidget;
-
-  const _RobustImage({
-    required this.url,
-    this.width,
-    this.height,
-    this.fit = BoxFit.cover,
-    this.placeholder,
-    this.errorWidget,
-  });
-
-  @override
-  State<_RobustImage> createState() => _RobustImageState();
-}
-
-class _RobustImageState extends State<_RobustImage> {
-  bool _isLoading = true;
-  bool _hasError = false;
-  int _retryCount = 0;
-  static const int _maxRetries = 3;
-
-  @override
-  void didUpdateWidget(_RobustImage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.url != widget.url) {
-      // Reset state when URL changes
-      setState(() {
-        _isLoading = true;
-        _hasError = false;
-        _retryCount = 0;
-      });
-    }
-  }
-
-  void _retryLoading() {
-    if (_retryCount < _maxRetries) {
-      setState(() {
-        _isLoading = true;
-        _hasError = false;
-        _retryCount++;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_hasError && _retryCount >= _maxRetries) {
-      return widget.errorWidget ??
-          Container(
-            width: widget.width,
-            height: widget.height,
-            color: Colors.grey[300],
-            child: const Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.image_not_supported,
-                  size: 48,
-                  color: Colors.grey,
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'Image unavailable',
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          );
-    }
-
-    return SizedBox(
-      width: widget.width,
-      height: widget.height,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.network(
-            widget.url,
-            fit: widget.fit,
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) {
-                // Image loaded successfully
-                if (mounted) {
-                  setState(() {
-                    _isLoading = false;
-                    _hasError = false;
-                  });
-                }
-                return child;
-              }
-              return Container(
-                color: Colors.grey[200],
-                child: const Center(
-                  child: CircularProgressIndicator(),
-                ),
-              );
-            },
-            errorBuilder: (context, error, stackTrace) {
-              if (mounted) {
-                setState(() {
-                  _isLoading = false;
-                  _hasError = true;
-                });
-              }
-
-              // Auto-retry after a delay if we haven't exceeded max retries
-              if (_retryCount < _maxRetries) {
-                Future.delayed(const Duration(seconds: 2), () {
-                  if (mounted) {
-                    _retryLoading();
-                  }
-                });
-                return Container(
-                  color: Colors.grey[200],
-                  child: const Center(
-                    child: CircularProgressIndicator(),
-                  ),
-                );
-              }
-
-              return widget.errorWidget ??
-                  Container(
-                    color: Colors.grey[300],
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.image_not_supported,
-                          size: 48,
-                          color: Colors.grey,
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Image unavailable',
-                          style: TextStyle(
-                            color: Colors.grey,
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        ElevatedButton.icon(
-                          onPressed: _retryLoading,
-                          icon: const Icon(Icons.refresh, size: 16),
-                          label: const Text('Retry'),
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 6),
-                            textStyle: const TextStyle(fontSize: 12),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-            },
-          ),
-          if (_isLoading && !_hasError)
-            Container(
-              color: Colors.grey[200],
-              child: const Center(
-                child: CircularProgressIndicator(),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
 class AdminEventDetailsScreen extends StatefulWidget {
   final Map event;
 
@@ -347,15 +169,15 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
                       else
                         Row(
                           children: [
-                            _statBox(
+                            _StatBox(
                                 "Applied", applied.toString(), Icons.people),
-                            _statBox("Approved", approved.toString(),
+                            _StatBox("Approved", approved.toString(),
                                 Icons.check_circle,
                                 color: Colors.green),
-                            _statBox(
+                            _StatBox(
                                 "Pending", pending.toString(), Icons.schedule,
                                 color: Colors.orange),
-                            _statBox(
+                            _StatBox(
                                 "Rejected", rejected.toString(), Icons.cancel,
                                 color: Colors.red),
                           ],
@@ -516,13 +338,13 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
   }
 }
 
-class _statBox extends StatelessWidget {
+class _StatBox extends StatelessWidget {
   final String label;
   final String value;
   final IconData icon;
   final Color? color;
 
-  const _statBox(this.label, this.value, this.icon, {this.color});
+  const _StatBox(this.label, this.value, this.icon, {this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -531,10 +353,10 @@ class _statBox extends StatelessWidget {
         margin: const EdgeInsets.symmetric(horizontal: 4),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: color?.withOpacity(0.1) ?? const Color(0xFFF7F9FD),
+          color: color?.withValues(alpha: 0.1) ?? const Color(0xFFF7F9FD),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: color?.withOpacity(0.3) ?? Colors.grey.shade300,
+            color: color?.withValues(alpha: 0.3) ?? Colors.grey.shade300,
           ),
         ),
         child: Column(

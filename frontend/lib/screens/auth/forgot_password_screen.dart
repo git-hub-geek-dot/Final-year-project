@@ -15,27 +15,78 @@ class ForgotPasswordScreen extends StatefulWidget {
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final emailController = TextEditingController();
+  final otpController = TextEditingController();
+  final passwordController = TextEditingController();
+  final confirmController = TextEditingController();
+
   bool loading = false;
   String? message;
-  int _cooldown = 0;
-  static const int _cooldownSeconds = 30;
+  bool _otpSent = false; // Track if OTP has been sent
 
   @override
   void dispose() {
     emailController.dispose();
+    otpController.dispose();
+    passwordController.dispose();
+    confirmController.dispose();
     super.dispose();
   }
 
-  void _startCooldown() {
-    setState(() => _cooldown = _cooldownSeconds);
-    Future.doWhile(() async {
-      if (!mounted) return false;
-      if (_cooldown <= 0) return false;
-      await Future.delayed(const Duration(seconds: 1));
-      if (!mounted) return false;
-      setState(() => _cooldown--);
-      return _cooldown > 0;
+  Future<void> resetPassword() async {
+    final email = emailController.text.trim();
+    final otp = otpController.text.trim();
+    final password = passwordController.text.trim();
+    final confirm = confirmController.text.trim();
+
+    if (email.isEmpty || otp.isEmpty || password.isEmpty || confirm.isEmpty) {
+      setState(() => message = "All fields are required");
+      return;
+    }
+
+    if (password != confirm) {
+      setState(() => message = "Passwords do not match");
+      return;
+    }
+
+    if (password.length < 6) {
+      setState(() => message = "Password must be at least 6 characters");
+      return;
+    }
+
+    setState(() {
+      loading = true;
+      message = null;
     });
+
+    try {
+      final response = await http.post(
+        Uri.parse("${ApiConfig.baseUrl}/reset-password"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "email": email,
+          "otp": otp,
+          "password": password,
+        }),
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Password reset successful")),
+        );
+        Navigator.pushNamedAndRemoveUntil(context, '/', (_) => false);
+      } else {
+        final data = jsonDecode(response.body);
+        setState(() => message = data["message"] ?? "Reset failed");
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => message = "Network error. Please try again.");
+      }
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
   }
 
   Future<void> sendResetEmail() async {
@@ -61,12 +112,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       if (!mounted) return;
 
       if (response.statusCode == 200) {
-        setState(() => message =
-            "If the email exists, a reset token has been sent.");
+        setState(() {
+          message = "If the email exists, a reset OTP has been sent.";
+          _otpSent = true;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Reset email sent")),
         );
-        _startCooldown();
       } else {
         final data = jsonDecode(response.body);
         setState(() => message = data["message"] ?? "Request failed");
@@ -84,11 +136,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     required IconData icon,
     required String hint,
     required TextEditingController controller,
+    bool obscure = false,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: TextField(
         controller: controller,
+        obscureText: obscure,
         decoration: InputDecoration(
           prefixIcon: Icon(icon),
           hintText: hint,
@@ -123,16 +177,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
-                    "Reset your password",
-                    style: TextStyle(
+                  Text(
+                    _otpSent ? "Set a new password" : "Reset your password",
+                    style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 12),
-                  const Text(
-                    "Enter your email to receive a reset token.",
+                  Text(
+                    _otpSent
+                        ? "Enter the OTP from your email and set a new password."
+                        : "Enter your email to receive a reset OTP.",
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 20),
@@ -141,6 +197,25 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     hint: "Email",
                     controller: emailController,
                   ),
+                  if (_otpSent) ...[
+                    _inputField(
+                      icon: Icons.confirmation_number,
+                      hint: "Reset OTP",
+                      controller: otpController,
+                    ),
+                    _inputField(
+                      icon: Icons.lock,
+                      hint: "New Password",
+                      controller: passwordController,
+                      obscure: true,
+                    ),
+                    _inputField(
+                      icon: Icons.lock_outline,
+                      hint: "Confirm Password",
+                      controller: confirmController,
+                      obscure: true,
+                    ),
+                  ],
                   if (message != null)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 10),
@@ -155,28 +230,35 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       ),
                     ),
                   const SizedBox(height: 8),
-                  (loading || _cooldown > 0)
+                  loading
                       ? const CircularProgressIndicator()
                       : AbsorbPointer(
-                          absorbing: loading || _cooldown > 0,
+                          absorbing: loading,
                           child: Opacity(
-                            opacity: (loading || _cooldown > 0) ? 0.6 : 1,
+                            opacity: loading ? 0.6 : 1,
                             child: GradientButton(
-                              text: _cooldown > 0
-                                  ? "Resend in ${_cooldown}s"
-                                  : "Send Reset Email",
-                              onTap: sendResetEmail,
+                              text: _otpSent ? "Reset Password" : "Send Reset OTP",
+                              onTap: _otpSent ? resetPassword : sendResetEmail,
                             ),
                           ),
                         ),
                   const SizedBox(height: 12),
-                  TextButton(
-                    onPressed: loading
-                        ? null
-                        : () =>
-                            Navigator.pushNamed(context, "/reset-password"),
-                    child: const Text("Already have a token? Reset now"),
-                  ),
+                  if (_otpSent) ...[
+                    TextButton(
+                      onPressed: loading
+                          ? null
+                          : () {
+                              setState(() {
+                                _otpSent = false;
+                                otpController.clear();
+                                passwordController.clear();
+                                confirmController.clear();
+                                message = null;
+                              });
+                            },
+                      child: const Text("Change Email"),
+                    ),
+                  ],
                   TextButton(
                     onPressed: loading
                         ? null

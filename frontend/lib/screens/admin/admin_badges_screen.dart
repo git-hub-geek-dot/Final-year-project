@@ -69,6 +69,7 @@ class _AdminBadgesScreenState extends State<AdminBadgesScreen> {
                       "role": role,
                       "threshold": int.parse(threshold.text),
                     });
+                    // ignore: use_build_context_synchronously
                     Navigator.pop(context);
                     refresh();
                   },
@@ -155,12 +156,14 @@ class _AdminBadgesScreenState extends State<AdminBadgesScreen> {
         await AdminService.deleteBadge(badgeId);
         refresh();
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to delete badge: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to delete badge: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }

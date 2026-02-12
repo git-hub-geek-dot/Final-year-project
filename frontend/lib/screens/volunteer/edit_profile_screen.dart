@@ -148,7 +148,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           cityController.text = user["city"] ?? "";
           contactController.text =
               user["contact_number"]?.toString() ?? "";
-          _profileImageUrl = user["profile_picture_url"];
+          _profileImageUrl =
+              _normalizeProfileImageUrl(user["profile_picture_url"]?.toString());
           loadingProfile = false;
         });
       } else {
@@ -157,6 +158,44 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     } catch (e) {
       loadingProfile = false;
     }
+  }
+
+  String? _normalizeProfileImageUrl(String? url) {
+    if (url == null || url.trim().isEmpty) return null;
+
+    final baseUri = Uri.parse(ApiConfig.baseUrl);
+    final origin =
+        "${baseUri.scheme}://${baseUri.host}${baseUri.hasPort ? ':${baseUri.port}' : ''}";
+
+    if (url.startsWith("/uploads/")) {
+      return "$origin$url";
+    }
+
+    if (url.startsWith("uploads/")) {
+      return "$origin/$url";
+    }
+
+    final parsed = Uri.tryParse(url);
+    if (parsed != null && parsed.hasScheme) {
+      if (ApiConfig.useCloud) {
+        return url;
+      }
+
+      final host = parsed.host;
+      final isLocalLike = host == "localhost" ||
+          host == "127.0.0.1" ||
+          host.startsWith("10.") ||
+          host.startsWith("192.168.") ||
+          host.startsWith("172.");
+
+      if (isLocalLike && host != baseUri.host) {
+        final pathWithQuery =
+            parsed.hasQuery ? "${parsed.path}?${parsed.query}" : parsed.path;
+        return "$origin$pathWithQuery";
+      }
+    }
+
+    return url;
   }
 
   // ================= BUILD PROFILE IMAGE PROVIDER =================
@@ -172,8 +211,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
     
     // Show uploaded image if available
-    if (_profileImageUrl != null && _profileImageUrl!.isNotEmpty) {
-      return NetworkImage(_profileImageUrl!);
+    final normalizedUrl = _normalizeProfileImageUrl(_profileImageUrl);
+    if (normalizedUrl != null && normalizedUrl.isNotEmpty) {
+      return NetworkImage(normalizedUrl);
     }
     
     return null;
@@ -488,6 +528,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         radius: 48,
                         backgroundColor: const Color(0xFFE6E6FA),
                         backgroundImage: _buildProfileImageProvider(),
+                        onBackgroundImageError: (_profileImage == null &&
+                                (_profileImageUrl?.isNotEmpty ?? false))
+                            ? (_, __) {
+                                if (!mounted || _profileImageUrl == null) {
+                                  return;
+                                }
+                                WidgetsBinding.instance.addPostFrameCallback((_) {
+                                  if (!mounted || _profileImageUrl == null) {
+                                    return;
+                                  }
+                                  setState(() => _profileImageUrl = null);
+                                });
+                              }
+                            : null,
                         child: (_profileImage == null &&
                                 (_profileImageUrl == null || _profileImageUrl!.isEmpty))
                             ? const Icon(Icons.person, size: 48, color: Colors.deepPurple)

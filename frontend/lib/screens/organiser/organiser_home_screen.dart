@@ -22,7 +22,7 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
   bool loading = true;
   List events = [];
   int? userId;
-  int _selectedTab = 0; // 0: Ongoing, 1: Upcoming, 2: Completed, 3: Draft
+  int _selectedTab = 0; // 0: All, 1: Ongoing, 2: Upcoming, 3: Completed, 4: Draft
   String? loadError;
 
   @override
@@ -208,13 +208,15 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    _tabButton('Ongoing', 0),
+                    _tabButton('All', 0, count: events.length),
                     const SizedBox(width: 8),
-                    _tabButton('Upcoming', 1),
+                    _tabButton('Ongoing', 1, count: ongoing.length),
                     const SizedBox(width: 8),
-                    _tabButton('Completed', 2),
+                    _tabButton('Upcoming', 2, count: upcoming.length),
                     const SizedBox(width: 8),
-                    _tabButton('Draft', 3),
+                    _tabButton('Completed', 3, count: completed.length),
+                    const SizedBox(width: 8),
+                    _tabButton('Draft', 4, count: draft.length),
                   ],
                 ),
               ),
@@ -259,10 +261,12 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
                             ),
                           ),
                         if (_selectedTab == 0)
-                          _section('Ongoing Events', ongoing, isCompleted: false)
+                          _section('All Events', events)
                         else if (_selectedTab == 1)
-                          _section('Upcoming Events', upcoming, isCompleted: false)
+                          _section('Ongoing Events', ongoing, isCompleted: false)
                         else if (_selectedTab == 2)
+                          _section('Upcoming Events', upcoming, isCompleted: false)
+                        else if (_selectedTab == 3)
                           _section('Completed Events', completed, isCompleted: true)
                         else
                           _section('Draft Events', draft, isDraft: true),
@@ -270,28 +274,6 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
                     ),
                   ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
-                ),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  StatItem(events.length.toString(), 'Total'),
-                  StatItem(draft.length.toString(), 'Draft'),
-                  StatItem(ongoing.length.toString(), 'Ongoing'),
-                  StatItem(upcoming.length.toString(), 'Upcoming'),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
         ],
       ),
       bottomNavigationBar: const OrganiserBottomNav(currentIndex: 0),
@@ -340,22 +322,43 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
     );
   }
 
-  Widget _tabButton(String label, int tabIndex) {
+  Widget _tabButton(String label, int tabIndex, {required int count}) {
     final isActive = _selectedTab == tabIndex;
     return InkWell(
       onTap: () => setState(() => _selectedTab = tabIndex),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: isActive ? const Color(0xFF22C55E) : Colors.grey.shade200,
           borderRadius: BorderRadius.circular(20),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isActive ? Colors.white : Colors.black,
-            fontWeight: FontWeight.bold,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: isActive ? Colors.white : Colors.black,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: isActive ? Colors.white.withOpacity(0.22) : Colors.white,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  color: isActive ? Colors.white : Colors.black87,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -395,6 +398,16 @@ Widget eventCard(
   bool isCompleted = false,
   bool isDraft = false,
 }) {
+  final statusKey = _eventStatus(event);
+  final statusLabel = _statusLabel(statusKey);
+  final statusColor = _statusColor(statusKey);
+  final statusBg = _statusBg(statusKey);
+  final urgency = _urgencyBadge(event, statusKey);
+  final progress = _progressData(event);
+  final signals = _healthSignals(event, statusKey, progress);
+  final isEventCompleted = statusKey == 'completed';
+  final isEventDraft = statusKey == 'draft';
+
   return InkWell(
     onTap: () {
       Navigator.push(
@@ -426,36 +439,48 @@ Widget eventCard(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (isMine)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 6),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isCompleted
-                          ? const Color(0xFFDCFCE7)
-                          : isDraft
-                              ? Colors.grey.shade200
-                              : const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      isCompleted
-                          ? 'Completed'
-                          : isDraft
-                              ? 'Draft'
-                              : 'My Event',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: isCompleted
-                            ? const Color(0xFF16A34A)
-                            : isDraft
-                                ? Colors.grey.shade700
-                                : const Color(0xFF16A34A),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: statusBg,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          statusLabel,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: statusColor,
+                          ),
+                        ),
                       ),
-                    ),
+                      if (urgency != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: urgency['bg'] as Color,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            urgency['text'] as String,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: urgency['color'] as Color,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 if (!isMine && event['organiser_name'] != null)
                   Padding(
@@ -480,7 +505,62 @@ Widget eventCard(
                 Text(
                   'Date: ${event['event_date'] == null ? 'N/A' : event['event_date'].toString().split('T')[0]}',
                 ),
-                if (isCompleted) ...[
+                if (progress != null) ...[
+                  const SizedBox(height: 10),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: LinearProgressIndicator(
+                      value: (progress['ratio'] as double),
+                      minHeight: 7,
+                      backgroundColor: Colors.grey.shade200,
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        Color(0xFF22C55E),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    progress['label'] as String,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey.shade700,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+                if (signals.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: signals
+                        .map(
+                          (signal) => Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF4D6),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: const Color(0xFFFACC15).withOpacity(0.6),
+                              ),
+                            ),
+                            child: Text(
+                              signal,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF854D0E),
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ],
+                if (isEventCompleted) ...[
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -499,7 +579,7 @@ Widget eventCard(
               ],
             ),
           ),
-          if (isMine && !isCompleted && !isDraft)
+          if (isMine && !isEventCompleted && !isEventDraft)
             InkWell(
               onTap: () {
                 Navigator.push(
@@ -533,30 +613,180 @@ Widget eventCard(
   );
 }
 
-class StatItem extends StatelessWidget {
-  final String value;
-  final String label;
+String _eventStatus(Map event) =>
+    (event['computed_status'] ?? event['status'] ?? 'upcoming')
+        .toString()
+        .toLowerCase();
 
-  const StatItem(this.value, this.label, {super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(color: Colors.white70, fontSize: 12),
-        ),
-      ],
-    );
+String _statusLabel(String status) {
+  switch (status) {
+    case 'ongoing':
+      return 'Ongoing';
+    case 'upcoming':
+      return 'Upcoming';
+    case 'completed':
+      return 'Completed';
+    case 'draft':
+      return 'Draft';
+    default:
+      return 'Upcoming';
   }
+}
+
+Color _statusColor(String status) {
+  switch (status) {
+    case 'ongoing':
+      return const Color(0xFF15803D);
+    case 'upcoming':
+      return const Color(0xFF1D4ED8);
+    case 'completed':
+      return const Color(0xFF6D28D9);
+    case 'draft':
+      return Colors.grey.shade700;
+    default:
+      return Colors.black87;
+  }
+}
+
+Color _statusBg(String status) {
+  switch (status) {
+    case 'ongoing':
+      return const Color(0xFFDCFCE7);
+    case 'upcoming':
+      return const Color(0xFFDBEAFE);
+    case 'completed':
+      return const Color(0xFFEDE9FE);
+    case 'draft':
+      return Colors.grey.shade200;
+    default:
+      return Colors.grey.shade200;
+  }
+}
+
+DateTime? _parseEventDate(dynamic value) {
+  if (value == null) return null;
+  return DateTime.tryParse(value.toString());
+}
+
+int? _readIntFromKeys(Map event, List<String> keys) {
+  for (final key in keys) {
+    final value = event[key];
+    if (value == null) continue;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    final parsed = int.tryParse(value.toString());
+    if (parsed != null) return parsed;
+  }
+  return null;
+}
+
+Map<String, dynamic>? _urgencyBadge(Map event, String status) {
+  final now = DateTime.now();
+  final eventDate = _parseEventDate(event['event_date']);
+  final deadline = _parseEventDate(event['application_deadline']);
+
+  if (status == 'draft') {
+    return {
+      'text': 'Not published',
+      'color': Colors.grey.shade700,
+      'bg': Colors.grey.shade200,
+    };
+  }
+
+  if (status == 'upcoming' && eventDate != null) {
+    final days = eventDate.difference(DateTime(now.year, now.month, now.day)).inDays;
+    if (days <= 0) {
+      return {
+        'text': 'Starts today',
+        'color': const Color(0xFFB45309),
+        'bg': const Color(0xFFFEF3C7),
+      };
+    }
+    if (days <= 2) {
+      return {
+        'text': 'Starts in ${days}d',
+        'color': const Color(0xFFB45309),
+        'bg': const Color(0xFFFEF3C7),
+      };
+    }
+  }
+
+  if (status == 'upcoming' && deadline != null) {
+    final days = deadline.difference(DateTime(now.year, now.month, now.day)).inDays;
+    if (days <= 1) {
+      return {
+        'text': days < 0 ? 'Deadline passed' : 'Deadline soon',
+        'color': const Color(0xFFB91C1C),
+        'bg': const Color(0xFFFEE2E2),
+      };
+    }
+  }
+
+  return null;
+}
+
+Map<String, dynamic>? _progressData(Map event) {
+  final requiredVolunteers = _readIntFromKeys(event, ['volunteers_required']) ?? 0;
+  if (requiredVolunteers <= 0) return null;
+
+  final accepted = _readIntFromKeys(
+    event,
+    ['accepted_count', 'approved_count', 'slots_filled', 'filled_slots'],
+  );
+  final applicants = _readIntFromKeys(
+    event,
+    ['applications_count', 'applicants_count', 'applied_count', 'total_applications'],
+  );
+
+  if (accepted == null && applicants == null) return null;
+
+  final raw = accepted ?? applicants ?? 0;
+  final ratio = (raw / requiredVolunteers).clamp(0.0, 1.0).toDouble();
+  final label = accepted != null
+      ? '$accepted / $requiredVolunteers volunteers filled'
+      : '$raw / $requiredVolunteers applicants';
+
+  return {
+    'ratio': ratio,
+    'label': label,
+    'accepted': accepted,
+    'applicants': applicants,
+    'required': requiredVolunteers,
+  };
+}
+
+List<String> _healthSignals(
+  Map event,
+  String status,
+  Map<String, dynamic>? progress,
+) {
+  final signals = <String>[];
+
+  if (status == 'draft') {
+    signals.add('Draft not visible to volunteers');
+    return signals;
+  }
+
+  final deadline = _parseEventDate(event['application_deadline']);
+  if (status == 'upcoming' && deadline != null && deadline.isBefore(DateTime.now())) {
+    signals.add('Application deadline passed');
+  }
+
+  final applicants = progress?['applicants'] as int?;
+  final accepted = progress?['accepted'] as int?;
+  final required = progress?['required'] as int?;
+
+  if (status == 'upcoming' && applicants != null && applicants == 0) {
+    signals.add('No applications yet');
+  }
+
+  if (status == 'ongoing' &&
+      required != null &&
+      required > 0 &&
+      accepted != null &&
+      accepted < required) {
+    signals.add('Understaffed by ${required - accepted}');
+  }
+
+  return signals;
 }

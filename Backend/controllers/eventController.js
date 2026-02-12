@@ -406,7 +406,10 @@ exports.updateEvent = async (req, res) => {
       banner_url,
       start_time,
       end_time,
+      publish,
     } = req.body;
+
+    const publishNow = publish === true;
 
     const result = await pool.query(
       `
@@ -423,8 +426,12 @@ exports.updateEvent = async (req, res) => {
         payment_per_day = $9,
         banner_url = $10,
         start_time = $11,
-        end_time = $12
-      WHERE id = $13 AND organiser_id = $14
+        end_time = $12,
+        status = CASE
+          WHEN $13::boolean = true AND status = 'draft' THEN 'open'
+          ELSE status
+        END
+      WHERE id = $14 AND organiser_id = $15
       RETURNING *
       `,
       [
@@ -440,6 +447,7 @@ exports.updateEvent = async (req, res) => {
         banner_url,
         start_time,
         end_time,
+        publishNow,
         eventId,
         organiserId,
       ]
@@ -471,5 +479,96 @@ exports.updateEvent = async (req, res) => {
   } catch (err) {
     console.error("UPDATE EVENT ERROR:", err);
     res.status(500).json({ error: "Failed to update event" });
+  }
+};
+
+// =======================================================
+// PUBLISH DRAFT EVENT (ORGANISER)
+// =======================================================
+exports.publishEvent = async (req, res) => {
+  try {
+    const organiserId = req.user.id;
+    const eventId = req.params.id;
+
+    const eventResult = await pool.query(
+      `
+      SELECT
+        id,
+        title,
+        location,
+        event_date,
+        end_date,
+        application_deadline,
+        volunteers_required,
+        event_type,
+        payment_per_day,
+        start_time,
+        end_time,
+        status
+      FROM events
+      WHERE id = $1 AND organiser_id = $2
+      `,
+      [eventId, organiserId]
+    );
+
+    if (eventResult.rowCount === 0) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    const event = eventResult.rows[0];
+    if (event.status !== "draft") {
+      return res
+        .status(400)
+        .json({ error: "Only draft events can be published" });
+    }
+
+    const missingFields = [];
+    if (!event.location || event.location.toString().trim() === "") {
+      missingFields.push("location");
+    }
+    if (!event.event_date) missingFields.push("event_date");
+    if (!event.end_date) missingFields.push("end_date");
+    if (!event.application_deadline) {
+      missingFields.push("application_deadline");
+    }
+    if (event.volunteers_required == null) {
+      missingFields.push("volunteers_required");
+    }
+    if (!event.event_type || !["paid", "unpaid"].includes(event.event_type)) {
+      missingFields.push("event_type");
+    }
+    if (!event.start_time) missingFields.push("start_time");
+    if (!event.end_time) missingFields.push("end_time");
+    if (
+      event.event_type === "paid" &&
+      (!event.payment_per_day || Number(event.payment_per_day) <= 0)
+    ) {
+      missingFields.push("payment_per_day");
+    }
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        error: "Complete required event fields before publishing",
+        missing_fields: missingFields,
+      });
+    }
+
+    const updatedResult = await pool.query(
+      `
+      UPDATE events
+      SET status = 'open'
+      WHERE id = $1 AND organiser_id = $2
+      RETURNING *
+      `,
+      [eventId, organiserId]
+    );
+
+    return res.status(200).json({
+      message: "Event published successfully",
+      event: updatedResult.rows[0],
+    });
+  } catch (err) {
+    console.error("PUBLISH EVENT ERROR:", err);
+    res.status(500).json({ error: "Failed to publish event" });
   }
 };

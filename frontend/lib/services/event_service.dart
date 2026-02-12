@@ -178,6 +178,7 @@ class EventService {
     List<String>? responsibilities,
     String? startTime,
     String? endTime,
+    bool publish = false,
   }) async {
     final token = await TokenService.getToken();
     if (token == null) throw Exception("No token");
@@ -203,10 +204,46 @@ class EventService {
         "responsibilities": responsibilities ?? [],
         "start_time": startTime,
         "end_time": endTime,
+        "publish": publish,
       }),
     );
 
     return response.statusCode == 200;
+  }
+
+  /// ================= PUBLISH DRAFT =================
+  static Future<void> publishDraftEvent(int id) async {
+    final token = await TokenService.getToken();
+    if (token == null) throw Exception("No token");
+
+    final response = await http.put(
+      Uri.parse("${ApiConfig.baseUrl}/events/$id/publish"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
+    );
+
+    if (response.statusCode == 200) return;
+
+    String? parsedMessage;
+    try {
+      final dynamic data = jsonDecode(response.body);
+      if (data is Map<String, dynamic>) {
+        final message =
+            data["error"] ?? data["message"] ?? "Failed to publish event";
+        final missing = data["missing_fields"];
+        if (missing is List && missing.isNotEmpty) {
+          parsedMessage = "$message: ${missing.join(', ')}";
+        } else {
+          parsedMessage = message.toString();
+        }
+      }
+    } catch (_) {
+      // Fallback below
+    }
+
+    throw Exception(parsedMessage ?? "Failed to publish event");
   }
 
   /// ================= LEADERBOARD =================

@@ -368,7 +368,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           loading ? const CircularProgressIndicator() : _actionButtons(),
         ]),
       ),
-      bottomNavigationBar: const OrganiserBottomNav(currentIndex: 0),
+      bottomNavigationBar: const OrganiserBottomNav(
+        currentIndex: 0,
+        isRootScreen: false,
+      ),
     );
   }
 

@@ -4,14 +4,16 @@ import '../screens/organiser/leaderboard_screen.dart';
 
 class OrganiserBottomNav extends StatelessWidget {
   final int currentIndex;
+  final bool isRootScreen;
 
   const OrganiserBottomNav({
     super.key,
     required this.currentIndex,
+    this.isRootScreen = true,
   });
 
   void _onTap(BuildContext context, int index) {
-    if (index == currentIndex) return;
+    if (isRootScreen && index == currentIndex) return;
 
     if (index == 0) {
       Navigator.pushReplacementNamed(context, '/organiser-home');

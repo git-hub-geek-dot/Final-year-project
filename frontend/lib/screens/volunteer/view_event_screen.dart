@@ -228,7 +228,7 @@ Join on VolunteerX
   }
 
   Widget _eventBanner() {
-    final imageUrl = widget.event["image_url"]?.toString();
+    final imageUrl = _normalizeImageUrl(widget.event["banner_url"]?.toString());
 
     if (imageUrl == null || imageUrl.isEmpty) {
       return Container(
@@ -554,7 +554,13 @@ Join on VolunteerX
   String? _normalizeImageUrl(String? url) {
     if (url == null || url.trim().isEmpty) return null;
 
-    final trimmed = url.trim();
+    String trimmed = url.trim();
+    
+    // Replace localhost with 10.0.2.2 for Android emulator
+    if (trimmed.contains("localhost")) {
+      trimmed = trimmed.replaceAll("localhost", "10.0.2.2");
+    }
+    
     if (trimmed.startsWith("http")) return trimmed;
 
     final baseUri = Uri.parse(ApiConfig.baseUrl);

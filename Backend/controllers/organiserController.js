@@ -9,7 +9,7 @@ exports.getOrganiserPublicProfile = async (req, res) => {
     // organiser basic info
     const userResult = await pool.query(
       `
-      SELECT id, name, email, city, role
+      SELECT id, name, email, city, role, profile_picture_url, contact_number
       FROM users
       WHERE id = $1 AND role = 'organiser'
       `,

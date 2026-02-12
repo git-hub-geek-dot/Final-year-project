@@ -313,7 +313,7 @@ exports.login = async (req, res) => {
 
     const result = await pool.query(
       `
-      SELECT id, name, email, password, role, status
+      SELECT id, name, email, password, role, status, suspended_until, suspension_reason
       FROM users
       WHERE email = $1
       `,
@@ -338,6 +338,18 @@ exports.login = async (req, res) => {
             ? "Account is banned. Please contact support."
             : "Account is inactive. Please contact support.",
       });
+    }
+
+    if (user.suspended_until) {
+      const until = new Date(user.suspended_until);
+      if (until.getTime() > Date.now()) {
+        return res.status(403).json({
+          success: false,
+          message: user.suspension_reason
+            ? `Account suspended until ${until.toISOString()}. Reason: ${user.suspension_reason}`
+            : `Account suspended until ${until.toISOString()}`,
+        });
+      }
     }
 
     const isMatch = await bcrypt.compare(password, user.password);

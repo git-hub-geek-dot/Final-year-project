@@ -130,6 +130,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
       case "accepted":
         return Colors.green;
       case "rejected":
+      case "cancelled":
         return Colors.red;
       default:
         return Colors.orange;
@@ -185,12 +186,22 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                         final title = app["title"] ?? "Unknown Event";
                         final location = app["location"] ?? "";
                         final status = app["status"] ?? "pending";
+                        final cancelReason =
+                            (app["admin_cancel_reason"] ?? "").toString();
+                        final subtitle = status.toString().toLowerCase() ==
+                                    "cancelled" &&
+                                cancelReason.isNotEmpty
+                            ? "$location\nReason: $cancelReason"
+                            : location.toString();
 
                         return Card(
                           margin: const EdgeInsets.only(bottom: 12),
                           child: ListTile(
                             title: Text(title),
-                            subtitle: Text(location),
+                            subtitle: Text(subtitle),
+                            isThreeLine: status.toString().toLowerCase() ==
+                                    "cancelled" &&
+                                cancelReason.isNotEmpty,
                             onTap: () async {
                               final raw = app["event_id"];
                               final eventId = raw is int

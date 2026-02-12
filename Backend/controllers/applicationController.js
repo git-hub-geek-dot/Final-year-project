@@ -107,6 +107,7 @@ exports.getMyApplications = async (req, res) => {
       SELECT 
         a.id,
         a.status,
+        a.admin_cancel_reason,
         a.applied_at,
         COALESCE(
           CASE WHEN e.event_type = 'unpaid' THEN 'not_applicable' END,

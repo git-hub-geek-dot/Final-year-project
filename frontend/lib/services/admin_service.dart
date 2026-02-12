@@ -89,6 +89,91 @@ class AdminService {
     }
   }
 
+  static Future<Map<String, dynamic>> addUserStrike(
+    int userId,
+    String reason,
+  ) async {
+    final token = await TokenService.getToken();
+
+    final res = await http.post(
+      Uri.parse("${ApiConfig.baseUrl}/admin/users/$userId/strikes"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
+      body: jsonEncode({"reason": reason}),
+    );
+
+    if (res.statusCode != 200) {
+      String message = "Failed to add strike";
+      try {
+        final data = jsonDecode(res.body);
+        message = data["error"]?.toString() ?? message;
+      } catch (_) {}
+      throw Exception(message);
+    }
+
+    return jsonDecode(res.body);
+  }
+
+  static Future<void> resetUserStrikes(int userId) async {
+    final token = await TokenService.getToken();
+
+    final res = await http.post(
+      Uri.parse("${ApiConfig.baseUrl}/admin/users/$userId/strikes/reset"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
+    );
+
+    if (res.statusCode != 200) {
+      throw Exception("Failed to reset strikes");
+    }
+  }
+
+  static Future<void> suspendUser(
+    int userId,
+    int days,
+    String reason,
+  ) async {
+    final token = await TokenService.getToken();
+
+    final res = await http.post(
+      Uri.parse("${ApiConfig.baseUrl}/admin/users/$userId/suspend"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
+      body: jsonEncode({"days": days, "reason": reason}),
+    );
+
+    if (res.statusCode != 200) {
+      String message = "Failed to suspend user";
+      try {
+        final data = jsonDecode(res.body);
+        message = data["error"]?.toString() ?? message;
+      } catch (_) {}
+      throw Exception(message);
+    }
+  }
+
+  static Future<void> unsuspendUser(int userId) async {
+    final token = await TokenService.getToken();
+
+    final res = await http.post(
+      Uri.parse("${ApiConfig.baseUrl}/admin/users/$userId/unsuspend"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
+    );
+
+    if (res.statusCode != 200) {
+      throw Exception("Failed to unsuspend user");
+    }
+  }
+
   // ================= APPLICATIONS =================
   static Future<Map<String, dynamic>> getAllApplications({int page = 1, int limit = 20}) async {
     final token = await TokenService.getToken();
@@ -108,18 +193,25 @@ class AdminService {
     return jsonDecode(res.body);
   }
 
-  static Future<void> cancelApplication(int appId) async {
+  static Future<void> cancelApplication(int appId, String reason) async {
     final token = await TokenService.getToken();
 
     final res = await http.delete(
       Uri.parse("${ApiConfig.baseUrl}/admin/applications/$appId"),
       headers: {
+        "Content-Type": "application/json",
         "Authorization": "Bearer $token",
       },
+      body: jsonEncode({"reason": reason}),
     );
 
     if (res.statusCode != 200) {
-      throw Exception("Failed to cancel application");
+      String message = "Failed to cancel application";
+      try {
+        final data = jsonDecode(res.body);
+        message = data["error"]?.toString() ?? message;
+      } catch (_) {}
+      throw Exception(message);
     }
   }
 

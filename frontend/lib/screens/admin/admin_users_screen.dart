@@ -404,9 +404,10 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                               Text(
                                                 "${u["email"]} - ${u["role"]} - ${u["status"]} - strikes:$strikeCount",
                                               ),
-                                              if (isSuspended)
+                                              if (isSuspended &&
+                                                  suspendedUntil != null)
                                                 Text(
-                                                  "Suspended until ${_formatDateTime(suspendedUntil!)}",
+                                                  "Suspended until ${_formatDateTime(suspendedUntil)}",
                                                   style: TextStyle(
                                                     color:
                                                         Colors.red.shade700,
@@ -838,7 +839,9 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             ],
             _detailRow(
               "Suspended",
-              isSuspended ? _formatDateTime(suspendedUntil!) : "No",
+              isSuspended && suspendedUntil != null
+                  ? _formatDateTime(suspendedUntil)
+                  : "No",
             ),
             if (isSuspended) _detailRow("Reason", suspensionReason),
             _detailRow("City", city),

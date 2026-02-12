@@ -9,6 +9,7 @@ const {
   getVolunteerLeaderboard,
   getOrganiserLeaderboard,
   updateEvent,
+  publishEvent,
 } = require("../controllers/eventController");
 
 const {
@@ -25,6 +26,7 @@ router.get("/events/my-events", authMiddleware, getMyEvents);
 router.get("/events/leaderboard/organisers", authMiddleware, getOrganiserLeaderboard);
 router.get("/events/leaderboard/volunteers", authMiddleware, getVolunteerLeaderboard);
 router.put("/events/:id", authMiddleware, updateEvent);
+router.put("/events/:id/publish", authMiddleware, publishEvent);
 router.get(
   "/events/:id/applications",
   authMiddleware,

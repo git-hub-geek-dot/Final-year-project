@@ -32,6 +32,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
 
   bool loading = false;
   String eventType = "unpaid";
+  bool _isDraftEvent = false;
 
   final List<String> categories = [
     "Education",
@@ -62,6 +63,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
   void initState() {
     super.initState();
     final e = widget.event;
+    final statusText =
+        (e["computed_status"] ?? e["status"] ?? "").toString().toLowerCase();
+    _isDraftEvent = statusText == "draft";
 
     titleController.text = e["title"] ?? "";
     descriptionController.text = e["description"] ?? "";
@@ -181,7 +185,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
     });
   }
 
-  Future<void> handleUpdateEvent() async {
+  Future<void> handleUpdateEvent({bool publish = false}) async {
     if (titleController.text.trim().isEmpty) {
       _toast("Event title is required");
       return;
@@ -248,9 +252,17 @@ class _EditEventScreenState extends State<EditEventScreen> {
         responsibilities: responsibilities,
         startTime: _fmtTime(eventStartTime!),
         endTime: _fmtTime(eventEndTime!),
+        publish: publish,
       );
 
-      if (success && mounted) Navigator.pop(context, true);
+      if (success && mounted) {
+        if (publish) {
+          _toast("Event published");
+        } else {
+          _toast("Event updated");
+        }
+        Navigator.pop(context, true);
+      }
     } catch (e) {
       _toast("Update failed: $e");
     } finally {
@@ -421,10 +433,13 @@ class _EditEventScreenState extends State<EditEventScreen> {
             ),
           ]),
           const SizedBox(height: 24),
-          loading ? const CircularProgressIndicator() : _submitButton(),
+          loading ? const CircularProgressIndicator() : _submitButtons(),
         ]),
       ),
-      bottomNavigationBar: const OrganiserBottomNav(currentIndex: 0),
+      bottomNavigationBar: const OrganiserBottomNav(
+        currentIndex: 0,
+        isRootScreen: false,
+      ),
     );
   }
 
@@ -452,8 +467,10 @@ class _EditEventScreenState extends State<EditEventScreen> {
     );
   }
 
-  Widget _submitButton() => InkWell(
-        onTap: handleUpdateEvent,
+  Widget _submitButtons() {
+    if (!_isDraftEvent) {
+      return InkWell(
+        onTap: () => handleUpdateEvent(),
         child: Container(
           height: 56,
           width: double.infinity,
@@ -464,12 +481,58 @@ class _EditEventScreenState extends State<EditEventScreen> {
             borderRadius: BorderRadius.circular(30),
           ),
           child: const Center(
-            child: Text("Update Event",
-                style: TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold)),
+            child: Text(
+              "Update Event",
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ),
       );
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton(
+            onPressed: () => handleUpdateEvent(),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 56),
+              side: const BorderSide(color: Color(0xFF3B82F6)),
+            ),
+            child: const Text("Save Draft"),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: InkWell(
+            onTap: () => handleUpdateEvent(publish: true),
+            child: Container(
+              height: 56,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
+                ),
+                borderRadius: BorderRadius.circular(30),
+              ),
+              child: const Center(
+                child: Text(
+                  "Publish Event",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _input(String hint, TextEditingController c,
       {int maxLines = 1, TextInputType keyboardType = TextInputType.text}) {

@@ -52,9 +52,48 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         _cityController.text = data["city"] ?? "";
         _contactController.text = data["contact_number"] ?? "";
         _govIdController.text = data["government_id"] ?? "";
-        _profilePictureUrl = data["profile_picture_url"];
+        _profilePictureUrl =
+            _normalizeProfileImageUrl(data["profile_picture_url"]?.toString());
       }
     } catch (_) {}
+  }
+
+  String? _normalizeProfileImageUrl(String? url) {
+    if (url == null || url.trim().isEmpty) return null;
+
+    final baseUri = Uri.parse(ApiConfig.baseUrl);
+    final origin =
+        "${baseUri.scheme}://${baseUri.host}${baseUri.hasPort ? ':${baseUri.port}' : ''}";
+
+    if (url.startsWith("/uploads/")) {
+      return "$origin$url";
+    }
+
+    if (url.startsWith("uploads/")) {
+      return "$origin/$url";
+    }
+
+    final parsed = Uri.tryParse(url);
+    if (parsed != null && parsed.hasScheme) {
+      if (ApiConfig.useCloud) {
+        return url;
+      }
+
+      final host = parsed.host;
+      final isLocalLike = host == "localhost" ||
+          host == "127.0.0.1" ||
+          host.startsWith("10.") ||
+          host.startsWith("192.168.") ||
+          host.startsWith("172.");
+
+      if (isLocalLike && host != baseUri.host) {
+        final pathWithQuery =
+            parsed.hasQuery ? "${parsed.path}?${parsed.query}" : parsed.path;
+        return "$origin$pathWithQuery";
+      }
+    }
+
+    return url;
   }
 
   @override
@@ -144,6 +183,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       : (_profilePictureUrl != null
                           ? NetworkImage(_profilePictureUrl!)
                           : null),
+                  onBackgroundImageError:
+                      (_selectedImage == null && _profilePictureUrl != null)
+                          ? (_, __) {
+                              if (!mounted || _profilePictureUrl == null) {
+                                return;
+                              }
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                if (!mounted || _profilePictureUrl == null) {
+                                  return;
+                                }
+                                setState(() => _profilePictureUrl = null);
+                              });
+                            }
+                          : null,
                   child: (_selectedImage == null && _profilePictureUrl == null)
                       ? const Icon(Icons.person, size: 40)
                       : null,

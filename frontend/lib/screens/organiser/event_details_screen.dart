@@ -18,6 +18,7 @@ class EventDetailsScreen extends StatefulWidget {
 
 class _EventDetailsScreenState extends State<EventDetailsScreen> {
   bool loadingStats = true;
+  bool publishingDraft = false;
 
   int applied = 0;
   int approved = 0;
@@ -61,9 +62,66 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     }
   }
 
+  bool _isDraft(Map event) {
+    final text =
+        (event["computed_status"] ?? event["status"] ?? "").toString().toLowerCase();
+    return text == "draft";
+  }
+
+  Future<void> _publishDraft(Map event) async {
+    final eventId = int.tryParse("${event["id"]}");
+    if (eventId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Invalid event id")),
+      );
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Publish Event"),
+        content: const Text(
+          "Do you want to publish this draft event now?",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Publish"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => publishingDraft = true);
+    try {
+      await EventService.publishDraftEvent(eventId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Event published successfully")),
+      );
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      final message = e.toString().replaceFirst("Exception: ", "");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } finally {
+      if (mounted) setState(() => publishingDraft = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final event = widget.event;
+    final isDraftEvent = _isDraft(event);
     final bannerUrl = event["banner_url"];
     final status = (event["computed_status"] ?? event["status"] ?? "upcoming")
         .toString()
@@ -231,11 +289,15 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                   ],
                 ),
               ),
+              if (isDraftEvent) _draftBottomActions(event),
             ],
           ),
         ),
       ),
-      bottomNavigationBar: const OrganiserBottomNav(currentIndex: 0),
+      bottomNavigationBar: const OrganiserBottomNav(
+        currentIndex: 0,
+        isRootScreen: false,
+      ),
     );
   }
 
@@ -243,6 +305,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isNarrow = constraints.maxWidth < 420;
+        final isDraftEvent = _isDraft(event);
 
         final viewVolunteersButton = ElevatedButton(
           onPressed: () async {
@@ -287,10 +350,14 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              viewVolunteersButton,
-              const SizedBox(height: 10),
-              editEventButton,
-              const SizedBox(height: 10),
+              if (!isDraftEvent) ...[
+                viewVolunteersButton,
+                const SizedBox(height: 10),
+              ],
+              if (!isDraftEvent) ...[
+                editEventButton,
+                const SizedBox(height: 10),
+              ],
               closeButton,
             ],
           );
@@ -298,14 +365,86 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
 
         return Row(
           children: [
-            Expanded(child: viewVolunteersButton),
-            const SizedBox(width: 10),
-            editEventButton,
-            const SizedBox(width: 10),
+            if (!isDraftEvent) ...[
+              Expanded(child: viewVolunteersButton),
+              const SizedBox(width: 10),
+            ],
+            if (!isDraftEvent) ...[
+              editEventButton,
+              const SizedBox(width: 10),
+            ],
             closeButton,
           ],
         );
       },
+    );
+  }
+
+  Widget _draftBottomActions(Map event) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: publishingDraft
+                  ? null
+                  : () async {
+                      final updated = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => EditEventScreen(event: event),
+                        ),
+                      );
+                      if (updated == true && mounted) {
+                        Navigator.pop(context, true);
+                      }
+                    },
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 56),
+                side: const BorderSide(color: Color(0xFF3B82F6)),
+              ),
+              child: const Text("Edit Draft"),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: InkWell(
+              onTap: publishingDraft ? null : () => _publishDraft(event),
+              child: Container(
+                height: 56,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  gradient: publishingDraft
+                      ? const LinearGradient(colors: [Colors.grey, Colors.grey])
+                      : const LinearGradient(
+                          colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
+                        ),
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: Center(
+                  child: publishingDraft
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          "Publish Event",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

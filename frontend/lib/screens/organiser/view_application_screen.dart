@@ -361,7 +361,10 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                     ),
                   ),
                 ),
-      bottomNavigationBar: const OrganiserBottomNav(currentIndex: 0),
+      bottomNavigationBar: const OrganiserBottomNav(
+        currentIndex: 0,
+        isRootScreen: false,
+      ),
     );
   }
 }

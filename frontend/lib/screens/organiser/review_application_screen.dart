@@ -136,7 +136,10 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: const OrganiserBottomNav(currentIndex: 0),
+      bottomNavigationBar: const OrganiserBottomNav(
+        currentIndex: 0,
+        isRootScreen: false,
+      ),
     );
   }
 }

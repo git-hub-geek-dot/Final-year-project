@@ -89,7 +89,8 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
           name = data["name"];
           email = data["email"];
           city = data["city"];
-          profilePictureUrl = data["profile_picture_url"];
+          profilePictureUrl =
+              _normalizeProfileImageUrl(data["profile_picture_url"]?.toString());
           role = data["role"];
           loading = false;
         });
@@ -105,6 +106,44 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
         errorMessage = "Error: $e";
       });
     }
+  }
+
+  String? _normalizeProfileImageUrl(String? url) {
+    if (url == null || url.trim().isEmpty) return null;
+
+    final baseUri = Uri.parse(ApiConfig.baseUrl);
+    final origin =
+        "${baseUri.scheme}://${baseUri.host}${baseUri.hasPort ? ':${baseUri.port}' : ''}";
+
+    if (url.startsWith("/uploads/")) {
+      return "$origin$url";
+    }
+
+    if (url.startsWith("uploads/")) {
+      return "$origin/$url";
+    }
+
+    final parsed = Uri.tryParse(url);
+    if (parsed != null && parsed.hasScheme) {
+      if (ApiConfig.useCloud) {
+        return url;
+      }
+
+      final host = parsed.host;
+      final isLocalLike = host == "localhost" ||
+          host == "127.0.0.1" ||
+          host.startsWith("10.") ||
+          host.startsWith("192.168.") ||
+          host.startsWith("172.");
+
+      if (isLocalLike && host != baseUri.host) {
+        final pathWithQuery =
+            parsed.hasQuery ? "${parsed.path}?${parsed.query}" : parsed.path;
+        return "$origin$pathWithQuery";
+      }
+    }
+
+    return url;
   }
 
   Future<void> loadRatingSummary() async {
@@ -277,6 +316,21 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
                               backgroundColor: Colors.white,
                               backgroundImage: profilePictureUrl != null
                                   ? NetworkImage(profilePictureUrl!)
+                                  : null,
+                              onBackgroundImageError: profilePictureUrl != null
+                                  ? (_, __) {
+                                      if (!mounted || profilePictureUrl == null) {
+                                        return;
+                                      }
+                                      WidgetsBinding.instance
+                                          .addPostFrameCallback((_) {
+                                        if (!mounted ||
+                                            profilePictureUrl == null) {
+                                          return;
+                                        }
+                                        setState(() => profilePictureUrl = null);
+                                      });
+                                    }
                                   : null,
                               child: profilePictureUrl == null
                                   ? const Icon(Icons.person, size: 40)

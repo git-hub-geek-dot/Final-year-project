@@ -28,7 +28,7 @@ class HelpSupportScreen extends StatelessWidget {
             title: "Frequently Asked Questions",
             subtitle: "Find answers to common questions",
             onTap: () {
-              // TODO: FAQ screen
+              _showFaqDialog(context);
             },
           ),
 
@@ -111,6 +111,27 @@ Widget _infoTile(String title, String value) {
       children: [
         Text(title, style: const TextStyle(color: Colors.grey)),
         Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
+      ],
+    ),
+  );
+}
+
+/// FAQ DIALOG
+void _showFaqDialog(BuildContext context) {
+  showDialog(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text("Frequently Asked Questions"),
+      content: const Text(
+        "• How do I manage my events?\nGo to My Events and update details or status.\n\n"
+        "• How does verification work?\nSubmit documents under Get Verified and wait for admin review.\n\n"
+        "• What is the strike/suspension policy?\nRepeated violations may lead to strikes. 2 strikes: 3-day suspension, 3 strikes: 7-day suspension, 4 strikes: ban.",
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("Close"),
+        ),
       ],
     ),
   );

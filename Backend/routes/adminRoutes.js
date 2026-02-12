@@ -22,6 +22,34 @@ router.post(
   adminController.updateUserStatus
 );
 
+router.post(
+  "/users/:id/strikes",
+  authenticateToken,
+  adminOnly,
+  adminController.addUserStrike
+);
+
+router.post(
+  "/users/:id/strikes/reset",
+  authenticateToken,
+  adminOnly,
+  adminController.resetUserStrikes
+);
+
+router.post(
+  "/users/:id/suspend",
+  authenticateToken,
+  adminOnly,
+  adminController.suspendUser
+);
+
+router.post(
+  "/users/:id/unsuspend",
+  authenticateToken,
+  adminOnly,
+  adminController.unsuspendUser
+);
+
 // ================= EVENTS =================
 router.get(
   "/events",

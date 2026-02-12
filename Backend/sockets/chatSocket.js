@@ -19,6 +19,33 @@ const getRateState = (userId) => {
   return rateLimits.get(userId);
 };
 
+const ensureActiveUser = async (userId) => {
+  const result = await pool.query(
+    `SELECT status, suspended_until
+     FROM users
+     WHERE id = $1`,
+    [userId]
+  );
+
+  if (result.rowCount === 0) {
+    return { ok: false, reason: "Unauthorized" };
+  }
+
+  const user = result.rows[0];
+  if (user.status !== "active") {
+    return { ok: false, reason: "Unauthorized" };
+  }
+
+  if (user.suspended_until) {
+    const until = new Date(user.suspended_until);
+    if (until.getTime() > Date.now()) {
+      return { ok: false, reason: "Suspended" };
+    }
+  }
+
+  return { ok: true };
+};
+
 const isRateLimited = (userId) => {
   const now = Date.now();
   const state = getRateState(userId);
@@ -48,13 +75,17 @@ const isTokenExpired = (socket) => {
 };
 
 const initChatSocket = (io) => {
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth?.token;
       if (!token) {
         return next(new Error("Unauthorized"));
       }
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const status = await ensureActiveUser(decoded.id);
+      if (!status.ok) {
+        return next(new Error("Unauthorized"));
+      }
       socket.user = decoded;
       return next();
     } catch (err) {
@@ -66,6 +97,12 @@ const initChatSocket = (io) => {
     socket.on("joinThread", async ({ threadId }) => {
       try {
         if (isTokenExpired(socket)) {
+          socket.disconnect(true);
+          return;
+        }
+
+        const userStatus = await ensureActiveUser(socket.user.id);
+        if (!userStatus.ok) {
           socket.disconnect(true);
           return;
         }
@@ -116,6 +153,12 @@ const initChatSocket = (io) => {
           socket.emit("rateLimited", {
             message: "Too many messages. Please slow down.",
           });
+          return;
+        }
+
+        const userStatus = await ensureActiveUser(socket.user.id);
+        if (!userStatus.ok) {
+          socket.disconnect(true);
           return;
         }
 

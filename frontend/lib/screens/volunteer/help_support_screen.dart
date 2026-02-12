@@ -29,6 +29,8 @@ class HelpSupportScreen extends StatelessWidget {
                 context,
                 title: "Frequently Asked Questions",
                 content: const [
+                  "� What is the strike/suspension policy?\nRepeated violations may lead to strikes. 2 strikes: 3-day suspension, 3 strikes: 7-day suspension, 4 strikes: ban.",
+
                   "• How do I apply for an event?\nTap on the Apply button on any event card.",
                   "• Can I cancel my application?\nYes, cancellation will be available once applications are approved.",
                   "• Are paid events guaranteed payments?\nPayments depend on organiser confirmation and event completion.",
@@ -175,3 +177,5 @@ class HelpSupportScreen extends StatelessWidget {
     );
   }
 }
+
+

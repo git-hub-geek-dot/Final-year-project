@@ -348,6 +348,22 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                       final isAdmin = u["role"] == "admin";
                                       final isVerified =
                                           u["isVerified"] == true;
+                                      final strikeCount =
+                                          (u["strike_count"] as num?)?.toInt() ??
+                                              0;
+                                      final suspendedUntilRaw =
+                                          u["suspended_until"];
+                                      final suspendedUntil =
+                                          suspendedUntilRaw == null
+                                              ? null
+                                              : DateTime.tryParse(
+                                                  suspendedUntilRaw.toString(),
+                                                );
+                                      final isSuspended = suspendedUntil !=
+                                              null &&
+                                          suspendedUntil.isAfter(
+                                            DateTime.now(),
+                                          );
                                       final userId = (u["id"] as num?)?.toInt();
                                       final canSelect =
                                           !isAdmin && userId != null;
@@ -381,8 +397,23 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                                 )
                                               : _buildProfileAvatar(profileUrl),
                                           title: Text(u["name"]),
-                                          subtitle: Text(
-                                            "${u["email"]} • ${u["role"]} • ${u["status"]}",
+                                          subtitle: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                "${u["email"]} - ${u["role"]} - ${u["status"]} - strikes:$strikeCount",
+                                              ),
+                                              if (isSuspended)
+                                                Text(
+                                                  "Suspended until ${_formatDateTime(suspendedUntil!)}",
+                                                  style: TextStyle(
+                                                    color:
+                                                        Colors.red.shade700,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                            ],
                                           ),
                                           onTap: () {
                                             if (_selectionMode && canSelect) {
@@ -404,83 +435,314 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                               else
                                                 PopupMenuButton<String>(
                                                   onSelected: (value) async {
-                                                    final confirm =
-                                                        await showDialog<bool>(
-                                                      context: context,
-                                                      builder: (ctx) =>
-                                                          AlertDialog(
-                                                        title: const Text(
-                                                          "Update user status",
-                                                        ),
-                                                        content: Text(
-                                                          "Set ${u["name"]} to ${value.toUpperCase()}?",
-                                                        ),
-                                                        actions: [
-                                                          TextButton(
-                                                            onPressed: () =>
-                                                                Navigator.pop(
-                                                                    ctx, false),
-                                                            child: const Text(
-                                                                "Cancel"),
+                                                    if (value.startsWith("status:")) {
+                                                      final status =
+                                                          value.split(":")[1];
+                                                      final confirm =
+                                                          await showDialog<bool>(
+                                                        context: context,
+                                                        builder: (ctx) =>
+                                                            AlertDialog(
+                                                          title: const Text(
+                                                            "Update user status",
                                                           ),
-                                                          TextButton(
-                                                            onPressed: () =>
-                                                                Navigator.pop(
-                                                                    ctx, true),
-                                                            child: const Text(
-                                                                "Confirm"),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    );
-
-                                                    if (confirm != true) return;
-
-                                                    try {
-                                                      await AdminService
-                                                          .updateUserStatus(
-                                                        u["id"],
-                                                        value,
-                                                      );
-                                                      if (!mounted) return;
-                                                      ScaffoldMessenger.of(
-                                                              context)
-                                                          .showSnackBar(
-                                                        SnackBar(
                                                           content: Text(
-                                                            "Status updated to ${value.toUpperCase()}",
+                                                            "Set ${u["name"]} to ${status.toUpperCase()}?",
                                                           ),
+                                                          actions: [
+                                                            TextButton(
+                                                              onPressed: () =>
+                                                                  Navigator.pop(
+                                                                      ctx,
+                                                                      false),
+                                                              child: const Text(
+                                                                  "Cancel"),
+                                                            ),
+                                                            TextButton(
+                                                              onPressed: () =>
+                                                                  Navigator.pop(
+                                                                      ctx,
+                                                                      true),
+                                                              child: const Text(
+                                                                  "Confirm"),
+                                                            ),
+                                                          ],
                                                         ),
                                                       );
-                                                      _fetchUsers(reset: true);
-                                                    } catch (_) {
-                                                      if (!mounted) return;
-                                                      ScaffoldMessenger.of(
-                                                              context)
-                                                          .showSnackBar(
-                                                        const SnackBar(
+
+                                                      if (confirm != true) {
+                                                        return;
+                                                      }
+
+                                                      try {
+                                                        await AdminService
+                                                            .updateUserStatus(
+                                                          u["id"],
+                                                          status,
+                                                        );
+                                                        if (!mounted) return;
+                                                        ScaffoldMessenger.of(
+                                                                context)
+                                                            .showSnackBar(
+                                                          SnackBar(
+                                                            content: Text(
+                                                              "Status updated to ${status.toUpperCase()}",
+                                                            ),
+                                                          ),
+                                                        );
+                                                        _fetchUsers(reset: true);
+                                                      } catch (_) {
+                                                        if (!mounted) return;
+                                                        ScaffoldMessenger.of(
+                                                                context)
+                                                            .showSnackBar(
+                                                          const SnackBar(
+                                                            content: Text(
+                                                              "Failed to update status",
+                                                            ),
+                                                          ),
+                                                        );
+                                                      }
+                                                      return;
+                                                    }
+
+                                                    if (value == "strike:add") {
+                                                      final reason =
+                                                          await _promptReason(
+                                                        title: "Add strike",
+                                                        hint:
+                                                            "Reason for strike",
+                                                      );
+                                                      if (reason == null ||
+                                                          reason.isEmpty) {
+                                                        return;
+                                                      }
+
+                                                      try {
+                                                        final result =
+                                                            await AdminService
+                                                                .addUserStrike(
+                                                          u["id"],
+                                                          reason,
+                                                        );
+                                                        if (!mounted) return;
+                                                        final action =
+                                                            result["action"]
+                                                                ?.toString();
+                                                        final count =
+                                                            (result["strikeCount"]
+                                                                        as num?)
+                                                                    ?.toInt() ??
+                                                                0;
+                                                        final message = action ==
+                                                                "banned"
+                                                            ? "User banned after strike"
+                                                            : action != null &&
+                                                                    action.startsWith(
+                                                                        "suspended_")
+                                                                ? "User suspended after strike"
+                                                                : "Strike added";
+                                                        ScaffoldMessenger.of(
+                                                                context)
+                                                            .showSnackBar(
+                                                          SnackBar(
+                                                            content: Text(
+                                                              "$message (strikes: $count)",
+                                                            ),
+                                                          ),
+                                                        );
+                                                        _fetchUsers(reset: true);
+                                                      } catch (err) {
+                                                        if (!mounted) return;
+                                                        ScaffoldMessenger.of(
+                                                                context)
+                                                            .showSnackBar(
+                                                          SnackBar(
+                                                            content: Text(
+                                                              err.toString(),
+                                                            ),
+                                                          ),
+                                                        );
+                                                      }
+                                                      return;
+                                                    }
+
+                                                    if (value ==
+                                                        "strike:reset") {
+                                                      final confirm =
+                                                          await showDialog<bool>(
+                                                        context: context,
+                                                        builder: (ctx) =>
+                                                            AlertDialog(
+                                                          title: const Text(
+                                                            "Reset strikes",
+                                                          ),
                                                           content: Text(
-                                                            "Failed to update status",
+                                                            "Reset strikes for ${u["name"]}?",
                                                           ),
+                                                          actions: [
+                                                            TextButton(
+                                                              onPressed: () =>
+                                                                  Navigator.pop(
+                                                                      ctx,
+                                                                      false),
+                                                              child: const Text(
+                                                                  "Cancel"),
+                                                            ),
+                                                            TextButton(
+                                                              onPressed: () =>
+                                                                  Navigator.pop(
+                                                                      ctx,
+                                                                      true),
+                                                              child: const Text(
+                                                                  "Confirm"),
+                                                            ),
+                                                          ],
                                                         ),
                                                       );
+
+                                                      if (confirm != true) {
+                                                        return;
+                                                      }
+
+                                                      try {
+                                                        await AdminService
+                                                            .resetUserStrikes(
+                                                          u["id"],
+                                                        );
+                                                        if (!mounted) return;
+                                                        ScaffoldMessenger.of(
+                                                                context)
+                                                            .showSnackBar(
+                                                          const SnackBar(
+                                                            content: Text(
+                                                              "Strikes reset",
+                                                            ),
+                                                          ),
+                                                        );
+                                                        _fetchUsers(reset: true);
+                                                      } catch (_) {
+                                                        if (!mounted) return;
+                                                        ScaffoldMessenger.of(
+                                                                context)
+                                                            .showSnackBar(
+                                                          const SnackBar(
+                                                            content: Text(
+                                                              "Failed to reset strikes",
+                                                            ),
+                                                          ),
+                                                        );
+                                                      }
+                                                      return;
+                                                    }
+
+                                                    if (value == "suspend") {
+                                                      final input =
+                                                          await _promptSuspension();
+                                                      if (input == null) {
+                                                        return;
+                                                      }
+
+                                                      try {
+                                                        await AdminService
+                                                            .suspendUser(
+                                                          u["id"],
+                                                          input.days,
+                                                          input.reason,
+                                                        );
+                                                        if (!mounted) return;
+                                                        ScaffoldMessenger.of(
+                                                                context)
+                                                            .showSnackBar(
+                                                          const SnackBar(
+                                                            content: Text(
+                                                              "User suspended",
+                                                            ),
+                                                          ),
+                                                        );
+                                                        _fetchUsers(reset: true);
+                                                      } catch (_) {
+                                                        if (!mounted) return;
+                                                        ScaffoldMessenger.of(
+                                                                context)
+                                                            .showSnackBar(
+                                                          const SnackBar(
+                                                            content: Text(
+                                                              "Failed to suspend user",
+                                                            ),
+                                                          ),
+                                                        );
+                                                      }
+                                                      return;
+                                                    }
+
+                                                    if (value ==
+                                                        "unsuspend") {
+                                                      try {
+                                                        await AdminService
+                                                            .unsuspendUser(
+                                                          u["id"],
+                                                        );
+                                                        if (!mounted) return;
+                                                        ScaffoldMessenger.of(
+                                                                context)
+                                                            .showSnackBar(
+                                                          const SnackBar(
+                                                            content: Text(
+                                                              "User unsuspended",
+                                                            ),
+                                                          ),
+                                                        );
+                                                        _fetchUsers(reset: true);
+                                                      } catch (_) {
+                                                        if (!mounted) return;
+                                                        ScaffoldMessenger.of(
+                                                                context)
+                                                            .showSnackBar(
+                                                          const SnackBar(
+                                                            content: Text(
+                                                              "Failed to unsuspend user",
+                                                            ),
+                                                          ),
+                                                        );
+                                                      }
                                                     }
                                                   },
-                                                  itemBuilder: (context) =>
-                                                      const [
-                                                    PopupMenuItem(
-                                                      value: "active",
+                                                  itemBuilder: (context) => [
+                                                    const PopupMenuItem(
+                                                      value: "status:active",
                                                       child: Text("Set Active"),
                                                     ),
-                                                    PopupMenuItem(
-                                                      value: "inactive",
+                                                    const PopupMenuItem(
+                                                      value: "status:inactive",
                                                       child:
                                                           Text("Set Inactive"),
                                                     ),
-                                                    PopupMenuItem(
-                                                      value: "banned",
+                                                    const PopupMenuItem(
+                                                      value: "status:banned",
                                                       child: Text("Set Banned"),
                                                     ),
+                                                    const PopupMenuDivider(),
+                                                    const PopupMenuItem(
+                                                      value: "strike:add",
+                                                      child: Text("Add Strike"),
+                                                    ),
+                                                    const PopupMenuItem(
+                                                      value: "strike:reset",
+                                                      child:
+                                                          Text("Reset Strikes"),
+                                                    ),
+                                                    const PopupMenuItem(
+                                                      value: "suspend",
+                                                      child:
+                                                          Text("Suspend User"),
+                                                    ),
+                                                    if (isSuspended)
+                                                      const PopupMenuItem(
+                                                        value: "unsuspend",
+                                                        child:
+                                                            Text("Unsuspend"),
+                                                      ),
                                                   ],
                                                   child: Chip(
                                                     label: Text(
@@ -515,6 +777,15 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     final createdAt = (user["created_at"] ?? "-").toString();
     final profileUrl = (user["profile_picture_url"] ?? "").toString();
     final isVerified = user["isVerified"] == true;
+    final strikeCount = (user["strike_count"] as num?)?.toInt() ?? 0;
+    final strikeHistory = (user["strike_history"] as List?) ?? [];
+    final suspendedUntilRaw = user["suspended_until"];
+    final suspendedUntil = suspendedUntilRaw == null
+        ? null
+        : DateTime.tryParse(suspendedUntilRaw.toString());
+    final isSuspended =
+        suspendedUntil != null && suspendedUntil.isAfter(DateTime.now());
+    final suspensionReason = (user["suspension_reason"] ?? "-").toString();
 
     showDialog(
       context: context,
@@ -542,6 +813,34 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             _detailRow("Role", role),
             _detailRow("Verified", isVerified ? "Yes" : "No"),
             _detailRow("Status", status),
+            _detailRow("Strikes", strikeCount.toString()),
+            if (strikeHistory.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              const Text(
+                "Strike History",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 6),
+              ...strikeHistory.map((entry) {
+                final reason = (entry["reason"] ?? "-").toString();
+                final createdAtRaw = entry["created_at"];
+                final createdAt = createdAtRaw == null
+                    ? "-"
+                    : _formatDateTime(
+                        DateTime.tryParse(createdAtRaw.toString()) ??
+                            DateTime.fromMillisecondsSinceEpoch(0),
+                      );
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text("• $createdAt: $reason"),
+                );
+              }).toList(),
+            ],
+            _detailRow(
+              "Suspended",
+              isSuspended ? _formatDateTime(suspendedUntil!) : "No",
+            ),
+            if (isSuspended) _detailRow("Reason", suspensionReason),
             _detailRow("City", city),
             _detailRow("Contact", contact),
             _detailRow("Joined", createdAt),
@@ -555,6 +854,96 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         ],
       ),
     );
+  }
+
+  String _formatDateTime(DateTime value) {
+    final y = value.year.toString().padLeft(4, '0');
+    final m = value.month.toString().padLeft(2, '0');
+    final d = value.day.toString().padLeft(2, '0');
+    final hh = value.hour.toString().padLeft(2, '0');
+    final mm = value.minute.toString().padLeft(2, '0');
+    return "$y-$m-$d $hh:$mm";
+  }
+
+  Future<String?> _promptReason({
+    required String title,
+    required String hint,
+  }) async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: controller,
+          maxLines: 3,
+          decoration: InputDecoration(hintText: hint),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text("Confirm"),
+          ),
+        ],
+      ),
+    );
+    return result;
+  }
+
+  Future<_SuspensionInput?> _promptSuspension() async {
+    final daysController = TextEditingController(text: "3");
+    final reasonController = TextEditingController();
+    final result = await showDialog<_SuspensionInput>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Suspend user"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: daysController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: "Days",
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: "Reason",
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () {
+              final days = int.tryParse(daysController.text.trim());
+              final reason = reasonController.text.trim();
+              if (days == null || days < 1 || reason.isEmpty) {
+                return;
+              }
+              Navigator.pop(
+                ctx,
+                _SuspensionInput(days: days, reason: reason),
+              );
+            },
+            child: const Text("Confirm"),
+          ),
+        ],
+      ),
+    );
+    return result;
   }
 
   Widget _detailRow(String label, String value) {
@@ -619,3 +1008,15 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     return sortAsc ? result : -result;
   }
 }
+
+class _SuspensionInput {
+  final int days;
+  final String reason;
+
+  _SuspensionInput({
+    required this.days,
+    required this.reason,
+  });
+}
+
+

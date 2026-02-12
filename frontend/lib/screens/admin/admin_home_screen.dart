@@ -116,6 +116,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           builder: (context, snapshot) {
             final stats = snapshot.data;
             final loadingStats = snapshot.connectionState == ConnectionState.waiting;
+            final hasStatsError = snapshot.hasError;
 
             return Column(
               children: [
@@ -168,6 +169,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     ],
                   ),
                 ),
+                if (hasStatsError && !loadingStats)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                    child: _statsErrorBanner(),
+                  ),
                 Expanded(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
@@ -252,54 +258,86 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
+  Widget _statsErrorBanner() {
+    return Card(
+      color: Colors.red.shade50,
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.red),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                "Failed to load dashboard stats.",
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+            TextButton(
+              onPressed: _refreshStats,
+              child: const Text("Retry"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _statCard({
     required String label,
     required String value,
     required IconData icon,
     required Color color,
+    VoidCallback? onTap,
   }) {
     return Expanded(
       child: Card(
         elevation: 2,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: color.withValues(alpha: 0.12),
-                child: Icon(icon, color: color, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.black54,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      value,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: color.withValues(alpha: 0.12),
+                  child: Icon(icon, color: color, size: 20),
                 ),
-              ),
-            ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.black54,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        value,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

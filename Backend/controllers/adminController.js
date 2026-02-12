@@ -1,6 +1,13 @@
 const pool = require("../config/db");
 const { notifyUser } = require("../services/notificationService");
 
+const STRIKE_SUSPENSIONS = [
+  { threshold: 2, days: 3 },
+  { threshold: 3, days: 7 },
+];
+const BAN_STRIKE_THRESHOLD = 4;
+const MAX_STRIKE_REASON_LENGTH = 500;
+
 // ================= GET ALL USERS =================
 const getUsers = async (req, res) => {
   try {
@@ -13,9 +20,37 @@ const getUsers = async (req, res) => {
     const totalPages = Math.max(Math.ceil(total / limit), 1);
 
     const users = await pool.query(
-      `SELECT id, name, email, role, status, created_at, profile_picture_url, city, contact_number, "isVerified"
-       FROM users
-       ORDER BY id DESC
+      `SELECT 
+         u.id,
+         u.name,
+         u.email,
+         u.role,
+         u.status,
+         u.created_at,
+         u.profile_picture_url,
+         u.city,
+         u.contact_number,
+         u."isVerified",
+         u.suspended_until,
+         u.suspension_reason,
+         (SELECT COUNT(*)::int FROM user_strikes s WHERE s.user_id = u.id) AS strike_count,
+         COALESCE(
+           (
+             SELECT json_agg(
+               json_build_object(
+                 'id', s.id,
+                 'reason', s.reason,
+                 'created_at', s.created_at
+               )
+               ORDER BY s.created_at DESC
+             )
+             FROM user_strikes s
+             WHERE s.user_id = u.id
+           ),
+           '[]'::json
+         ) AS strike_history
+       FROM users u
+       ORDER BY u.id DESC
        LIMIT $1 OFFSET $2`,
       [limit, offset]
     );
@@ -79,6 +114,7 @@ const getApplications = async (req, res) => {
       `SELECT 
          a.id,
          a.status,
+         a.admin_cancel_reason,
          a.applied_at,
          u.name AS volunteer_name,
          u.email AS volunteer_email,
@@ -209,16 +245,244 @@ const getStatsTimeseries = async (req, res) => {
   } catch (err) {
     console.error("UPDATE USER STATUS ERROR:", err);
     res.status(500).json({ error: "Failed to update user status" });
-  }};
+  }
+};
 
+const addUserStrike = async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id, 10);
+    const adminId = req.user?.id;
+    const reason = (req.body?.reason || "").toString().trim();
+
+    if (!userId || Number.isNaN(userId)) {
+      return res.status(400).json({ error: "Invalid user ID" });
+    }
+
+    if (!adminId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    if (!reason) {
+      return res.status(400).json({ error: "Strike reason is required" });
+    }
+
+    if (reason.length > MAX_STRIKE_REASON_LENGTH) {
+      return res.status(400).json({ error: "Strike reason is too long" });
+    }
+
+    const userRes = await pool.query(
+      "SELECT id, role, status, suspended_until FROM users WHERE id = $1",
+      [userId]
+    );
+
+    if (userRes.rowCount === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (userRes.rows[0].role === "admin") {
+      return res.status(400).json({ error: "Cannot strike admin users" });
+    }
+
+    await pool.query(
+      `INSERT INTO user_strikes (user_id, admin_id, reason)
+       VALUES ($1, $2, $3)`,
+      [userId, adminId, reason]
+    );
+
+    const countRes = await pool.query(
+      "SELECT COUNT(*)::int AS count FROM user_strikes WHERE user_id = $1",
+      [userId]
+    );
+
+    const strikeCount = countRes.rows[0]?.count || 0;
+    let action = "warning";
+    let suspendedUntil = null;
+    let status = userRes.rows[0].status;
+
+    if (strikeCount >= BAN_STRIKE_THRESHOLD) {
+      await pool.query(
+        `UPDATE users
+         SET status = 'banned',
+             suspended_until = NULL,
+             suspension_reason = $2
+         WHERE id = $1`,
+        [userId, reason]
+      );
+      action = "banned";
+      status = "banned";
+    } else {
+      const match = STRIKE_SUSPENSIONS.find(
+        (entry) => entry.threshold === strikeCount
+      );
+
+      if (match) {
+        const until = new Date(Date.now() + match.days * 24 * 60 * 60 * 1000);
+        const updateRes = await pool.query(
+          `UPDATE users
+           SET suspended_until = CASE
+               WHEN suspended_until IS NULL OR suspended_until < $2 THEN $2
+               ELSE suspended_until
+             END,
+             suspension_reason = $3
+           WHERE id = $1
+           RETURNING suspended_until, status`,
+          [userId, until, reason]
+        );
+
+        suspendedUntil = updateRes.rows[0]?.suspended_until || until;
+        status = updateRes.rows[0]?.status || status;
+        action = `suspended_${match.days}_days`;
+      }
+    }
+
+    res.json({ strikeCount, action, suspendedUntil, status });
+
+    try {
+      await notifyUser(userId, {
+        title: "Account notice",
+        body:
+          action === "warning"
+            ? `You received a strike on your account. Reason: ${reason}`
+            : action === "banned"
+                ? `Your account has been banned. Reason: ${reason}`
+                : `Your account has been suspended. Reason: ${reason}`,
+        data: { type: "account_strike", action, strikeCount, reason },
+      });
+    } catch (notifyErr) {
+      console.error("STRIKE NOTIFY ERROR:", notifyErr);
+    }
+  } catch (err) {
+    console.error("ADD STRIKE ERROR:", err);
+    res.status(500).json({ error: "Failed to add strike" });
+  }
+};
+
+const resetUserStrikes = async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id, 10);
+
+    if (!userId || Number.isNaN(userId)) {
+      return res.status(400).json({ error: "Invalid user ID" });
+    }
+
+    await pool.query("DELETE FROM user_strikes WHERE user_id = $1", [userId]);
+    await pool.query(
+      "UPDATE users SET suspended_until = NULL, suspension_reason = NULL WHERE id = $1",
+      [userId]
+    );
+
+    res.json({ message: "User strikes reset", strikeCount: 0 });
+  } catch (err) {
+    console.error("RESET STRIKES ERROR:", err);
+    res.status(500).json({ error: "Failed to reset strikes" });
+  }
+};
+
+const suspendUser = async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id, 10);
+    const days = parseInt(req.body?.days, 10);
+    const reason = (req.body?.reason || "").toString().trim();
+
+    if (!userId || Number.isNaN(userId)) {
+      return res.status(400).json({ error: "Invalid user ID" });
+    }
+
+    if (!days || Number.isNaN(days) || days < 1 || days > 365) {
+      return res.status(400).json({ error: "Invalid suspension days" });
+    }
+
+    if (!reason) {
+      return res.status(400).json({ error: "Suspension reason is required" });
+    }
+
+    if (reason.length > MAX_STRIKE_REASON_LENGTH) {
+      return res.status(400).json({ error: "Suspension reason is too long" });
+    }
+
+    const userRes = await pool.query(
+      "SELECT id, role, status FROM users WHERE id = $1",
+      [userId]
+    );
+
+    if (userRes.rowCount === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (userRes.rows[0].role === "admin") {
+      return res.status(400).json({ error: "Cannot suspend admin users" });
+    }
+
+    const result = await pool.query(
+      `UPDATE users
+       SET suspended_until = NOW() + ($2 || ' days')::interval,
+           suspension_reason = $3
+       WHERE id = $1
+       RETURNING suspended_until`,
+      [userId, days, reason]
+    );
+
+    res.json({
+      message: "User suspended",
+      suspendedUntil: result.rows[0]?.suspended_until || null,
+    });
+  } catch (err) {
+    console.error("SUSPEND USER ERROR:", err);
+    res.status(500).json({ error: "Failed to suspend user" });
+  }
+};
+
+const unsuspendUser = async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id, 10);
+
+    if (!userId || Number.isNaN(userId)) {
+      return res.status(400).json({ error: "Invalid user ID" });
+    }
+
+    const result = await pool.query(
+      `UPDATE users
+       SET suspended_until = NULL,
+           suspension_reason = NULL
+       WHERE id = $1
+       RETURNING id`,
+      [userId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({ message: "User unsuspended" });
+  } catch (err) {
+    console.error("UNSUSPEND USER ERROR:", err);
+    res.status(500).json({ error: "Failed to unsuspend user" });
+  }
+};
 
   const cancelApplication = async (req, res) => {
   try {
     const appId = req.params.id;
+    const reason = (req.body?.reason || "").toString().trim();
+
+    if (!reason) {
+      return res
+        .status(400)
+        .json({ error: "Cancellation reason is required" });
+    }
+
+    if (reason.length > 500) {
+      return res
+        .status(400)
+        .json({ error: "Cancellation reason is too long" });
+    }
 
     const result = await pool.query(
-      "UPDATE applications SET status = 'cancelled' WHERE id = $1",
-      [appId]
+      `UPDATE applications
+       SET status = 'cancelled', admin_cancel_reason = $1
+       WHERE id = $2
+       RETURNING id, volunteer_id`,
+      [reason, appId]
     );
 
     if (result.rowCount === 0) {
@@ -228,16 +492,12 @@ const getStatsTimeseries = async (req, res) => {
     res.json({ message: "Application cancelled" });
 
     try {
-      const appResult = await pool.query(
-        "SELECT volunteer_id FROM applications WHERE id = $1",
-        [appId]
-      );
-      const volunteerId = appResult.rows[0]?.volunteer_id;
+      const volunteerId = result.rows[0]?.volunteer_id;
       if (volunteerId) {
         await notifyUser(volunteerId, {
           title: "Application update",
-          body: "Your application was cancelled by admin.",
-          data: { type: "application_cancelled" },
+          body: `Your application was cancelled by admin. Reason: ${reason}`,
+          data: { type: "application_cancelled", reason },
         });
       }
     } catch (notifyErr) {
@@ -629,6 +889,10 @@ module.exports = {
   getStats,
   getStatsTimeseries,
   updateUserStatus,
+  addUserStrike,
+  resetUserStrikes,
+  suspendUser,
+  unsuspendUser,
   cancelApplication,
   deleteEvent,
   hardDeleteEvent,

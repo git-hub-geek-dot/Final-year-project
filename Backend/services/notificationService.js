@@ -42,7 +42,27 @@ const notifyUsers = async (userIds, payload) => {
   await sendToTokens(tokens, payload);
 };
 
+const getAllUserIds = async (roleFilter = null) => {
+  let query = "SELECT id FROM users WHERE status = 'active'";
+  let params = [];
+
+  if (roleFilter && roleFilter !== 'all') {
+    query += " AND role = $1";
+    params = [roleFilter];
+  }
+
+  const result = await pool.query(query, params);
+  return result.rows.map(row => row.id);
+};
+
+const broadcastNotification = async (payload, roleFilter = null) => {
+  const userIds = await getAllUserIds(roleFilter);
+  await notifyUsers(userIds, payload);
+};
+
 module.exports = {
   notifyUser,
   notifyUsers,
+  broadcastNotification,
+  getAllUserIds,
 };

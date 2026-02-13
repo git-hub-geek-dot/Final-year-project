@@ -250,7 +250,16 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
                                       return Opacity(
                                         opacity: isDeleted ? 0.4 : 1.0,
                                         child: Card(
-                                          child: ListTile(
+                                          margin: const EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 4),
+                                          elevation: 2,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                          child: InkWell(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
                                             onTap: () {
                                               Navigator.push(
                                                 context,
@@ -261,31 +270,130 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
                                                 ),
                                               );
                                             },
-                                            title: Text(
-                                              isDeleted
-                                                  ? "${event["title"]} (Deleted)"
-                                                  : event["title"],
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                decoration: isDeleted
-                                                    ? TextDecoration.lineThrough
-                                                    : null,
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(16),
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  // Title and Status Row
+                                                  Row(
+                                                    children: [
+                                                      Expanded(
+                                                        child: Text(
+                                                          event["title"],
+                                                          style: TextStyle(
+                                                            fontSize: 18,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            decoration: isDeleted
+                                                                ? TextDecoration
+                                                                    .lineThrough
+                                                                : null,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      if (isDeleted)
+                                                        Container(
+                                                          padding:
+                                                              const EdgeInsets
+                                                                  .symmetric(
+                                                                  horizontal: 8,
+                                                                  vertical: 4),
+                                                          decoration:
+                                                              BoxDecoration(
+                                                            color: Colors
+                                                                .red.shade100,
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        12),
+                                                          ),
+                                                          child: Text(
+                                                            "DELETED",
+                                                            style: TextStyle(
+                                                              fontSize: 10,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                              color: Colors
+                                                                  .red.shade700,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 8),
+
+                                                  // Organiser and Date Row
+                                                  Row(
+                                                    children: [
+                                                      Icon(Icons.person,
+                                                          size: 16,
+                                                          color: Colors.grey),
+                                                      const SizedBox(width: 4),
+                                                      Expanded(
+                                                        child: Text(
+                                                          "Organiser: ${event["organiser_name"] ?? "N/A"}",
+                                                          style:
+                                                              const TextStyle(
+                                                                  color: Colors
+                                                                      .grey),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 4),
+
+                                                  Row(
+                                                    children: [
+                                                      Icon(Icons.calendar_today,
+                                                          size: 16,
+                                                          color: Colors.grey),
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        _formatEventDate(event[
+                                                            "event_date"]),
+                                                        style: const TextStyle(
+                                                            color: Colors.grey),
+                                                      ),
+                                                    ],
+                                                  ),
+
+                                                  // Actions Row
+                                                  const SizedBox(height: 12),
+                                                  Row(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment.end,
+                                                    children: [
+                                                      if (!isDeleted)
+                                                        TextButton.icon(
+                                                          onPressed: () async {
+                                                            await _confirmDelete(
+                                                                event);
+                                                          },
+                                                          icon: const Icon(
+                                                              Icons.delete,
+                                                              size: 16),
+                                                          label: const Text(
+                                                              "Delete"),
+                                                          style: TextButton
+                                                              .styleFrom(
+                                                            foregroundColor:
+                                                                Colors.red,
+                                                            padding:
+                                                                const EdgeInsets
+                                                                    .symmetric(
+                                                                    horizontal:
+                                                                        12,
+                                                                    vertical:
+                                                                        8),
+                                                          ),
+                                                        ),
+                                                    ],
+                                                  ),
+                                                ],
                                               ),
-                                            ),
-                                            subtitle: Text(
-                                              "Organiser: ${event["organiser_name"] ?? "N/A"}",
-                                            ),
-                                            trailing: IconButton(
-                                              icon: const Icon(
-                                                Icons.delete,
-                                                color: Colors.red,
-                                              ),
-                                              onPressed: isDeleted
-                                                  ? null
-                                                  : () async {
-                                                      await _confirmDelete(
-                                                          event);
-                                                    },
                                             ),
                                           ),
                                         ),
@@ -299,6 +407,24 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
                   ),
       ),
     );
+  }
+
+  String _formatEventDate(String? dateString) {
+    if (dateString == null) return "Date TBA";
+    final date = DateTime.tryParse(dateString);
+    if (date == null) return "Invalid Date";
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final eventDate = DateTime(date.year, date.month, date.day);
+
+    if (eventDate == today) {
+      return "Today, ${date.hour}:${date.minute.toString().padLeft(2, '0')}";
+    } else if (eventDate == today.add(const Duration(days: 1))) {
+      return "Tomorrow, ${date.hour}:${date.minute.toString().padLeft(2, '0')}";
+    } else {
+      return "${date.day}/${date.month}/${date.year}, ${date.hour}:${date.minute.toString().padLeft(2, '0')}";
+    }
   }
 
   int _compareEvents(Map a, Map b) {

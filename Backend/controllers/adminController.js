@@ -882,6 +882,48 @@ const deleteBadge = async (req, res) => {
   }
 };
 
+// ================= BROADCAST NOTIFICATIONS =================
+const { broadcastNotification } = require("../services/notificationService");
+
+const sendBroadcastNotification = async (req, res) => {
+  try {
+    const { title, message, targetRole } = req.body;
+
+    if (!title || !message) {
+      return res.status(400).json({ error: "Title and message are required" });
+    }
+
+    if (title.length > 100 || message.length > 500) {
+      return res.status(400).json({ error: "Title or message too long" });
+    }
+
+    // Validate targetRole if provided
+    if (targetRole && !['volunteer', 'organiser', 'all'].includes(targetRole)) {
+      return res.status(400).json({ error: "Invalid target role" });
+    }
+
+    const roleFilter = targetRole === 'all' ? null : targetRole;
+
+    await broadcastNotification({
+      title,
+      body: message,
+      data: { 
+        type: "broadcast", 
+        targetRole: roleFilter || 'all',
+        sentAt: new Date().toISOString()
+      }
+    }, roleFilter);
+
+    res.json({ 
+      message: "Broadcast notification sent successfully",
+      targetRole: roleFilter || 'all'
+    });
+  } catch (err) {
+    console.error("BROADCAST NOTIFICATION ERROR:", err);
+    res.status(500).json({ error: "Failed to send broadcast notification" });
+  }
+};
+
 module.exports = {
   getUsers,
   getEvents,
@@ -906,4 +948,5 @@ module.exports = {
   getVerificationRequests,
   approveVerification,
   rejectVerification,
+  sendBroadcastNotification,
 };

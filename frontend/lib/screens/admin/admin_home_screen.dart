@@ -41,49 +41,63 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         icon: Icons.bar_chart,
         title: 'Stats',
         subtitle: 'View system statistics',
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminStatsScreen())),
+        onTap: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const AdminStatsScreen())),
         color: Colors.blue,
       ),
       DashboardItem(
         icon: Icons.event,
         title: 'Events',
         subtitle: 'Manage events',
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminEventsScreen())),
+        onTap: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const AdminEventsScreen())),
         color: Colors.green,
       ),
       DashboardItem(
         icon: Icons.people,
         title: 'Users',
         subtitle: 'Manage users',
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminUsersScreen())),
+        onTap: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const AdminUsersScreen())),
         color: Colors.orange,
       ),
       DashboardItem(
         icon: Icons.assignment,
         title: 'Applications',
         subtitle: 'Review applications',
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminApplicationsScreen())),
+        onTap: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const AdminApplicationsScreen())),
         color: Colors.purple,
       ),
       DashboardItem(
         icon: Icons.verified_user,
         title: 'Verification',
         subtitle: 'Verify users',
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminVerificationScreen())),
+        onTap: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const AdminVerificationScreen())),
         color: Colors.cyan,
+      ),
+      DashboardItem(
+        icon: Icons.notifications_active,
+        title: 'Broadcast',
+        subtitle: 'Send notifications',
+        onTap: () => _showBroadcastDialog(context),
+        color: Colors.teal,
       ),
       DashboardItem(
         icon: Icons.leaderboard,
         title: 'Leaderboard',
         subtitle: 'View leaderboard',
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminLeaderboardScreen())),
+        onTap: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const AdminLeaderboardScreen())),
         color: Colors.red,
       ),
       DashboardItem(
         icon: Icons.military_tech,
         title: 'Badges',
         subtitle: 'Manage badges',
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminBadgesScreen())),
+        onTap: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const AdminBadgesScreen())),
         color: Colors.amber,
       ),
     ];
@@ -115,7 +129,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           future: _statsFuture,
           builder: (context, snapshot) {
             final stats = snapshot.data;
-            final loadingStats = snapshot.connectionState == ConnectionState.waiting;
+            final loadingStats =
+                snapshot.connectionState == ConnectionState.waiting;
             final hasStatsError = snapshot.hasError;
 
             return Column(
@@ -152,7 +167,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           ? _statSkeletonCard()
                           : _statCard(
                               label: "Pending Verifications",
-                              value: stats?['pendingVerifications']?.toString() ?? "-",
+                              value:
+                                  stats?['pendingVerifications']?.toString() ??
+                                      "-",
                               icon: Icons.verified_user,
                               color: Colors.orange,
                             ),
@@ -161,8 +178,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           ? _statSkeletonCard()
                           : _statCard(
                               label: "Applications",
-                              value:
-                                  stats?['totalApplications']?.toString() ?? "-",
+                              value: stats?['totalApplications']?.toString() ??
+                                  "-",
                               icon: Icons.assignment,
                               color: Colors.purple,
                             ),
@@ -179,11 +196,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     builder: (context, constraints) {
                       final width = constraints.maxWidth;
                       final crossAxisCount = width < 600
-                          ? 1
+                          ? 2
                           : width < 900
-                              ? 2
-                              : 3;
-                      final childAspectRatio = width < 600 ? 1.6 : 1.2;
+                              ? 3
+                              : 4;
+                      final childAspectRatio = width < 600 ? 1.1 : 1.0;
 
                       return GridView.builder(
                         padding: const EdgeInsets.all(16.0),
@@ -197,20 +214,21 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         itemBuilder: (context, index) {
                           final item = items[index];
                           return Card(
-                            elevation: 4.0,
+                            elevation: 8.0,
+                            shadowColor: item.color.withValues(alpha: 0.3),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16.0),
+                              borderRadius: BorderRadius.circular(20.0),
                             ),
                             child: InkWell(
                               onTap: item.onTap,
-                              borderRadius: BorderRadius.circular(16.0),
+                              borderRadius: BorderRadius.circular(20.0),
                               child: Container(
                                 decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(16.0),
+                                  borderRadius: BorderRadius.circular(20.0),
                                   gradient: LinearGradient(
                                     colors: [
-                                      item.color.withValues(alpha: 0.7),
-                                      item.color
+                                      item.color.withValues(alpha: 0.8),
+                                      item.color.withValues(alpha: 0.6),
                                     ],
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
@@ -219,8 +237,19 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(item.icon,
-                                        size: 48.0, color: Colors.white),
+                                    Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            Colors.white.withValues(alpha: 0.2),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        item.icon,
+                                        size: 32.0,
+                                        color: Colors.white,
+                                      ),
+                                    ),
                                     const SizedBox(height: 12.0),
                                     Text(
                                       item.title,
@@ -387,6 +416,129 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  void _showBroadcastDialog(BuildContext context) {
+    final titleController = TextEditingController();
+    final messageController = TextEditingController();
+    String selectedRole = 'all';
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Send Broadcast Notification'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: titleController,
+                  decoration: const InputDecoration(
+                    labelText: 'Title',
+                    hintText: 'Enter notification title',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLength: 100,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: messageController,
+                  decoration: const InputDecoration(
+                    labelText: 'Message',
+                    hintText: 'Enter notification message',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLength: 500,
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: selectedRole,
+                  decoration: const InputDecoration(
+                    labelText: 'Target Audience',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'all', child: Text('All Users')),
+                    DropdownMenuItem(
+                        value: 'volunteer', child: Text('Volunteers Only')),
+                    DropdownMenuItem(
+                        value: 'organiser', child: Text('Organizers Only')),
+                  ],
+                  onChanged: (value) {
+                    setState(() => selectedRole = value!);
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      if (titleController.text.trim().isEmpty ||
+                          messageController.text.trim().isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please fill in all fields'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+
+                      setState(() => isLoading = true);
+
+                      try {
+                        await AdminService.sendBroadcastNotification(
+                          title: titleController.text.trim(),
+                          message: messageController.text.trim(),
+                          targetRole: selectedRole,
+                        );
+
+                        if (context.mounted) {
+                          Navigator.of(dialogContext).pop();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Notification sent to ${selectedRole == 'all' ? 'all users' : selectedRole + 's'}!',
+                              ),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Failed to send notification: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      } finally {
+                        setState(() => isLoading = false);
+                      }
+                    },
+              child: isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Send'),
+            ),
+          ],
         ),
       ),
     );

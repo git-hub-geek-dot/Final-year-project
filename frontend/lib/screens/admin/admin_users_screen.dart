@@ -73,6 +73,26 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
   bool get _selectionMode => selectedUserIds.isNotEmpty;
 
+  List<Map<String, dynamic>> _getFilteredUsers() {
+    final filtered = users
+        .where((u) {
+          final matchSearch = u["name"].toLowerCase().contains(search) ||
+              u["email"].toLowerCase().contains(search);
+
+          final matchStatus =
+              statusFilter == "all" || u["status"] == statusFilter;
+
+          final matchRole = roleFilter == "all" || u["role"] == roleFilter;
+
+          return matchSearch && matchStatus && matchRole;
+        })
+        .map((u) => u as Map<String, dynamic>)
+        .toList();
+
+    filtered.sort((a, b) => _compareUsers(a, b));
+    return filtered;
+  }
+
   void _toggleSelected(int userId) {
     setState(() {
       if (selectedUserIds.contains(userId)) {
@@ -137,11 +157,635 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     _fetchUsers(reset: true);
   }
 
-  Widget _buildProfileAvatar(String profileUrl) {
+  Widget _buildProfileAvatar(String profileUrl, {double radius = 24}) {
     return CircleAvatar(
+      radius: radius,
+      backgroundColor: Colors.grey.shade200,
       backgroundImage: profileUrl.isNotEmpty ? NetworkImage(profileUrl) : null,
       onBackgroundImageError: profileUrl.isNotEmpty ? (_, __) {} : null,
-      child: profileUrl.isEmpty ? const Icon(Icons.person) : null,
+      child: profileUrl.isEmpty
+          ? Icon(Icons.person, color: Colors.grey.shade600)
+          : null,
+    );
+  }
+
+  Widget _buildLoadingSkeleton() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: 5,
+      itemBuilder: (context, index) {
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: 200,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFilterChip({
+    required String label,
+    required bool selected,
+    required Function(bool) onSelected,
+  }) {
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: onSelected,
+      backgroundColor: Colors.white,
+      selectedColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+      checkmarkColor: Theme.of(context).primaryColor,
+      side: BorderSide(
+        color: selected ? Theme.of(context).primaryColor : Colors.grey.shade300,
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.people_outline,
+            size: 64,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            search.isNotEmpty || statusFilter != 'all' || roleFilter != 'all'
+                ? 'No users match your filters'
+                : 'No users found',
+            style: TextStyle(
+              fontSize: 18,
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            search.isNotEmpty || statusFilter != 'all' || roleFilter != 'all'
+                ? 'Try adjusting your search or filters'
+                : 'Users will appear here once registered',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade500,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          if (search.isNotEmpty || statusFilter != 'all' || roleFilter != 'all')
+            Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: TextButton.icon(
+                onPressed: () {
+                  setState(() {
+                    search = '';
+                    statusFilter = 'all';
+                    roleFilter = 'all';
+                  });
+                },
+                icon: const Icon(Icons.clear_all),
+                label: const Text('Clear all filters'),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEnhancedUserCard(Map<String, dynamic> user) {
+    final isAdmin = user["role"] == "admin";
+    final isVerified = user["isVerified"] == true;
+    final strikeCount = (user["strike_count"] as num?)?.toInt() ?? 0;
+    final suspendedUntilRaw = user["suspended_until"];
+    final suspendedUntil = suspendedUntilRaw == null
+        ? null
+        : DateTime.tryParse(suspendedUntilRaw.toString());
+    final isSuspended =
+        suspendedUntil != null && suspendedUntil.isAfter(DateTime.now());
+    final userId = (user["id"] as num?)?.toInt();
+    final canSelect = !isAdmin && userId != null;
+    final selected = userId != null && selectedUserIds.contains(userId);
+    final profileUrl = (user["profile_picture_url"] ?? "").toString();
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      elevation: selected ? 4 : 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: selected
+            ? BorderSide(color: Theme.of(context).primaryColor, width: 2)
+            : BorderSide.none,
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          if (_selectionMode && canSelect) {
+            _toggleSelected(userId);
+            return;
+          }
+          _showUserDetails(context, user);
+        },
+        onLongPress: canSelect ? () => _toggleSelected(userId) : null,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              // Selection Checkbox (when in selection mode)
+              if (_selectionMode) ...[
+                Checkbox(
+                  value: selected,
+                  onChanged: canSelect ? (_) => _toggleSelected(userId) : null,
+                ),
+                const SizedBox(width: 12),
+              ],
+
+              // Profile Avatar
+              _buildProfileAvatar(profileUrl, radius: 28),
+              const SizedBox(width: 16),
+
+              // User Info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Name and Status Row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            user["name"] ?? "Unknown",
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildStatusBadge(user["status"], isSuspended),
+                      ],
+                    ),
+
+                    const SizedBox(height: 4),
+
+                    // Email and Role
+                    Text(
+                      user["email"] ?? "",
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+
+                    const SizedBox(height: 2),
+
+                    // Role and Additional Info
+                    Row(
+                      children: [
+                        _buildRoleChip(user["role"]),
+                        if (isVerified) ...[
+                          const SizedBox(width: 8),
+                          Icon(Icons.verified, size: 16, color: Colors.blue),
+                        ],
+                        if (strikeCount > 0) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade50,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.red.shade200),
+                            ),
+                            child: Text(
+                              '$strikeCount strike${strikeCount == 1 ? '' : 's'}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.red.shade700,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+
+                    // Suspension Info
+                    if (isSuspended) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        "Suspended until ${_formatDateTime(suspendedUntil)}",
+                        style: TextStyle(
+                          color: Colors.red.shade700,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+              // Action Menu
+              if (!isAdmin)
+                PopupMenuButton<String>(
+                  onSelected: (value) async {
+                    if (value.startsWith("status:")) {
+                      final status = value.split(":")[1];
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text("Update user status"),
+                          content: Text(
+                              "Set ${user["name"]} to ${status.toUpperCase()}?"),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text("Cancel"),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text("Confirm"),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (confirm != true) return;
+
+                      try {
+                        await AdminService.updateUserStatus(user["id"], status);
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                                "Status updated to ${status.toUpperCase()}"),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                        _fetchUsers(reset: true);
+                      } catch (e) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text("Failed to update status: $e"),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    } else if (value == "strike:add") {
+                      final reason = await _promptStrikeReason();
+                      if (reason == null || reason.isEmpty) return;
+
+                      try {
+                        final result = await AdminService.addUserStrike(
+                            user["id"], reason);
+                        if (!mounted) return;
+                        final action = result["action"]?.toString();
+                        final count =
+                            (result["strikeCount"] as num?)?.toInt() ?? 0;
+                        final message = action == "banned"
+                            ? "User banned after strike"
+                            : action != null && action.startsWith("suspended_")
+                                ? "User suspended after strike"
+                                : "Strike added";
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text("$message (strikes: $count)"),
+                            backgroundColor: Colors.orange,
+                          ),
+                        );
+                        _fetchUsers(reset: true);
+                      } catch (e) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text("Failed to add strike: $e"),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    } else if (value == "strike:reset") {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text("Reset strikes"),
+                          content: Text("Reset strikes for ${user["name"]}?"),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text("Cancel"),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text("Confirm"),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (confirm != true) return;
+
+                      try {
+                        await AdminService.resetUserStrikes(user["id"]);
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("Strikes reset"),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                        _fetchUsers(reset: true);
+                      } catch (e) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text("Failed to reset strikes: $e"),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    } else if (value == "suspend") {
+                      final input = await _promptSuspension();
+                      if (input == null) return;
+
+                      try {
+                        await AdminService.suspendUser(
+                            user["id"], input.days, input.reason);
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("User suspended"),
+                            backgroundColor: Colors.orange,
+                          ),
+                        );
+                        _fetchUsers(reset: true);
+                      } catch (e) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text("Failed to suspend user: $e"),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    } else if (value == "unsuspend") {
+                      try {
+                        await AdminService.unsuspendUser(user["id"]);
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("User unsuspended"),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                        _fetchUsers(reset: true);
+                      } catch (e) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text("Failed to unsuspend user: $e"),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    } else if (value == "view_details") {
+                      _showUserDetails(context, user);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: "view_details",
+                      child: Row(
+                        children: [
+                          Icon(Icons.visibility, size: 18),
+                          SizedBox(width: 8),
+                          Text("View Details"),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(
+                      value: "status:active",
+                      child: Row(
+                        children: [
+                          Icon(Icons.check_circle,
+                              size: 18, color: Colors.green),
+                          SizedBox(width: 8),
+                          Text("Set Active"),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: "status:inactive",
+                      child: Row(
+                        children: [
+                          Icon(Icons.pause_circle,
+                              size: 18, color: Colors.orange),
+                          SizedBox(width: 8),
+                          Text("Set Inactive"),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: "status:banned",
+                      child: Row(
+                        children: [
+                          Icon(Icons.block, size: 18, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text("Set Banned"),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(
+                      value: "strike:add",
+                      child: Row(
+                        children: [
+                          Icon(Icons.warning, size: 18, color: Colors.orange),
+                          SizedBox(width: 8),
+                          Text("Add Strike"),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: "strike:reset",
+                      child: Row(
+                        children: [
+                          Icon(Icons.refresh, size: 18, color: Colors.blue),
+                          SizedBox(width: 8),
+                          Text("Reset Strikes"),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(
+                      value: "suspend",
+                      child: Row(
+                        children: [
+                          Icon(Icons.timer_off, size: 18, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text("Suspend User"),
+                        ],
+                      ),
+                    ),
+                    if (isSuspended)
+                      const PopupMenuItem(
+                        value: "unsuspend",
+                        child: Row(
+                          children: [
+                            Icon(Icons.timer, size: 18, color: Colors.green),
+                            SizedBox(width: 8),
+                            Text("Unsuspend"),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge(String status, bool isSuspended) {
+    Color color;
+    IconData icon;
+    String label;
+
+    if (isSuspended) {
+      color = Colors.red;
+      icon = Icons.pause_circle;
+      label = "Suspended";
+    } else {
+      switch (status) {
+        case 'active':
+          color = Colors.green;
+          icon = Icons.check_circle;
+          label = "Active";
+          break;
+        case 'inactive':
+          color = Colors.orange;
+          icon = Icons.pause_circle;
+          label = "Inactive";
+          break;
+        case 'banned':
+          color = Colors.red;
+          icon = Icons.block;
+          label = "Banned";
+          break;
+        default:
+          color = Colors.grey;
+          icon = Icons.help;
+          label = status;
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: color,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRoleChip(String role) {
+    Color color;
+    String label;
+
+    switch (role) {
+      case 'admin':
+        color = Colors.purple;
+        label = 'Admin';
+        break;
+      case 'organiser':
+        color = Colors.blue;
+        label = 'Organiser';
+        break;
+      case 'volunteer':
+        color = Colors.green;
+        label = 'Volunteer';
+        break;
+      default:
+        color = Colors.grey;
+        label = role;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          color: color,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
     );
   }
 
@@ -150,10 +794,26 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Users'),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        actions: [
+          if (_selectionMode)
+            IconButton(
+              icon: const Icon(Icons.clear_all),
+              onPressed: () => setState(() => selectedUserIds.clear()),
+              tooltip: 'Clear selection',
+            ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () => _fetchUsers(reset: true),
+            tooltip: 'Refresh',
+          ),
+        ],
       ),
       body: AppBackground(
         child: loading
-            ? const Center(child: CircularProgressIndicator())
+            ? _buildLoadingSkeleton()
             : errorMessage != null
                 ? ErrorState(
                     message: errorMessage!,
@@ -161,79 +821,120 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   )
                 : Builder(
                     builder: (context) {
-                      final filtered = users.where((u) {
-                        final matchSearch =
-                            u["name"].toLowerCase().contains(search) ||
-                                u["email"].toLowerCase().contains(search);
-
-                        final matchStatus = statusFilter == "all" ||
-                            u["status"] == statusFilter;
-
-                        final matchRole =
-                            roleFilter == "all" || u["role"] == roleFilter;
-
-                        return matchSearch && matchStatus && matchRole;
-                      }).toList()
-                        ..sort((a, b) => _compareUsers(a, b));
+                      final filteredUsers = _getFilteredUsers();
 
                       return Column(
                         children: [
-                          // 🔍 Search
-                          Padding(
-                            padding: const EdgeInsets.all(8),
+                          // Enhanced Search Bar
+                          Container(
+                            margin: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.1),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
                             child: TextField(
-                              decoration: const InputDecoration(
-                                hintText: "Search name or email",
-                                prefixIcon: Icon(Icons.search),
+                              decoration: InputDecoration(
+                                hintText: "Search by name or email...",
+                                prefixIcon: const Icon(Icons.search,
+                                    color: Colors.grey),
+                                suffixIcon: search.isNotEmpty
+                                    ? IconButton(
+                                        icon: const Icon(Icons.clear,
+                                            color: Colors.grey),
+                                        onPressed: () =>
+                                            setState(() => search = ""),
+                                        tooltip: 'Clear search',
+                                      )
+                                    : null,
+                                border: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 14),
                               ),
                               onChanged: (v) =>
                                   setState(() => search = v.toLowerCase()),
                             ),
                           ),
 
-                          // 🔽 Filters
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            child: Wrap(
-                              spacing: 8,
-                              runSpacing: 4,
+                          // Enhanced Filters with Chips
+                          Container(
+                            height: 50,
+                            margin: const EdgeInsets.symmetric(horizontal: 16),
+                            child: ListView(
+                              scrollDirection: Axis.horizontal,
                               children: [
-                                DropdownButton<String>(
-                                  value: statusFilter,
-                                  items: const [
-                                    DropdownMenuItem(
-                                        value: "all",
-                                        child: Text("All Status")),
-                                    DropdownMenuItem(
-                                        value: "active", child: Text("Active")),
-                                    DropdownMenuItem(
-                                        value: "inactive",
-                                        child: Text("Inactive")),
-                                    DropdownMenuItem(
-                                        value: "banned", child: Text("Banned")),
-                                  ],
-                                  onChanged: (v) =>
-                                      setState(() => statusFilter = v!),
+                                _buildFilterChip(
+                                  label: 'All Status',
+                                  selected: statusFilter == 'all',
+                                  onSelected: (selected) =>
+                                      setState(() => statusFilter = 'all'),
                                 ),
-                                DropdownButton<String>(
-                                  value: roleFilter,
-                                  items: const [
-                                    DropdownMenuItem(
-                                        value: "all", child: Text("All Roles")),
-                                    DropdownMenuItem(
-                                        value: "volunteer",
-                                        child: Text("Volunteer")),
-                                    DropdownMenuItem(
-                                        value: "organiser",
-                                        child: Text("Organiser")),
-                                    DropdownMenuItem(
-                                        value: "admin", child: Text("Admin")),
-                                  ],
-                                  onChanged: (v) =>
-                                      setState(() => roleFilter = v!),
+                                _buildFilterChip(
+                                  label: 'Active',
+                                  selected: statusFilter == 'active',
+                                  onSelected: (selected) =>
+                                      setState(() => statusFilter = 'active'),
                                 ),
+                                _buildFilterChip(
+                                  label: 'Inactive',
+                                  selected: statusFilter == 'inactive',
+                                  onSelected: (selected) =>
+                                      setState(() => statusFilter = 'inactive'),
+                                ),
+                                _buildFilterChip(
+                                  label: 'Banned',
+                                  selected: statusFilter == 'banned',
+                                  onSelected: (selected) =>
+                                      setState(() => statusFilter = 'banned'),
+                                ),
+                                const SizedBox(width: 16),
+                                _buildFilterChip(
+                                  label: 'All Roles',
+                                  selected: roleFilter == 'all',
+                                  onSelected: (selected) =>
+                                      setState(() => roleFilter = 'all'),
+                                ),
+                                _buildFilterChip(
+                                  label: 'Volunteers',
+                                  selected: roleFilter == 'volunteer',
+                                  onSelected: (selected) =>
+                                      setState(() => roleFilter = 'volunteer'),
+                                ),
+                                _buildFilterChip(
+                                  label: 'Organisers',
+                                  selected: roleFilter == 'organiser',
+                                  onSelected: (selected) =>
+                                      setState(() => roleFilter = 'organiser'),
+                                ),
+                                _buildFilterChip(
+                                  label: 'Admins',
+                                  selected: roleFilter == 'admin',
+                                  onSelected: (selected) =>
+                                      setState(() => roleFilter = 'admin'),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // Sort Controls
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
+                            child: Row(
+                              children: [
+                                const Text('Sort by:',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.w500)),
+                                const SizedBox(width: 8),
                                 DropdownButton<String>(
                                   value: sortField,
+                                  underline: const SizedBox(),
                                   items: const [
                                     DropdownMenuItem(
                                         value: "created_at",
@@ -248,515 +949,167 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                 ),
                                 IconButton(
                                   icon: Icon(
-                                    sortAsc
-                                        ? Icons.arrow_upward
-                                        : Icons.arrow_downward,
-                                  ),
+                                      sortAsc
+                                          ? Icons.arrow_upward
+                                          : Icons.arrow_downward,
+                                      size: 20),
                                   onPressed: () =>
                                       setState(() => sortAsc = !sortAsc),
-                                  constraints: const BoxConstraints(),
-                                  padding: EdgeInsets.zero,
+                                  tooltip: sortAsc ? 'Ascending' : 'Descending',
                                 ),
                               ],
                             ),
                           ),
 
-                          const SizedBox(height: 8),
-
+                          // Selection Mode Actions
                           if (_selectionMode)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
+                            Container(
+                              margin: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 8),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context)
+                                    .primaryColor
+                                    .withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                    color: Theme.of(context)
+                                        .primaryColor
+                                        .withValues(alpha: 0.3)),
                               ),
-                              child: Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                crossAxisAlignment: WrapCrossAlignment.center,
+                              child: Row(
                                 children: [
-                                  Text("${selectedUserIds.length} selected"),
-                                  OutlinedButton(
-                                    onPressed: bulkLoading
-                                        ? null
-                                        : () => setState(
-                                              () => selectedUserIds.clear(),
-                                            ),
-                                    child: const Text("Clear"),
+                                  Icon(Icons.check_circle,
+                                      color: Theme.of(context).primaryColor),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '${selectedUserIds.length} user${selectedUserIds.length == 1 ? '' : 's'} selected',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w500),
                                   ),
-                                  ElevatedButton(
+                                  const Spacer(),
+                                  TextButton(
+                                    onPressed: () =>
+                                        setState(() => selectedUserIds.clear()),
+                                    child: const Text('Clear'),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ElevatedButton.icon(
                                     onPressed: bulkLoading
                                         ? null
                                         : () => _bulkUpdateStatus("active"),
-                                    child: const Text("Set Active"),
+                                    icon: const Icon(Icons.check_circle,
+                                        size: 16),
+                                    label: const Text("Activate"),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green,
+                                      foregroundColor: Colors.white,
+                                    ),
                                   ),
-                                  ElevatedButton(
+                                  const SizedBox(width: 8),
+                                  ElevatedButton.icon(
                                     onPressed: bulkLoading
                                         ? null
                                         : () => _bulkUpdateStatus("inactive"),
-                                    child: const Text("Set Inactive"),
+                                    icon: const Icon(Icons.pause_circle,
+                                        size: 16),
+                                    label: const Text("Deactivate"),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.orange,
+                                      foregroundColor: Colors.white,
+                                    ),
                                   ),
-                                  ElevatedButton(
+                                  const SizedBox(width: 8),
+                                  ElevatedButton.icon(
+                                    onPressed: bulkLoading
+                                        ? null
+                                        : () => _bulkUpdateStatus("banned"),
+                                    icon: const Icon(Icons.block, size: 16),
+                                    label: const Text("Ban"),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.red,
                                       foregroundColor: Colors.white,
                                     ),
-                                    onPressed: bulkLoading
-                                        ? null
-                                        : () => _bulkUpdateStatus("banned"),
-                                    child: const Text("Set Banned"),
                                   ),
                                 ],
                               ),
                             ),
 
-                          // 📋 User list
+                          // User List with Enhanced Empty State
                           Expanded(
-                            child: filtered.isEmpty
-                                ? const Center(child: Text("No users found"))
+                            child: filteredUsers.isEmpty
+                                ? _buildEmptyState()
                                 : ListView.builder(
-                                    itemCount: filtered.length + 1,
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16),
+                                    itemCount: filteredUsers.length + 1,
                                     itemBuilder: (context, i) {
-                                      if (i == filtered.length) {
+                                      if (i == filteredUsers.length) {
                                         final canLoadMore = page <= totalPages;
                                         return Padding(
                                           padding: const EdgeInsets.symmetric(
-                                              vertical: 12),
+                                              vertical: 16),
                                           child: Center(
                                             child: canLoadMore
-                                                ? ElevatedButton(
+                                                ? ElevatedButton.icon(
                                                     onPressed: loadingMore
                                                         ? null
                                                         : () => _fetchUsers(),
-                                                    child: loadingMore
+                                                    icon: loadingMore
                                                         ? const SizedBox(
-                                                            width: 18,
-                                                            height: 18,
+                                                            width: 16,
+                                                            height: 16,
                                                             child:
                                                                 CircularProgressIndicator(
                                                                     strokeWidth:
                                                                         2),
                                                           )
-                                                        : const Text(
-                                                            "Load More"),
+                                                        : const Icon(
+                                                            Icons.expand_more),
+                                                    label: Text(loadingMore
+                                                        ? "Loading..."
+                                                        : "Load More Users"),
+                                                    style: ElevatedButton
+                                                        .styleFrom(
+                                                      padding: const EdgeInsets
+                                                          .symmetric(
+                                                          horizontal: 24,
+                                                          vertical: 12),
+                                                    ),
                                                   )
-                                                : const Text("No more users"),
+                                                : Container(
+                                                    padding:
+                                                        const EdgeInsets.all(
+                                                            16),
+                                                    decoration: BoxDecoration(
+                                                      color:
+                                                          Colors.grey.shade100,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              8),
+                                                    ),
+                                                    child: const Row(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .center,
+                                                      children: [
+                                                        Icon(Icons.check_circle,
+                                                            color:
+                                                                Colors.green),
+                                                        SizedBox(width: 8),
+                                                        Text("All users loaded",
+                                                            style: TextStyle(
+                                                                color: Colors
+                                                                    .grey)),
+                                                      ],
+                                                    ),
+                                                  ),
                                           ),
                                         );
                                       }
 
-                                      final u = filtered[i];
-                                      final isAdmin = u["role"] == "admin";
-                                      final isVerified =
-                                          u["isVerified"] == true;
-                                      final strikeCount =
-                                          (u["strike_count"] as num?)?.toInt() ??
-                                              0;
-                                      final suspendedUntilRaw =
-                                          u["suspended_until"];
-                                      final suspendedUntil =
-                                          suspendedUntilRaw == null
-                                              ? null
-                                              : DateTime.tryParse(
-                                                  suspendedUntilRaw.toString(),
-                                                );
-                                      final isSuspended = suspendedUntil !=
-                                              null &&
-                                          suspendedUntil.isAfter(
-                                            DateTime.now(),
-                                          );
-                                      final userId = (u["id"] as num?)?.toInt();
-                                      final canSelect =
-                                          !isAdmin && userId != null;
-                                      final selected = userId != null &&
-                                          selectedUserIds.contains(userId);
-                                      final profileUrl =
-                                          (u["profile_picture_url"] ?? "")
-                                              .toString();
-
-                                      return Card(
-                                        child: ListTile(
-                                          leading: _selectionMode || selected
-                                              ? SizedBox(
-                                                  width: 72,
-                                                  child: Row(
-                                                    mainAxisSize:
-                                                        MainAxisSize.min,
-                                                    children: [
-                                                      Checkbox(
-                                                        value: selected,
-                                                        onChanged: canSelect
-                                                            ? (_) =>
-                                                                _toggleSelected(
-                                                                    userId)
-                                                            : null,
-                                                      ),
-                                                      _buildProfileAvatar(
-                                                          profileUrl),
-                                                    ],
-                                                  ),
-                                                )
-                                              : _buildProfileAvatar(profileUrl),
-                                          title: Text(u["name"]),
-                                          subtitle: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                "${u["email"]} - ${u["role"]} - ${u["status"]} - strikes:$strikeCount",
-                                              ),
-                                              if (isSuspended &&
-                                                  suspendedUntil != null)
-                                                Text(
-                                                  "Suspended until ${_formatDateTime(suspendedUntil)}",
-                                                  style: TextStyle(
-                                                    color:
-                                                        Colors.red.shade700,
-                                                    fontSize: 12,
-                                                  ),
-                                                ),
-                                            ],
-                                          ),
-                                          onTap: () {
-                                            if (_selectionMode && canSelect) {
-                                              _toggleSelected(userId);
-                                              return;
-                                            }
-                                            _showUserDetails(context, u);
-                                          },
-                                          onLongPress: canSelect
-                                              ? () => _toggleSelected(userId)
-                                              : null,
-                                          trailing: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              _verificationBadge(isVerified),
-                                              const SizedBox(width: 6),
-                                              if (isAdmin)
-                                                const Text("Admin")
-                                              else
-                                                PopupMenuButton<String>(
-                                                  onSelected: (value) async {
-                                                    if (value.startsWith("status:")) {
-                                                      final status =
-                                                          value.split(":")[1];
-                                                      final confirm =
-                                                          await showDialog<bool>(
-                                                        context: context,
-                                                        builder: (ctx) =>
-                                                            AlertDialog(
-                                                          title: const Text(
-                                                            "Update user status",
-                                                          ),
-                                                          content: Text(
-                                                            "Set ${u["name"]} to ${status.toUpperCase()}?",
-                                                          ),
-                                                          actions: [
-                                                            TextButton(
-                                                              onPressed: () =>
-                                                                  Navigator.pop(
-                                                                      ctx,
-                                                                      false),
-                                                              child: const Text(
-                                                                  "Cancel"),
-                                                            ),
-                                                            TextButton(
-                                                              onPressed: () =>
-                                                                  Navigator.pop(
-                                                                      ctx,
-                                                                      true),
-                                                              child: const Text(
-                                                                  "Confirm"),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      );
-
-                                                      if (confirm != true) {
-                                                        return;
-                                                      }
-
-                                                      try {
-                                                        await AdminService
-                                                            .updateUserStatus(
-                                                          u["id"],
-                                                          status,
-                                                        );
-                                                        if (!mounted) return;
-                                                        ScaffoldMessenger.of(
-                                                                context)
-                                                            .showSnackBar(
-                                                          SnackBar(
-                                                            content: Text(
-                                                              "Status updated to ${status.toUpperCase()}",
-                                                            ),
-                                                          ),
-                                                        );
-                                                        _fetchUsers(reset: true);
-                                                      } catch (_) {
-                                                        if (!mounted) return;
-                                                        ScaffoldMessenger.of(
-                                                                context)
-                                                            .showSnackBar(
-                                                          const SnackBar(
-                                                            content: Text(
-                                                              "Failed to update status",
-                                                            ),
-                                                          ),
-                                                        );
-                                                      }
-                                                      return;
-                                                    }
-
-                                                    if (value == "strike:add") {
-                                                      final reason =
-                                                          await _promptReason(
-                                                        title: "Add strike",
-                                                        hint:
-                                                            "Reason for strike",
-                                                      );
-                                                      if (reason == null ||
-                                                          reason.isEmpty) {
-                                                        return;
-                                                      }
-
-                                                      try {
-                                                        final result =
-                                                            await AdminService
-                                                                .addUserStrike(
-                                                          u["id"],
-                                                          reason,
-                                                        );
-                                                        if (!mounted) return;
-                                                        final action =
-                                                            result["action"]
-                                                                ?.toString();
-                                                        final count =
-                                                            (result["strikeCount"]
-                                                                        as num?)
-                                                                    ?.toInt() ??
-                                                                0;
-                                                        final message = action ==
-                                                                "banned"
-                                                            ? "User banned after strike"
-                                                            : action != null &&
-                                                                    action.startsWith(
-                                                                        "suspended_")
-                                                                ? "User suspended after strike"
-                                                                : "Strike added";
-                                                        ScaffoldMessenger.of(
-                                                                context)
-                                                            .showSnackBar(
-                                                          SnackBar(
-                                                            content: Text(
-                                                              "$message (strikes: $count)",
-                                                            ),
-                                                          ),
-                                                        );
-                                                        _fetchUsers(reset: true);
-                                                      } catch (err) {
-                                                        if (!mounted) return;
-                                                        ScaffoldMessenger.of(
-                                                                context)
-                                                            .showSnackBar(
-                                                          SnackBar(
-                                                            content: Text(
-                                                              err.toString(),
-                                                            ),
-                                                          ),
-                                                        );
-                                                      }
-                                                      return;
-                                                    }
-
-                                                    if (value ==
-                                                        "strike:reset") {
-                                                      final confirm =
-                                                          await showDialog<bool>(
-                                                        context: context,
-                                                        builder: (ctx) =>
-                                                            AlertDialog(
-                                                          title: const Text(
-                                                            "Reset strikes",
-                                                          ),
-                                                          content: Text(
-                                                            "Reset strikes for ${u["name"]}?",
-                                                          ),
-                                                          actions: [
-                                                            TextButton(
-                                                              onPressed: () =>
-                                                                  Navigator.pop(
-                                                                      ctx,
-                                                                      false),
-                                                              child: const Text(
-                                                                  "Cancel"),
-                                                            ),
-                                                            TextButton(
-                                                              onPressed: () =>
-                                                                  Navigator.pop(
-                                                                      ctx,
-                                                                      true),
-                                                              child: const Text(
-                                                                  "Confirm"),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      );
-
-                                                      if (confirm != true) {
-                                                        return;
-                                                      }
-
-                                                      try {
-                                                        await AdminService
-                                                            .resetUserStrikes(
-                                                          u["id"],
-                                                        );
-                                                        if (!mounted) return;
-                                                        ScaffoldMessenger.of(
-                                                                context)
-                                                            .showSnackBar(
-                                                          const SnackBar(
-                                                            content: Text(
-                                                              "Strikes reset",
-                                                            ),
-                                                          ),
-                                                        );
-                                                        _fetchUsers(reset: true);
-                                                      } catch (_) {
-                                                        if (!mounted) return;
-                                                        ScaffoldMessenger.of(
-                                                                context)
-                                                            .showSnackBar(
-                                                          const SnackBar(
-                                                            content: Text(
-                                                              "Failed to reset strikes",
-                                                            ),
-                                                          ),
-                                                        );
-                                                      }
-                                                      return;
-                                                    }
-
-                                                    if (value == "suspend") {
-                                                      final input =
-                                                          await _promptSuspension();
-                                                      if (input == null) {
-                                                        return;
-                                                      }
-
-                                                      try {
-                                                        await AdminService
-                                                            .suspendUser(
-                                                          u["id"],
-                                                          input.days,
-                                                          input.reason,
-                                                        );
-                                                        if (!mounted) return;
-                                                        ScaffoldMessenger.of(
-                                                                context)
-                                                            .showSnackBar(
-                                                          const SnackBar(
-                                                            content: Text(
-                                                              "User suspended",
-                                                            ),
-                                                          ),
-                                                        );
-                                                        _fetchUsers(reset: true);
-                                                      } catch (_) {
-                                                        if (!mounted) return;
-                                                        ScaffoldMessenger.of(
-                                                                context)
-                                                            .showSnackBar(
-                                                          const SnackBar(
-                                                            content: Text(
-                                                              "Failed to suspend user",
-                                                            ),
-                                                          ),
-                                                        );
-                                                      }
-                                                      return;
-                                                    }
-
-                                                    if (value ==
-                                                        "unsuspend") {
-                                                      try {
-                                                        await AdminService
-                                                            .unsuspendUser(
-                                                          u["id"],
-                                                        );
-                                                        if (!mounted) return;
-                                                        ScaffoldMessenger.of(
-                                                                context)
-                                                            .showSnackBar(
-                                                          const SnackBar(
-                                                            content: Text(
-                                                              "User unsuspended",
-                                                            ),
-                                                          ),
-                                                        );
-                                                        _fetchUsers(reset: true);
-                                                      } catch (_) {
-                                                        if (!mounted) return;
-                                                        ScaffoldMessenger.of(
-                                                                context)
-                                                            .showSnackBar(
-                                                          const SnackBar(
-                                                            content: Text(
-                                                              "Failed to unsuspend user",
-                                                            ),
-                                                          ),
-                                                        );
-                                                      }
-                                                    }
-                                                  },
-                                                  itemBuilder: (context) => [
-                                                    const PopupMenuItem(
-                                                      value: "status:active",
-                                                      child: Text("Set Active"),
-                                                    ),
-                                                    const PopupMenuItem(
-                                                      value: "status:inactive",
-                                                      child:
-                                                          Text("Set Inactive"),
-                                                    ),
-                                                    const PopupMenuItem(
-                                                      value: "status:banned",
-                                                      child: Text("Set Banned"),
-                                                    ),
-                                                    const PopupMenuDivider(),
-                                                    const PopupMenuItem(
-                                                      value: "strike:add",
-                                                      child: Text("Add Strike"),
-                                                    ),
-                                                    const PopupMenuItem(
-                                                      value: "strike:reset",
-                                                      child:
-                                                          Text("Reset Strikes"),
-                                                    ),
-                                                    const PopupMenuItem(
-                                                      value: "suspend",
-                                                      child:
-                                                          Text("Suspend User"),
-                                                    ),
-                                                    if (isSuspended)
-                                                      const PopupMenuItem(
-                                                        value: "unsuspend",
-                                                        child:
-                                                            Text("Unsuspend"),
-                                                      ),
-                                                  ],
-                                                  child: Chip(
-                                                    label: Text(
-                                                      (u["status"] ?? "active")
-                                                          .toString()
-                                                          .toUpperCase(),
-                                                    ),
-                                                  ),
-                                                ),
-                                            ],
-                                          ),
-                                        ),
-                                      );
+                                      return _buildEnhancedUserCard(
+                                          filteredUsers[i]);
                                     },
                                   ),
                           ),
@@ -835,13 +1188,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   padding: const EdgeInsets.only(bottom: 6),
                   child: Text("• $createdAt: $reason"),
                 );
-              }).toList(),
+              }),
             ],
             _detailRow(
               "Suspended",
-              isSuspended && suspendedUntil != null
-                  ? _formatDateTime(suspendedUntil)
-                  : "No",
+              isSuspended ? _formatDateTime(suspendedUntil) : "No",
             ),
             if (isSuspended) _detailRow("Reason", suspensionReason),
             _detailRow("City", city),
@@ -868,87 +1219,6 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     return "$y-$m-$d $hh:$mm";
   }
 
-  Future<String?> _promptReason({
-    required String title,
-    required String hint,
-  }) async {
-    final controller = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: TextField(
-          controller: controller,
-          maxLines: 3,
-          decoration: InputDecoration(hintText: hint),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("Cancel"),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: const Text("Confirm"),
-          ),
-        ],
-      ),
-    );
-    return result;
-  }
-
-  Future<_SuspensionInput?> _promptSuspension() async {
-    final daysController = TextEditingController(text: "3");
-    final reasonController = TextEditingController();
-    final result = await showDialog<_SuspensionInput>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text("Suspend user"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: daysController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: "Days",
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: reasonController,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: "Reason",
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("Cancel"),
-          ),
-          TextButton(
-            onPressed: () {
-              final days = int.tryParse(daysController.text.trim());
-              final reason = reasonController.text.trim();
-              if (days == null || days < 1 || reason.isEmpty) {
-                return;
-              }
-              Navigator.pop(
-                ctx,
-                _SuspensionInput(days: days, reason: reason),
-              );
-            },
-            child: const Text("Confirm"),
-          ),
-        ],
-      ),
-    );
-    return result;
-  }
-
   Widget _detailRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
@@ -968,22 +1238,84 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     );
   }
 
-  Widget _verificationBadge(bool isVerified) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: isVerified ? Colors.green.shade50 : Colors.grey.shade200,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        isVerified ? "Verified" : "Unverified",
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: isVerified ? Colors.green.shade700 : Colors.grey.shade700,
+  Future<_SuspensionInput?> _promptSuspension() async {
+    final daysController = TextEditingController(text: "3");
+    final reasonController = TextEditingController();
+    final result = await showDialog<_SuspensionInput>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Suspend User"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: daysController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: "Days",
+                hintText: "Number of days to suspend",
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: "Reason",
+                hintText: "Reason for suspension",
+              ),
+            ),
+          ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () {
+              final days = int.tryParse(daysController.text.trim());
+              final reason = reasonController.text.trim();
+              if (days == null || days < 1 || reason.isEmpty) {
+                return;
+              }
+              Navigator.pop(ctx, _SuspensionInput(days: days, reason: reason));
+            },
+            child: const Text("Suspend"),
+          ),
+        ],
       ),
     );
+    return result;
+  }
+
+  Future<String?> _promptStrikeReason() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Add Strike"),
+        content: TextField(
+          controller: controller,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            hintText: "Reason for strike",
+            labelText: "Reason",
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text("Add Strike"),
+          ),
+        ],
+      ),
+    );
+    return result;
   }
 
   int _compareUsers(Map a, Map b) {
@@ -1021,5 +1353,3 @@ class _SuspensionInput {
     required this.reason,
   });
 }
-
-

@@ -182,4 +182,16 @@ router.post(
   adminController.rejectVerification
 );
 
+// =================================================
+// ========== BROADCAST NOTIFICATIONS ==============
+// =================================================
+
+// 📢 Send broadcast notification
+router.post(
+  "/notifications/broadcast",
+  authenticateToken,
+  adminOnly,
+  adminController.sendBroadcastNotification
+);
+
 module.exports = router;

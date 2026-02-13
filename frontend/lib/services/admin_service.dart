@@ -5,7 +5,8 @@ import '../config/api_config.dart';
 
 class AdminService {
   // ================= EVENTS =================
-  static Future<Map<String, dynamic>> getAllEvents({int page = 1, int limit = 20}) async {
+  static Future<Map<String, dynamic>> getAllEvents(
+      {int page = 1, int limit = 20}) async {
     final token = await TokenService.getToken();
 
     final response = await http.get(
@@ -54,7 +55,8 @@ class AdminService {
   }
 
   // ================= USERS =================
-  static Future<Map<String, dynamic>> getAllUsers({int page = 1, int limit = 20}) async {
+  static Future<Map<String, dynamic>> getAllUsers(
+      {int page = 1, int limit = 20}) async {
     final token = await TokenService.getToken();
 
     final res = await http.get(
@@ -175,11 +177,13 @@ class AdminService {
   }
 
   // ================= APPLICATIONS =================
-  static Future<Map<String, dynamic>> getAllApplications({int page = 1, int limit = 20}) async {
+  static Future<Map<String, dynamic>> getAllApplications(
+      {int page = 1, int limit = 20}) async {
     final token = await TokenService.getToken();
 
     final res = await http.get(
-      Uri.parse("${ApiConfig.baseUrl}/admin/applications?page=$page&limit=$limit"),
+      Uri.parse(
+          "${ApiConfig.baseUrl}/admin/applications?page=$page&limit=$limit"),
       headers: {
         "Content-Type": "application/json",
         "Authorization": "Bearer $token",
@@ -400,6 +404,32 @@ class AdminService {
 
     if (res.statusCode != 200) {
       throw Exception("Failed to reject verification");
+    }
+  }
+
+  // ================= BROADCAST NOTIFICATIONS =================
+  static Future<void> sendBroadcastNotification({
+    required String title,
+    required String message,
+    String targetRole = 'all',
+  }) async {
+    final token = await TokenService.getToken();
+
+    final response = await http.post(
+      Uri.parse("${ApiConfig.baseUrl}/admin/notifications/broadcast"),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({
+        "title": title,
+        "message": message,
+        "targetRole": targetRole,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception("Failed to send broadcast notification");
     }
   }
 }

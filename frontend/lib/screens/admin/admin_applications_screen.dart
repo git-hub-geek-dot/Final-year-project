@@ -135,6 +135,22 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
     }
   }
 
+  String statusLabel(String status) {
+    switch (status.toLowerCase()) {
+      case "accepted":
+      case "approved":
+        return "Approved";
+      case "rejected":
+        return "Rejected";
+      case "cancelled":
+        return "Cancelled";
+      case "pending":
+        return "Pending";
+      default:
+        return status;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -208,7 +224,7 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
                                     ),
                                     DropdownMenuItem(
                                       value: "accepted",
-                                      child: Text("Accepted"),
+                                      child: Text("Approved"),
                                     ),
                                     DropdownMenuItem(
                                       value: "rejected",
@@ -306,10 +322,13 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
                                       final organiserName =
                                           app["organiser_name"] ?? "-";
 
-                                      final subtitleText = isCancelled &&
-                                              cancelReason.isNotEmpty
-                                          ? "${app["volunteer_name"]} | ${app["status"]}\nOrganiser: $organiserName | Date: $eventDate\nReason: $cancelReason"
-                                          : "${app["volunteer_name"]} | ${app["status"]}\nOrganiser: $organiserName | Date: $eventDate";
+                                      final statusText = statusLabel(
+                                        (app["status"] ?? "").toString(),
+                                      );
+                                      final subtitleText =
+                                          isCancelled && cancelReason.isNotEmpty
+                                              ? "${app["volunteer_name"]} | $statusText\nOrganiser: $organiserName | Date: $eventDate\nReason: $cancelReason"
+                                              : "${app["volunteer_name"]} | $statusText\nOrganiser: $organiserName | Date: $eventDate";
 
                                       return Card(
                                         child: ListTile(
@@ -339,8 +358,7 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
                                                       BorderRadius.circular(12),
                                                 ),
                                                 child: Text(
-                                                  (app["status"] ?? "")
-                                                      .toString(),
+                                                  statusText,
                                                   style: const TextStyle(
                                                     color: Colors.white,
                                                     fontSize: 12,
@@ -424,6 +442,7 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
     final eventCreatedAt = _fmtDateTime(app["event_created_at"]);
     final appliedAt = _fmtDateTime(app["applied_at"]);
     final status = app["status"] ?? "-";
+    final statusText = statusLabel(status.toString());
     final cancelReason = (app["admin_cancel_reason"] ?? "").toString();
 
     showDialog(
@@ -443,7 +462,7 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
             _detailRow("Email", volunteerEmail),
             _detailRow("City", volunteerCity),
             const SizedBox(height: 8),
-            _detailRow("Status", status),
+            _detailRow("Status", statusText),
             _detailRow("Applied", appliedAt),
             if (status == "cancelled" && cancelReason.isNotEmpty)
               _detailRow("Reason", cancelReason),

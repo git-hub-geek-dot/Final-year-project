@@ -466,13 +466,22 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
         final isOngoing = dateOnly.isAtSameMomentAs(today) && !isCompleted;
       final isUpcoming = dateOnly.isAfter(today) && !isCompleted;
 
-        final matchesTab = selectedTab == "all"
-          ? true
-          : selectedTab == "past"
-            ? isPast
-            : selectedTab == "ongoing"
-              ? isOngoing
-              : isUpcoming;
+        final appStatus = _applicationStatusForEvent(event) ??
+          (event["application_status"] ??
+              event["applicationStatus"] ??
+              event["my_application_status"] ??
+              "")
+            .toString()
+            .toLowerCase();
+        final isApproved = appStatus == "accepted" || appStatus == "completed";
+
+            final matchesTab = selectedTab == "all"
+              ? !isCompleted && appStatus != "rejected"
+              : selectedTab == "past"
+                ? isPast && isApproved
+                : selectedTab == "ongoing"
+                  ? isOngoing && appStatus != "rejected"
+                  : isUpcoming && appStatus != "rejected";
 
       final matchesDate = _matchesDateFilter(dateOnly, today);
 
@@ -566,12 +575,57 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
     return true;
   }
 
+  int? _readIntFromKeys(Map<String, dynamic> event, List<String> keys) {
+    for (final key in keys) {
+      final value = event[key];
+      if (value is int) return value;
+      if (value is double) return value.toInt();
+      if (value is String) {
+        final parsed = int.tryParse(value);
+        if (parsed != null) return parsed;
+      }
+    }
+    return null;
+  }
+
+  String? _progressLabel(Map<String, dynamic> event) {
+    final required = _readIntFromKeys(event, [
+      "volunteers_required",
+      "volunteersRequired",
+      "volunteers_needed",
+      "volunteersNeeded",
+      "required_volunteers",
+    ]);
+    if (required == null || required <= 0) return null;
+
+    final filled = _readIntFromKeys(event, [
+      "accepted_count",
+      "approved_count",
+      "slots_filled",
+      "filled_slots",
+      "volunteers_filled",
+    ]);
+    if (filled != null) {
+      return "$filled/$required approved";
+    }
+
+    final applied = _readIntFromKeys(event, [
+      "applications_count",
+      "applicants_count",
+      "applied_count",
+      "total_applications",
+    ]);
+    final fallback = applied ?? 0;
+    return "$fallback/$required approved";
+  }
+
   Widget _eventCard(Map<String, dynamic> event) {
     final date = _formatDate(event["event_date"]?.toString());
     final time = "${_formatTime(event["start_time"])} - ${_formatTime(event["end_time"])}";
+    final progressLabel = _progressLabel(event);
     final statusText = event["computed_status"]?.toString() == "completed"
-        ? "Closed"
-        : "Open";
+      ? "Completed"
+      : "Open";
     final statusColor = statusText == "Open" ? Colors.green : Colors.grey;
     final rawApplicationStatus = _applicationStatusForEvent(event) ??
       (event["application_status"] ??
@@ -582,7 +636,7 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
         .toLowerCase();
 
     final isPastTab = selectedTab == "past";
-    final isClosed = statusText == "Closed";
+    final isClosed = statusText == "Completed";
     final actionState = _actionState(rawApplicationStatus, isPastTab, isClosed);
 
     return GestureDetector(
@@ -710,6 +764,25 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
                           },
                         )
                       : _statusPill(actionState.label, actionState.color),
+                if (progressLabel != null) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.people_outline,
+                          size: 12, color: Colors.black38),
+                      const SizedBox(width: 4),
+                      Text(
+                        progressLabel,
+                        style: const TextStyle(
+                          color: Colors.black38,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ],
@@ -725,7 +798,7 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
       return _ActionState("Pending", false, Colors.orange);
     }
     if (status == "accepted" || status == "approved") {
-      return _ActionState("Accepted", false, Colors.green);
+      return _ActionState("Approved", false, Colors.green);
     }
     if (status == "rejected") {
       return _ActionState("Rejected", false, Colors.red);

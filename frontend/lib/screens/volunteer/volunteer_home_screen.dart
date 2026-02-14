@@ -670,6 +670,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     final date = _formatDate(event["event_date"]?.toString());
     final time =
         "${_formatTime(event["start_time"])} - ${_formatTime(event["end_time"])}";
+    final progressLabel = _recommendedProgressLabel(event);
 
     return GestureDetector(
       key: key,
@@ -752,7 +753,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
             ),
             const SizedBox(width: 12),
             Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 _eventImage(event["banner_url"]?.toString()),
                 const SizedBox(height: 12),
@@ -769,6 +770,28 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                     await fetchMyApplications();
                   },
                 ),
+                if (progressLabel != null) ...[
+                  const SizedBox(height: 6),
+                  Align(
+                    alignment: Alignment.center,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.people_outline,
+                            size: 12, color: Colors.black38),
+                        const SizedBox(width: 4),
+                        Text(
+                          progressLabel,
+                          style: const TextStyle(
+                            color: Colors.black38,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ],
@@ -783,6 +806,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
         "${_formatTime(event["start_time"])} - ${_formatTime(event["end_time"])}";
     final rawStatus = _applicationStatusForEvent(event);
     final actionState = _actionState(rawStatus);
+    final progressLabel = _recommendedProgressLabel(event);
 
     return GestureDetector(
       key: key,
@@ -845,22 +869,47 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                 ],
               ),
             ),
-            actionState.isEnabled
-                ? _gradientButton(
-                    label: actionState.label,
-                    compact: true,
-                    onTap: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ViewEventScreen(event: event),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                actionState.isEnabled
+                    ? _gradientButton(
+                        label: actionState.label,
+                        compact: true,
+                        onTap: () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ViewEventScreen(event: event),
+                            ),
+                          );
+                          await _loadSavedEvents();
+                          await fetchMyApplications();
+                        },
+                      )
+                    : _statusPill(actionState.label, actionState.color),
+                if (progressLabel != null) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.people_outline,
+                          size: 12, color: Colors.black38),
+                      const SizedBox(width: 4),
+                      Text(
+                        progressLabel,
+                        style: const TextStyle(
+                          color: Colors.black38,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
                         ),
-                      );
-                      await _loadSavedEvents();
-                      await fetchMyApplications();
-                    },
-                  )
-                : _statusPill(actionState.label, actionState.color),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
           ],
         ),
       ),
@@ -884,13 +933,57 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     return null;
   }
 
+  int? _readIntFromKeys(Map<String, dynamic> event, List<String> keys) {
+    for (final key in keys) {
+      final value = event[key];
+      if (value is int) return value;
+      if (value is double) return value.toInt();
+      if (value is String) {
+        final parsed = int.tryParse(value);
+        if (parsed != null) return parsed;
+      }
+    }
+    return null;
+  }
+
+  String? _recommendedProgressLabel(Map<String, dynamic> event) {
+    final required = _readIntFromKeys(event, [
+      "volunteers_required",
+      "volunteersRequired",
+      "volunteers_needed",
+      "volunteersNeeded",
+      "required_volunteers",
+    ]);
+    if (required == null || required <= 0) return null;
+
+    final filled = _readIntFromKeys(event, [
+      "accepted_count",
+      "approved_count",
+      "slots_filled",
+      "filled_slots",
+      "volunteers_filled",
+    ]);
+    if (filled != null) {
+      return "$filled/$required approved";
+    }
+
+    final applied = _readIntFromKeys(event, [
+      "applications_count",
+      "applicants_count",
+      "applied_count",
+      "total_applications",
+    ]);
+    final fallback = applied ?? 0;
+    return "$fallback/$required approved";
+  }
+
   _ActionState _actionState(String? status) {
     final normalized = status?.toLowerCase() ?? "";
     if (normalized == "pending") {
       return _ActionState("Pending", false, Colors.orange);
     }
     if (normalized == "accepted" || normalized == "approved") {
-      return _ActionState("Accepted", false, Colors.green);
+      return _ActionState("Approved", false, Colors.green);
     }
     if (normalized == "rejected") {
       return _ActionState("Rejected", false, Colors.red);

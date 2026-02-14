@@ -248,6 +248,7 @@ exports.getAllEvents = async (req, res) => {
         e.*,
         u.name AS organiser_name,
         u.profile_picture_url AS organiser_profile_picture_url,
+        COALESCE(COUNT(DISTINCT a.id), 0)::int AS approved_count,
         COALESCE(
           array_agg(DISTINCT er.responsibility) FILTER (WHERE er.responsibility IS NOT NULL),
           '{}'
@@ -264,6 +265,8 @@ exports.getAllEvents = async (req, res) => {
         END AS computed_status
       FROM events e
       JOIN users u ON e.organiser_id = u.id
+      LEFT JOIN applications a
+        ON a.event_id = e.id AND a.status IN ('accepted', 'approved')
       LEFT JOIN event_responsibilities er ON er.event_id = e.id
       LEFT JOIN event_categories ec ON ec.event_id = e.id
       LEFT JOIN categories c ON c.id = ec.category_id

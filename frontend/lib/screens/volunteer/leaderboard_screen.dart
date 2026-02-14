@@ -1,5 +1,8 @@
-import 'package:flutter/material.dart';
 import 'dart:math';
+
+import 'package:flutter/material.dart';
+import '../../services/event_service.dart';
+import '../../theme/app_colors.dart';
 
 class LeaderboardScreen extends StatefulWidget {
   const LeaderboardScreen({super.key});
@@ -12,42 +15,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     with SingleTickerProviderStateMixin {
   bool isWeekly = true;
   int _selectedTab = 1;
+  bool _loading = true;
+  String? _error;
+  List<Map<String, dynamic>> _leaders = [];
 
   late AnimationController _confettiController;
-
-  /// ✅ VOLUNTEER DATA
-  final List<Map<String, dynamic>> volunteerWeeklyData = [
-    {"rank": 1, "name": "Amit Sharma", "events": 42},
-    {"rank": 2, "name": "Neha Verma", "events": 36},
-    {"rank": 3, "name": "Rahul Mehta", "events": 31},
-    {"rank": 4, "name": "You", "events": 24},
-    {"rank": 5, "name": "Sanjay Rao", "events": 22},
-  ];
-
-  final List<Map<String, dynamic>> volunteerMonthlyData = [
-    {"rank": 1, "name": "Neha Verma", "events": 120},
-    {"rank": 2, "name": "Amit Sharma", "events": 115},
-    {"rank": 3, "name": "You", "events": 98},
-    {"rank": 4, "name": "Rahul Mehta", "events": 91},
-    {"rank": 5, "name": "Sanjay Rao", "events": 84},
-  ];
-
-  /// ✅ ORGANISER DATA
-  final List<Map<String, dynamic>> organiserWeeklyData = [
-    {"rank": 1, "name": "Ankit Verma", "events": 18},
-    {"rank": 2, "name": "Rahul Sharma", "events": 16},
-    {"rank": 3, "name": "Neha Gupta", "events": 15},
-    {"rank": 4, "name": "Amit Patel", "events": 12},
-    {"rank": 5, "name": "Sneha Iyer", "events": 11},
-  ];
-
-  final List<Map<String, dynamic>> organiserMonthlyData = [
-    {"rank": 1, "name": "Rahul Sharma", "events": 54},
-    {"rank": 2, "name": "Ankit Verma", "events": 49},
-    {"rank": 3, "name": "Neha Gupta", "events": 47},
-    {"rank": 4, "name": "Amit Patel", "events": 41},
-    {"rank": 5, "name": "Sneha Iyer", "events": 38},
-  ];
 
   @override
   void initState() {
@@ -56,6 +28,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat();
+    _loadLeaderboard();
   }
 
   @override
@@ -66,72 +39,120 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
   @override
   Widget build(BuildContext context) {
-    final data = _getLeaderboardData();
-
-    final yourRank =
-        data.firstWhere((e) => e["name"] == "You", orElse: () => {});
+    final data = _leaders;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
         title: const Text("Leaderboard"),
-        backgroundColor: const Color(0xFF2E6BE6),
-      ),
-      body: Column(
-        children: [
-          const SizedBox(height: 12),
-
-          /// 🔁 ORGANISER / VOLUNTEER TOGGLE
-          _roleToggleBar(),
-
-          const SizedBox(height: 12),
-
-          /// 🔁 WEEK / MONTH TOGGLE
-          _toggleBar(),
-
-          const SizedBox(height: 16),
-
-          /// 🥇 TOP 3
-          _topThree(data),
-
-          const SizedBox(height: 16),
-
-          /// 📌 YOUR RANK (PINNED)
-          if (yourRank.isNotEmpty) _yourRankCard(yourRank),
-
-          const SizedBox(height: 12),
-
-          /// 📋 FULL LIST
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: data.length,
-              itemBuilder: (context, index) {
-                final user = data[index];
-
-                return AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 400),
-                  child: _rankCard(
-                    key: ValueKey("${user["rank"]}-${isWeekly}"),
-                    rank: user["rank"],
-                    name: user["name"],
-                    events: user["events"],
-                  ),
-                );
-              },
-            ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: AppColors.primaryGradient,
           ),
-        ],
+        ),
+      ),
+      body: RefreshIndicator(
+        onRefresh: _loadLeaderboard,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.only(bottom: 16),
+          children: [
+            const SizedBox(height: 12),
+            _roleToggleBar(),
+            const SizedBox(height: 12),
+            _toggleBar(),
+            const SizedBox(height: 16),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 120),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_error != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 120),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(_error!),
+                      const SizedBox(height: 10),
+                      ElevatedButton(
+                        onPressed: _loadLeaderboard,
+                        child: const Text("Retry"),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else if (data.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 120),
+                child: Center(child: Text("No leaderboard data available")),
+              )
+            else ...[
+              _topThree(data),
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  children: data.map((user) {
+                    return AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      child: _rankCard(
+                        key: ValueKey("${user["rank"]}-$_selectedTab-$isWeekly"),
+                        rank: user["rank"],
+                        name: user["name"],
+                        events: user["events"],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
 
   /// ================= TOGGLE =================
-  List<Map<String, dynamic>> _getLeaderboardData() {
-    if (_selectedTab == 0) {
-      return isWeekly ? organiserWeeklyData : organiserMonthlyData;
+  Future<void> _loadLeaderboard() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final role = _selectedTab == 0 ? "organisers" : "volunteers";
+      final period = isWeekly ? "weekly" : "monthly";
+      final raw = await EventService.fetchLeaderboard(role: role, period: period);
+
+      final parsed = <Map<String, dynamic>>[];
+      for (var i = 0; i < raw.length; i++) {
+        final item = raw[i] as Map;
+        final name = item["name"]?.toString() ?? "Unknown";
+        final events = int.tryParse(item["completed_events"].toString()) ?? 0;
+        parsed.add({
+          "rank": i + 1,
+          "name": name,
+          "events": events,
+        });
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _leaders = parsed;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = "Failed to load leaderboard";
+      });
     }
-    return isWeekly ? volunteerWeeklyData : volunteerMonthlyData;
   }
 
   Widget _roleToggleBar() {
@@ -145,10 +166,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       child: Row(
         children: [
           _roleToggleButton("Organisers", _selectedTab == 0, () {
+            if (_selectedTab == 0) return;
             setState(() => _selectedTab = 0);
+            _loadLeaderboard();
           }),
           _roleToggleButton("Volunteers", _selectedTab == 1, () {
+            if (_selectedTab == 1) return;
             setState(() => _selectedTab = 1);
+            _loadLeaderboard();
           }),
         ],
       ),
@@ -162,7 +187,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: active ? const Color(0xFF2E6BE6) : Colors.transparent,
+            gradient: active ? AppColors.primaryGradient : null,
             borderRadius: BorderRadius.circular(30),
           ),
           child: Text(
@@ -189,10 +214,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       child: Row(
         children: [
           _toggleButton("Weekly", isWeekly, () {
+            if (isWeekly) return;
             setState(() => isWeekly = true);
+            _loadLeaderboard();
           }),
           _toggleButton("Monthly", !isWeekly, () {
+            if (!isWeekly) return;
             setState(() => isWeekly = false);
+            _loadLeaderboard();
           }),
         ],
       ),
@@ -206,7 +235,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: active ? const Color(0xFF2E6BE6) : Colors.transparent,
+            gradient: active ? AppColors.primaryGradient : null,
             borderRadius: BorderRadius.circular(30),
           ),
           child: Text(
@@ -311,7 +340,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF2E6BE6),
+        gradient: AppColors.primaryGradient,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -347,7 +376,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: const Color(0xFF2E6BE6),
+          backgroundColor: AppColors.primaryBlue,
           child: Text(
             "#$rank",
             style: const TextStyle(color: Colors.white),

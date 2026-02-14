@@ -204,9 +204,47 @@ const getEventRatings = async (req, res) => {
   }
 };
 
+const getMyRatingForEvent = async (req, res) => {
+  try {
+    const raterId = req.user.id;
+    const eventId = req.query.event_id;
+    const rateeId = req.query.ratee_id;
+
+    if (!eventId || !rateeId) {
+      return res.status(400).json({ error: "event_id and ratee_id are required" });
+    }
+
+    const result = await pool.query(
+      `
+      SELECT score, comment, created_at
+      FROM ratings
+      WHERE event_id = $1 AND ratee_id = $2 AND rater_id = $3
+      LIMIT 1
+      `,
+      [eventId, rateeId, raterId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.json({ rated: false });
+    }
+
+    const row = result.rows[0];
+    return res.json({
+      rated: true,
+      score: row.score,
+      comment: row.comment,
+      created_at: row.created_at,
+    });
+  } catch (err) {
+    console.error("GET MY RATING ERROR:", err);
+    res.status(500).json({ error: "Failed to fetch rating" });
+  }
+};
+
 module.exports = {
   giveRating,
   getRatingsForUser,
   getRatingSummary,
   getEventRatings,
+  getMyRatingForEvent,
 };

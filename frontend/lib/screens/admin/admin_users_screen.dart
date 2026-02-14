@@ -306,17 +306,21 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     final selected = userId != null && selectedUserIds.contains(userId);
     final profileUrl = (user["profile_picture_url"] ?? "").toString();
 
+    // Get screen size for responsive design
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 600;
+
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: EdgeInsets.only(bottom: isSmallScreen ? 6 : 8),
       elevation: selected ? 4 : 1,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
         side: selected
             ? BorderSide(color: Theme.of(context).primaryColor, width: 2)
             : BorderSide.none,
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
         onTap: () {
           if (_selectionMode && canSelect) {
             _toggleSelected(userId);
@@ -326,7 +330,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         },
         onLongPress: canSelect ? () => _toggleSelected(userId) : null,
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
           child: Row(
             children: [
               // Selection Checkbox (when in selection mode)
@@ -335,12 +339,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   value: selected,
                   onChanged: canSelect ? (_) => _toggleSelected(userId) : null,
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: isSmallScreen ? 8 : 12),
               ],
 
               // Profile Avatar
-              _buildProfileAvatar(profileUrl, radius: 28),
-              const SizedBox(width: 16),
+              _buildProfileAvatar(profileUrl, radius: isSmallScreen ? 24 : 28),
+              SizedBox(width: isSmallScreen ? 12 : 16),
 
               // User Info
               Expanded(
@@ -353,56 +357,60 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                         Expanded(
                           child: Text(
                             user["name"] ?? "Unknown",
-                            style: const TextStyle(
-                              fontSize: 16,
+                            style: TextStyle(
+                              fontSize: isSmallScreen ? 15 : 16,
                               fontWeight: FontWeight.w600,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: isSmallScreen ? 6 : 8),
                         _buildStatusBadge(user["status"], isSuspended),
                       ],
                     ),
 
-                    const SizedBox(height: 4),
+                    SizedBox(height: isSmallScreen ? 3 : 4),
 
                     // Email and Role
                     Text(
                       user["email"] ?? "",
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: isSmallScreen ? 13 : 14,
                         color: Colors.grey.shade600,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
 
-                    const SizedBox(height: 2),
+                    SizedBox(height: isSmallScreen ? 2 : 2),
 
                     // Role and Additional Info
                     Row(
                       children: [
                         _buildRoleChip(user["role"]),
                         if (isVerified) ...[
-                          const SizedBox(width: 8),
-                          Icon(Icons.verified, size: 16, color: Colors.blue),
+                          SizedBox(width: isSmallScreen ? 6 : 8),
+                          Icon(Icons.verified,
+                              size: isSmallScreen ? 14 : 16,
+                              color: Colors.blue),
                         ],
                         if (strikeCount > 0) ...[
-                          const SizedBox(width: 8),
+                          SizedBox(width: isSmallScreen ? 6 : 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
+                            padding: EdgeInsets.symmetric(
+                                horizontal: isSmallScreen ? 5 : 6,
+                                vertical: isSmallScreen ? 1.5 : 2),
                             decoration: BoxDecoration(
                               color: Colors.red.shade50,
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius:
+                                  BorderRadius.circular(isSmallScreen ? 8 : 10),
                               border: Border.all(color: Colors.red.shade200),
                             ),
                             child: Text(
                               '$strikeCount strike${strikeCount == 1 ? '' : 's'}',
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: isSmallScreen ? 11 : 12,
                                 color: Colors.red.shade700,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -414,12 +422,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
                     // Suspension Info
                     if (isSuspended) ...[
-                      const SizedBox(height: 4),
+                      SizedBox(height: isSmallScreen ? 3 : 4),
                       Text(
                         "Suspended until ${_formatDateTime(suspendedUntil)}",
                         style: TextStyle(
                           color: Colors.red.shade700,
-                          fontSize: 12,
+                          fontSize: isSmallScreen ? 11 : 12,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -431,6 +439,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
               // Action Menu
               if (!isAdmin)
                 PopupMenuButton<String>(
+                  padding: EdgeInsets.zero,
                   onSelected: (value) async {
                     if (value.startsWith("status:")) {
                       final status = value.split(":")[1];
@@ -596,89 +605,139 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                     }
                   },
                   itemBuilder: (context) => [
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: "view_details",
+                      padding: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 12 : 16,
+                          vertical: isSmallScreen ? 8 : 12),
                       child: Row(
                         children: [
-                          Icon(Icons.visibility, size: 18),
-                          SizedBox(width: 8),
-                          Text("View Details"),
+                          Icon(Icons.visibility, size: isSmallScreen ? 16 : 18),
+                          SizedBox(width: isSmallScreen ? 6 : 8),
+                          Text("View Details",
+                              style:
+                                  TextStyle(fontSize: isSmallScreen ? 14 : 16)),
                         ],
                       ),
                     ),
                     const PopupMenuDivider(),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: "status:active",
+                      padding: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 12 : 16,
+                          vertical: isSmallScreen ? 8 : 12),
                       child: Row(
                         children: [
                           Icon(Icons.check_circle,
-                              size: 18, color: Colors.green),
-                          SizedBox(width: 8),
-                          Text("Set Active"),
+                              size: isSmallScreen ? 16 : 18,
+                              color: Colors.green),
+                          SizedBox(width: isSmallScreen ? 6 : 8),
+                          Text("Set Active",
+                              style:
+                                  TextStyle(fontSize: isSmallScreen ? 14 : 16)),
                         ],
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: "status:inactive",
+                      padding: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 12 : 16,
+                          vertical: isSmallScreen ? 8 : 12),
                       child: Row(
                         children: [
                           Icon(Icons.pause_circle,
-                              size: 18, color: Colors.orange),
-                          SizedBox(width: 8),
-                          Text("Set Inactive"),
+                              size: isSmallScreen ? 16 : 18,
+                              color: Colors.orange),
+                          SizedBox(width: isSmallScreen ? 6 : 8),
+                          Text("Set Inactive",
+                              style:
+                                  TextStyle(fontSize: isSmallScreen ? 14 : 16)),
                         ],
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: "status:banned",
+                      padding: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 12 : 16,
+                          vertical: isSmallScreen ? 8 : 12),
                       child: Row(
                         children: [
-                          Icon(Icons.block, size: 18, color: Colors.red),
-                          SizedBox(width: 8),
-                          Text("Set Banned"),
+                          Icon(Icons.block,
+                              size: isSmallScreen ? 16 : 18, color: Colors.red),
+                          SizedBox(width: isSmallScreen ? 6 : 8),
+                          Text("Set Banned",
+                              style:
+                                  TextStyle(fontSize: isSmallScreen ? 14 : 16)),
                         ],
                       ),
                     ),
                     const PopupMenuDivider(),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: "strike:add",
+                      padding: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 12 : 16,
+                          vertical: isSmallScreen ? 8 : 12),
                       child: Row(
                         children: [
-                          Icon(Icons.warning, size: 18, color: Colors.orange),
-                          SizedBox(width: 8),
-                          Text("Add Strike"),
+                          Icon(Icons.warning,
+                              size: isSmallScreen ? 16 : 18,
+                              color: Colors.orange),
+                          SizedBox(width: isSmallScreen ? 6 : 8),
+                          Text("Add Strike",
+                              style:
+                                  TextStyle(fontSize: isSmallScreen ? 14 : 16)),
                         ],
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: "strike:reset",
+                      padding: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 12 : 16,
+                          vertical: isSmallScreen ? 8 : 12),
                       child: Row(
                         children: [
-                          Icon(Icons.refresh, size: 18, color: Colors.blue),
-                          SizedBox(width: 8),
-                          Text("Reset Strikes"),
+                          Icon(Icons.refresh,
+                              size: isSmallScreen ? 16 : 18,
+                              color: Colors.blue),
+                          SizedBox(width: isSmallScreen ? 6 : 8),
+                          Text("Reset Strikes",
+                              style:
+                                  TextStyle(fontSize: isSmallScreen ? 14 : 16)),
                         ],
                       ),
                     ),
                     const PopupMenuDivider(),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: "suspend",
+                      padding: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 12 : 16,
+                          vertical: isSmallScreen ? 8 : 12),
                       child: Row(
                         children: [
-                          Icon(Icons.timer_off, size: 18, color: Colors.red),
-                          SizedBox(width: 8),
-                          Text("Suspend User"),
+                          Icon(Icons.timer_off,
+                              size: isSmallScreen ? 16 : 18, color: Colors.red),
+                          SizedBox(width: isSmallScreen ? 6 : 8),
+                          Text("Suspend User",
+                              style:
+                                  TextStyle(fontSize: isSmallScreen ? 14 : 16)),
                         ],
                       ),
                     ),
                     if (isSuspended)
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: "unsuspend",
+                        padding: EdgeInsets.symmetric(
+                            horizontal: isSmallScreen ? 12 : 16,
+                            vertical: isSmallScreen ? 8 : 12),
                         child: Row(
                           children: [
-                            Icon(Icons.timer, size: 18, color: Colors.green),
-                            SizedBox(width: 8),
-                            Text("Unsuspend"),
+                            Icon(Icons.timer,
+                                size: isSmallScreen ? 16 : 18,
+                                color: Colors.green),
+                            SizedBox(width: isSmallScreen ? 6 : 8),
+                            Text("Unsuspend",
+                                style: TextStyle(
+                                    fontSize: isSmallScreen ? 14 : 16)),
                           ],
                         ),
                       ),

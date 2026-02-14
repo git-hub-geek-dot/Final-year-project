@@ -6,26 +6,36 @@ const fs = require("fs");
 
 const authMiddleware = require("../middleware/auth");
 const profileController = require("../controllers/profileController");
+const { storage: cloudinaryStorage } = require("../config/cloudinary");
 
 // ================= MULTER CONFIGURATION FOR PROFILE PICTURE =================
-// Ensure uploads folder exists
-const uploadDir = path.join(__dirname, "..", "uploads");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+// Check if Cloudinary is configured
+const isCloudinaryConfigured = process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET;
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    console.log("Multer destination - saving to:", uploadDir);
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    const filename = Date.now() + ext;
-    console.log("Multer filename:", filename);
-    cb(null, filename);
-  },
-});
+// Use Cloudinary if configured, otherwise local disk storage
+let storage;
+if (isCloudinaryConfigured) {
+  storage = cloudinaryStorage;
+} else {
+  // Ensure uploads folder exists for local storage
+  const uploadDir = path.join(__dirname, "..", "uploads");
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+
+  storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      console.log("Multer destination - saving to:", uploadDir);
+      cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname);
+      const filename = Date.now() + ext;
+      console.log("Multer filename:", filename);
+      cb(null, filename);
+    },
+  });
+}
 
 // Accept only common image types and limit size (5MB)
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB

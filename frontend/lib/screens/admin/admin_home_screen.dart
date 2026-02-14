@@ -132,11 +132,14 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             final loadingStats =
                 snapshot.connectionState == ConnectionState.waiting;
             final hasStatsError = snapshot.hasError;
+            final screenWidth = MediaQuery.of(context).size.width;
+            final isSmallScreen = screenWidth < 600;
 
             return Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  padding: EdgeInsets.fromLTRB(isSmallScreen ? 12 : 16,
+                      isSmallScreen ? 12 : 16, isSmallScreen ? 12 : 16, 0),
                   child: Row(
                     children: [
                       loadingStats
@@ -147,7 +150,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                               icon: Icons.people,
                               color: Colors.blue,
                             ),
-                      const SizedBox(width: 12),
+                      SizedBox(width: isSmallScreen ? 8 : 12),
                       loadingStats
                           ? _statSkeletonCard()
                           : _statCard(
@@ -160,7 +163,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  padding: EdgeInsets.fromLTRB(
+                      isSmallScreen ? 12 : 16,
+                      isSmallScreen ? 8 : 12,
+                      isSmallScreen ? 12 : 16,
+                      isSmallScreen ? 4 : 8),
                   child: Row(
                     children: [
                       loadingStats
@@ -173,7 +180,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                               icon: Icons.verified_user,
                               color: Colors.orange,
                             ),
-                      const SizedBox(width: 12),
+                      SizedBox(width: isSmallScreen ? 8 : 12),
                       loadingStats
                           ? _statSkeletonCard()
                           : _statCard(
@@ -188,19 +195,21 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 ),
                 if (hasStatsError && !loadingStats)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                    padding: EdgeInsets.fromLTRB(
+                        isSmallScreen ? 12 : 16, 2, isSmallScreen ? 12 : 16, 0),
                     child: _statsErrorBanner(),
                   ),
                 Expanded(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
-                      final width = constraints.maxWidth;
+                      final width = MediaQuery.of(context).size.width;
                       final crossAxisCount = width < 600
                           ? 2
                           : width < 900
                               ? 3
                               : 4;
                       final childAspectRatio = width < 600 ? 1.1 : 1.0;
+                      final isSmallScreen = width < 600;
 
                       return GridView.builder(
                         padding: const EdgeInsets.all(16.0),
@@ -210,66 +219,121 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           mainAxisSpacing: 16.0,
                           childAspectRatio: childAspectRatio,
                         ),
+                        shrinkWrap: true,
                         itemCount: items.length,
                         itemBuilder: (context, index) {
                           final item = items[index];
-                          return Card(
-                            elevation: 8.0,
-                            shadowColor: item.color.withValues(alpha: 0.3),
-                            shape: RoundedRectangleBorder(
+                          return Container(
+                            decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(20.0),
-                            ),
-                            child: InkWell(
-                              onTap: item.onTap,
-                              borderRadius: BorderRadius.circular(20.0),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(20.0),
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      item.color.withValues(alpha: 0.8),
-                                      item.color.withValues(alpha: 0.6),
-                                    ],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: item.color.withValues(alpha: 0.2),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
+                                  spreadRadius: 0,
                                 ),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color:
-                                            Colors.white.withValues(alpha: 0.2),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Icon(
-                                        item.icon,
-                                        size: 32.0,
-                                        color: Colors.white,
-                                      ),
+                                BoxShadow(
+                                  color: item.color.withValues(alpha: 0.1),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                  spreadRadius: -2,
+                                ),
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.05),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 8),
+                                  spreadRadius: 0,
+                                ),
+                              ],
+                            ),
+                            child: Card(
+                              elevation: 0,
+                              shadowColor: Colors.transparent,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20.0),
+                              ),
+                              child: InkWell(
+                                onTap: item.onTap,
+                                borderRadius: BorderRadius.circular(20.0),
+                                splashColor:
+                                    Colors.white.withValues(alpha: 0.2),
+                                highlightColor:
+                                    Colors.white.withValues(alpha: 0.1),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(20.0),
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        item.color.withValues(alpha: 0.9),
+                                        item.color.withValues(alpha: 0.7),
+                                        item.color.withValues(alpha: 0.5),
+                                        item.color.withValues(alpha: 0.8),
+                                      ],
+                                      stops: const [0.0, 0.3, 0.7, 1.0],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
                                     ),
-                                    const SizedBox(height: 12.0),
-                                    Text(
-                                      item.title,
-                                      style: const TextStyle(
-                                        fontSize: 16.0,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
-                                      textAlign: TextAlign.center,
+                                  ),
+                                  child: Padding(
+                                    padding: EdgeInsets.all(
+                                        isSmallScreen ? 12.0 : 16.0),
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Container(
+                                          padding: EdgeInsets.all(
+                                              isSmallScreen ? 10 : 12),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white
+                                                .withValues(alpha: 0.2),
+                                            shape: BoxShape.circle,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.white
+                                                    .withValues(alpha: 0.1),
+                                                blurRadius: 8,
+                                                spreadRadius: 0,
+                                              ),
+                                            ],
+                                          ),
+                                          child: Icon(
+                                            item.icon,
+                                            size: isSmallScreen ? 28.0 : 32.0,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                        SizedBox(
+                                            height: isSmallScreen ? 8.0 : 12.0),
+                                        Text(
+                                          item.title,
+                                          style: TextStyle(
+                                            fontSize:
+                                                isSmallScreen ? 14.0 : 16.0,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        SizedBox(
+                                            height: isSmallScreen ? 2.0 : 4.0),
+                                        Text(
+                                          item.subtitle,
+                                          style: TextStyle(
+                                            fontSize:
+                                                isSmallScreen ? 10.0 : 12.0,
+                                            color: Colors.white70,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                          maxLines: isSmallScreen ? 1 : 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(height: 4.0),
-                                    Text(
-                                      item.subtitle,
-                                      style: const TextStyle(
-                                        fontSize: 12.0,
-                                        color: Colors.white70,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ],
+                                  ),
                                 ),
                               ),
                             ),
@@ -321,23 +385,30 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     required Color color,
     VoidCallback? onTap,
   }) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 600;
+
     return Expanded(
       child: Card(
         elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16)),
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            padding: EdgeInsets.symmetric(
+                horizontal: isSmallScreen ? 10 : 14,
+                vertical: isSmallScreen ? 8 : 12),
             child: Row(
               children: [
                 CircleAvatar(
-                  radius: 18,
+                  radius: isSmallScreen ? 16 : 18,
                   backgroundColor: color.withValues(alpha: 0.12),
-                  child: Icon(icon, color: color, size: 20),
+                  child:
+                      Icon(icon, color: color, size: isSmallScreen ? 18 : 20),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: isSmallScreen ? 8 : 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -347,18 +418,18 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         label,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12,
+                        style: TextStyle(
+                          fontSize: isSmallScreen ? 11 : 12,
                           color: Colors.black54,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      SizedBox(height: isSmallScreen ? 1 : 2),
                       Text(
                         value,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 18,
+                        style: TextStyle(
+                          fontSize: isSmallScreen ? 16 : 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -374,42 +445,50 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   }
 
   Widget _statSkeletonCard() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 600;
+
     return Expanded(
       child: Card(
         elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16)),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          padding: EdgeInsets.symmetric(
+              horizontal: isSmallScreen ? 10 : 14,
+              vertical: isSmallScreen ? 8 : 12),
           child: Row(
             children: [
               Container(
-                width: 36,
-                height: 36,
+                width: isSmallScreen ? 32 : 36,
+                height: isSmallScreen ? 32 : 36,
                 decoration: BoxDecoration(
                   color: Colors.grey.shade300,
                   shape: BoxShape.circle,
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: isSmallScreen ? 8 : 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    width: 50,
-                    height: 10,
+                    width: isSmallScreen ? 45 : 50,
+                    height: isSmallScreen ? 9 : 10,
                     decoration: BoxDecoration(
                       color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius:
+                          BorderRadius.circular(isSmallScreen ? 5 : 6),
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  SizedBox(height: isSmallScreen ? 3 : 6),
                   Container(
-                    width: 36,
-                    height: 16,
+                    width: isSmallScreen ? 30 : 36,
+                    height: isSmallScreen ? 14 : 16,
                     decoration: BoxDecoration(
                       color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius:
+                          BorderRadius.circular(isSmallScreen ? 5 : 6),
                     ),
                   ),
                 ],

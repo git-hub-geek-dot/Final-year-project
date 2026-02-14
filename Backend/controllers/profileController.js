@@ -1,5 +1,4 @@
 const pool = require("../config/db");
-// Removed fs and path imports - no longer needed for local file operations
 
 // ================= UPLOAD PROFILE PICTURE =================
 exports.uploadProfilePicture = async (req, res) => {
@@ -31,12 +30,9 @@ exports.uploadProfilePicture = async (req, res) => {
 
       const oldPictureUrl = oldUserResult.rows[0]?.profile_picture_url;
 
-      // Build the image URL - handle localhost and production
-      const host = req.get("host");
-      const protocol = req.protocol || (req.secure ? "https" : "http");
-      const imageUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
-
-      console.log("Image URL:", imageUrl);
+      // Build the image URL - multer storage provides the path/URL
+      const imageUrl = req.file.path;
+      console.log("Profile picture uploaded - URL:", imageUrl);
 
       // Update database with new profile picture URL
       const result = await pool.query(
@@ -57,7 +53,7 @@ exports.uploadProfilePicture = async (req, res) => {
         });
       }
 
-      // Old profile picture will remain in Cloudinary (can be cleaned up later if needed)
+      // Old profile picture cleanup can be handled by a separate cleanup service if needed
       console.log("Profile picture uploaded successfully for user:", userId);
       return res.status(200).json({
         success: true,

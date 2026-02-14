@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../config/api_config.dart';
 import '../../services/token_service.dart';
+import '../../services/rating_service.dart';
 import '../../services/saved_events_service.dart';
 import 'view_organiser_profile_screen.dart';
 import 'package:share_plus/share_plus.dart';
@@ -23,6 +24,10 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
   bool isApplying = false;
   bool isSaved = false;
   String? organiserPhotoUrl;
+  bool isLoadingRating = true;
+  bool hasRated = false;
+  int? ratingScore;
+  String? ratingComment;
 
   /// null | pending | accepted | rejected
   String? applicationStatus;
@@ -33,6 +38,41 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
     _fetchApplicationStatus();
     _loadSavedState();
     _loadOrganiserPhoto();
+    _fetchMyRating();
+  }
+
+  Future<void> _fetchMyRating() async {
+    final organiserId = widget.event["organiser_id"];
+    final eventId = widget.event["id"];
+    if (organiserId == null || eventId == null) {
+      if (!mounted) return;
+      setState(() {
+        isLoadingRating = false;
+      });
+      return;
+    }
+
+    try {
+      final data = await RatingService.fetchMyRating(
+        eventId: eventId,
+        rateeId: organiserId,
+      );
+      if (!mounted) return;
+
+      setState(() {
+        hasRated = data["rated"] == true;
+        ratingScore = data["score"] is int
+            ? data["score"] as int
+            : int.tryParse(data["score"]?.toString() ?? "");
+        ratingComment = data["comment"]?.toString();
+        isLoadingRating = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        isLoadingRating = false;
+      });
+    }
   }
 
   Future<void> _loadOrganiserPhoto() async {
@@ -308,26 +348,71 @@ Join on VolunteerX
               (applicationStatus == "accepted" ||
                   applicationStatus == "completed")) ...[
             const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  final organiserId = widget.event["organiser_id"];
-                  if (organiserId == null) return;
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => RatingScreen(
-                        eventId: widget.event["id"],
-                        rateeId: organiserId,
-                        title: "Rate Organiser",
+            if (isLoadingRating)
+              const Center(child: CircularProgressIndicator())
+            else if (hasRated && ratingScore != null)
+              _ratedSummary(ratingScore!, ratingComment)
+            else
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    final organiserId = widget.event["organiser_id"];
+                    if (organiserId == null) return;
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => RatingScreen(
+                          eventId: widget.event["id"],
+                          rateeId: organiserId,
+                          title: "Rate Organiser",
+                        ),
                       ),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.star_border),
-                label: const Text("Rate organiser"),
+                    );
+                    await _fetchMyRating();
+                  },
+                  icon: const Icon(Icons.star_border),
+                  label: const Text("Rate organiser"),
+                ),
               ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _ratedSummary(int score, String? comment) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F6FA),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE0E0E0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: List.generate(
+              5,
+              (index) => Icon(
+                index < score ? Icons.star : Icons.star_border,
+                size: 16,
+                color: Colors.amber,
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            "You rated $score/5",
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+          if (comment != null && comment.trim().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              comment,
+              style: const TextStyle(fontSize: 13, color: Colors.grey),
             ),
           ],
         ],
@@ -465,6 +550,7 @@ Join on VolunteerX
     final isClosed = status != null && status != "open";
 
     if (isCompleted || isClosed) {
+      final closedLabel = isCompleted ? "Event completed" : "Applications closed";
       return SizedBox(
         height: 54,
         width: double.infinity,
@@ -475,9 +561,9 @@ Join on VolunteerX
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
             padding: EdgeInsets.zero,
           ),
-          child: const Text(
-            "Applications closed",
-            style: TextStyle(
+          child: Text(
+            closedLabel,
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
             ),

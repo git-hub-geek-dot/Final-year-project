@@ -6,6 +6,32 @@ import '../config/api_config.dart';
 import 'token_service.dart';
 
 class RatingService {
+  static Future<Map<String, dynamic>> fetchMyRating({
+    required int eventId,
+    required int rateeId,
+  }) async {
+    final token = await TokenService.getToken();
+    if (token == null || token.isEmpty) {
+      throw Exception("Token not found");
+    }
+
+    final response = await http.get(
+      Uri.parse(
+        "${ApiConfig.baseUrl}/ratings/check?event_id=$eventId&ratee_id=$rateeId",
+      ),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+
+    throw Exception("Failed to fetch rating");
+  }
+
   static Future<void> submitRating({
     required int eventId,
     required int rateeId,

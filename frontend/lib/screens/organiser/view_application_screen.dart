@@ -122,7 +122,11 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
 
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Application ${status.toUpperCase()} ✅")),
+          SnackBar(
+            content: Text(
+              "Application ${statusLabel(status).toUpperCase()} ✅",
+            ),
+          ),
         );
 
         // ✅ update locally
@@ -212,6 +216,20 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
     }
   }
 
+  String statusLabel(String status) {
+    switch (status.toLowerCase()) {
+      case "accepted":
+      case "approved":
+        return "Approved";
+      case "rejected":
+        return "Rejected";
+      case "pending":
+        return "Pending";
+      default:
+        return status;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final app = application;
@@ -271,7 +289,9 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
 
                       const SizedBox(height: 8),
                       Chip(
-                        label: Text(status.toString().toUpperCase()),
+                        label: Text(
+                          statusLabel(status.toString()).toUpperCase(),
+                        ),
                         backgroundColor:
                             statusColor(status).withOpacity(0.15),
                         labelStyle: TextStyle(color: statusColor(status)),

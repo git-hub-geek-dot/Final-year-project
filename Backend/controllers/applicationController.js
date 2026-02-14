@@ -266,10 +266,11 @@ exports.updateApplicationStatus = async (req, res) => {
         [app.event_id]
       );
       const eventTitle = eventResult.rows[0]?.title || "your event";
+      const statusLabel = app.status === "accepted" ? "approved" : app.status;
 
       await notifyUser(app.volunteer_id, {
         title: "Application update",
-        body: `Your application for ${eventTitle} was ${app.status}.`,
+        body: `Your application for ${eventTitle} was ${statusLabel}.`,
         data: { type: "application_status", status: app.status },
       });
     } catch (notifyErr) {

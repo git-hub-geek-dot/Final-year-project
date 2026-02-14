@@ -7,6 +7,13 @@ const authMiddleware = require("../middleware/auth");
 // Give rating
 router.post("/ratings", authMiddleware, ratingController.giveRating);
 
+// Check if current user already rated
+router.get(
+	"/ratings/check",
+	authMiddleware,
+	ratingController.getMyRatingForEvent
+);
+
 // Get ratings for a user
 router.get("/ratings/:id", authMiddleware, ratingController.getRatingsForUser);
 router.get(

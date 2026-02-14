@@ -137,6 +137,22 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
     }
   }
 
+  String statusLabel(String status) {
+    switch (status.toLowerCase()) {
+      case "accepted":
+      case "approved":
+        return "Approved";
+      case "rejected":
+        return "Rejected";
+      case "cancelled":
+        return "Cancelled";
+      case "pending":
+        return "Pending";
+      default:
+        return status;
+    }
+  }
+
   bool _isPastEventDate(String? rawDate) {
     if (rawDate == null || rawDate.isEmpty) return false;
 
@@ -211,7 +227,9 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                               await openEventDetails(eventId);
                             },
                             trailing: Chip(
-                              label: Text(status.toString().toUpperCase()),
+                              label: Text(
+                                statusLabel(status.toString()).toUpperCase(),
+                              ),
                               backgroundColor:
                                   statusColor(status).withOpacity(0.15),
                               labelStyle:

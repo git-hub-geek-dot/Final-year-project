@@ -28,6 +28,27 @@ exports.createEvent = async (req, res) => {
       });
     }
 
+    const verificationResult = await pool.query(
+      `
+      SELECT "isVerified"
+      FROM users
+      WHERE id = $1 AND role = 'organiser'
+      `,
+      [req.user.id]
+    );
+
+    if (verificationResult.rowCount === 0) {
+      return res.status(404).json({ error: "Organiser not found" });
+    }
+
+    const isVerified = verificationResult.rows[0]?.isVerified === true;
+    if (!isVerified) {
+      return res.status(403).json({
+        error:
+          "You need to be a verified organiser to create events. Please complete verification first.",
+      });
+    }
+
     const {
       title,
       description,
@@ -208,13 +229,18 @@ exports.getMyEvents = async (req, res) => {
       `
       SELECT
         e.*,
+        COALESCE(COUNT(DISTINCT a.id), 0)::int AS applications_count,
+        COALESCE(
+          COUNT(DISTINCT a.id) FILTER (WHERE a.status IN ('accepted', 'approved')),
+          0
+        )::int AS approved_count,
         COALESCE(
           array_agg(er.responsibility) FILTER (WHERE er.responsibility IS NOT NULL),
           '{}'
         ) AS responsibilities,
        CASE
-  WHEN status = 'draft' THEN 'draft'
-  WHEN status = 'deleted' THEN 'deleted_by_admin'
+  WHEN e.status = 'draft' THEN 'draft'
+  WHEN e.status = 'deleted' THEN 'deleted_by_admin'
   WHEN NOW() < (event_date + COALESCE(start_time, TIME '00:00:00')) THEN 'upcoming'
   WHEN NOW() BETWEEN (event_date + COALESCE(start_time, TIME '00:00:00'))
                   AND (COALESCE(end_date, event_date) + COALESCE(end_time, TIME '23:59:59')) THEN 'ongoing'
@@ -222,9 +248,10 @@ exports.getMyEvents = async (req, res) => {
 END AS computed_status
 
       FROM events e
+      LEFT JOIN applications a ON a.event_id = e.id
       LEFT JOIN event_responsibilities er ON er.event_id = e.id
-      WHERE organiser_id = $1
-        AND status IN ('draft', 'open', 'closed', 'completed', 'deleted')
+      WHERE e.organiser_id = $1
+        AND e.status IN ('draft', 'open', 'closed', 'completed', 'deleted')
       GROUP BY e.id
       ORDER BY event_date DESC
       `,

@@ -227,9 +227,14 @@ exports.getApplicationById = async (req, res) => {
 // ================= UPDATE APPLICATION STATUS =================
 // Approve / Reject by organiser
 exports.updateApplicationStatus = async (req, res) => {
+  const client = await pool.connect();
   try {
-    const applicationId = req.params.id;
-    const { status } = req.body;
+    const applicationId = parseInt(req.params.id, 10);
+    const status = (req.body?.status || "").toString().toLowerCase();
+
+    if (!Number.isInteger(applicationId) || applicationId <= 0) {
+      return res.status(400).json({ error: "Invalid application ID" });
+    }
 
     // allow only these values (matches your existing system)
     const allowed = ["pending", "accepted", "rejected"];
@@ -239,7 +244,71 @@ exports.updateApplicationStatus = async (req, res) => {
       });
     }
 
-    const result = await pool.query(
+    await client.query("BEGIN");
+
+    const applicationResult = await client.query(
+      `
+      SELECT id, status, event_id, volunteer_id, applied_at
+      FROM applications
+      WHERE id = $1
+      FOR UPDATE
+      `,
+      [applicationId]
+    );
+
+    if (applicationResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Application not found" });
+    }
+
+    const currentApplication = applicationResult.rows[0];
+    const wasAlreadyApproved =
+      currentApplication.status === "accepted" ||
+      currentApplication.status === "approved";
+
+    if (status === "accepted" && !wasAlreadyApproved) {
+      const eventResult = await client.query(
+        `
+        SELECT id, volunteers_required
+        FROM events
+        WHERE id = $1
+        FOR UPDATE
+        `,
+        [currentApplication.event_id]
+      );
+
+      if (eventResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ error: "Event not found" });
+      }
+
+      const volunteersRequired =
+        Number(eventResult.rows[0].volunteers_required) || 0;
+
+      const approvedCountResult = await client.query(
+        `
+        SELECT COUNT(*)::int AS approved_count
+        FROM applications
+        WHERE event_id = $1
+          AND status IN ('accepted', 'approved')
+          AND id <> $2
+        `,
+        [currentApplication.event_id, applicationId]
+      );
+
+      const approvedCount = approvedCountResult.rows[0]?.approved_count ?? 0;
+
+      if (volunteersRequired <= 0 || approvedCount >= volunteersRequired) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          error: "Cannot approve application. Volunteer slots are full.",
+          approved_count: approvedCount,
+          volunteers_required: volunteersRequired,
+        });
+      }
+    }
+
+    const result = await client.query(
       `
       UPDATE applications
       SET status = $1
@@ -249,9 +318,7 @@ exports.updateApplicationStatus = async (req, res) => {
       [status, applicationId]
     );
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Application not found" });
-    }
+    await client.query("COMMIT");
 
     res.status(200).json({
       success: true,
@@ -277,8 +344,13 @@ exports.updateApplicationStatus = async (req, res) => {
       console.error("APPLICATION STATUS NOTIFY ERROR:", notifyErr);
     }
   } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (_) {}
     console.error("UPDATE APPLICATION STATUS ERROR:", err);
     res.status(500).json({ error: "Failed to update status" });
+  } finally {
+    client.release();
   }
 };
 

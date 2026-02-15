@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../services/event_service.dart';
+import '../../services/verification_service.dart';
 import '../../widgets/organiser_bottom_nav.dart';
 import 'my_events_screen.dart';
 
@@ -72,6 +73,36 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  Future<bool> _ensureVerifiedOrganiser() async {
+    final status = (await VerificationService.getStatus())?.toLowerCase();
+
+    if (status == "approved") {
+      return true;
+    }
+
+    String message;
+    switch (status) {
+      case "pending":
+        message =
+            "Your verification is under review. You can create events after approval.";
+        break;
+      case "rejected":
+        message =
+            "Your verification was rejected. Please submit verification again to create events.";
+        break;
+      case "not_requested":
+        message = "You need to be verified before creating events.";
+        break;
+      default:
+        message =
+            "Unable to verify your account right now. Please try again.";
+        break;
+    }
+
+    _toast(message);
+    return false;
+  }
+
   Future<void> pickDate(bool isStart) async {
     final picked = await showDatePicker(
       context: context,
@@ -119,6 +150,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   }
 
   Future<void> _submitEvent({required bool saveAsDraft}) async {
+    final canCreate = await _ensureVerifiedOrganiser();
+    if (!canCreate) return;
+
     if (titleController.text.trim().isEmpty) {
       _toast("Event title is required");
       return;

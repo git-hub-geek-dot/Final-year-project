@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -20,6 +22,7 @@ import 'screens/admin/admin_home_screen.dart';
 import 'screens/organiser/organiser_profile_screen.dart';
 import 'services/token_service.dart';
 import 'services/notification_service.dart';
+import 'services/session_manager.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,7 +45,9 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
 
-      home: const AuthGate(),
+      home: const SessionListener(
+        child: AuthGate(),
+      ),
 
       routes: {
         // 🔐 AUTH
@@ -120,4 +125,65 @@ class _AuthState {
   final String? role;
 
   _AuthState({required this.token, required this.role});
+}
+
+class SessionListener extends StatefulWidget {
+  final Widget child;
+  const SessionListener({super.key, required this.child});
+
+  @override
+  State<SessionListener> createState() => _SessionListenerState();
+}
+
+class _SessionListenerState extends State<SessionListener> {
+  StreamSubscription<void>? _sub;
+  bool _dialogOpen = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _sub = SessionManager.onSessionExpired.listen((_) async {
+      if (!mounted || _dialogOpen) return;
+      _dialogOpen = true;
+
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) {
+          return AlertDialog(
+            title: const Text("Session expired"),
+            content: const Text("Please log in again to continue."),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text("OK"),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (!mounted) return;
+      _dialogOpen = false;
+      await TokenService.clearToken();
+      SessionManager.reset();
+
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.child;
+  }
 }

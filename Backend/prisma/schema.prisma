@@ -45,6 +45,18 @@ enum OtpChannel {
   phone
 }
 
+enum ReportTargetType {
+  user
+  event
+  chat_message
+}
+
+enum ReportStatus {
+  pending
+  resolved
+  dismissed
+}
+
 
 //// MODELS
 
@@ -227,6 +239,30 @@ model ChatMessage {
   @@map("chat_messages")
 }
 
+model Report {
+  id         Int              @id @default(autoincrement())
+  reporterId Int              @map("reporter_id")
+  targetType ReportTargetType @map("target_type")
+  targetId   Int              @map("target_id")
+  reason     String
+  details    String?
+  status     ReportStatus     @default(pending)
+  adminNote  String?          @map("admin_note")
+  actionTaken String?         @map("action_taken")
+  resolvedBy Int?             @map("resolved_by")
+  resolvedAt DateTime?        @map("resolved_at") @db.Timestamp(6)
+  createdAt  DateTime         @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt  DateTime         @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  reporter   User             @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  resolver   User?            @relation("ReportResolver", fields: [resolvedBy], references: [id])
+
+  @@index([status], map: "idx_reports_status")
+  @@index([targetType], map: "idx_reports_target_type")
+  @@index([reporterId], map: "idx_reports_reporter_id")
+  @@map("reports")
+}
+
 model VerificationRequest {
   id                Int                 @id @default(autoincrement())
   userId            Int                 @map("user_id")
@@ -277,6 +313,8 @@ model User {
   deviceTokens DeviceToken[]
   strikes       UserStrike[] @relation("UserStrikes")
   strikesGiven  UserStrike[] @relation("AdminStrikes")
+  reportsFiled  Report[]     @relation("ReportReporter")
+  reportsResolved Report[]   @relation("ReportResolver")
 
   @@map("users")
 }

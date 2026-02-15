@@ -157,6 +157,102 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     _fetchUsers(reset: true);
   }
 
+  Future<void> _showNotifySelectedDialog() async {
+    if (selectedUserIds.isEmpty) return;
+
+    final titleController = TextEditingController();
+    final messageController = TextEditingController();
+    bool isLoading = false;
+
+    await showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text("Notify selected users"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: titleController,
+                decoration: const InputDecoration(
+                  labelText: "Title",
+                  border: OutlineInputBorder(),
+                ),
+                maxLength: 100,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: messageController,
+                decoration: const InputDecoration(
+                  labelText: "Message",
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+                maxLength: 500,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      if (titleController.text.trim().isEmpty ||
+                          messageController.text.trim().isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("Please fill in all fields"),
+                          ),
+                        );
+                        return;
+                      }
+
+                      setState(() => isLoading = true);
+                      try {
+                        await AdminService.sendTargetedNotification(
+                          userIds: selectedUserIds.toList(),
+                          title: titleController.text.trim(),
+                          message: messageController.text.trim(),
+                        );
+
+                        if (context.mounted) {
+                          Navigator.pop(dialogContext);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                "Notification sent to ${selectedUserIds.length} user(s)",
+                              ),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text("Send failed: $e")),
+                          );
+                        }
+                      } finally {
+                        setState(() => isLoading = false);
+                      }
+                    },
+              child: isLoading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text("Send"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildProfileAvatar(String profileUrl, {double radius = 24}) {
     return CircleAvatar(
       radius: radius,
@@ -1089,6 +1185,15 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                       backgroundColor: Colors.red,
                                       foregroundColor: Colors.white,
                                     ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ElevatedButton.icon(
+                                    onPressed: bulkLoading
+                                        ? null
+                                        : _showNotifySelectedDialog,
+                                    icon: const Icon(Icons.notifications_active,
+                                        size: 16),
+                                    label: const Text("Notify"),
                                   ),
                                 ],
                               ),

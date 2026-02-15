@@ -1,5 +1,5 @@
 const pool = require("../config/db");
-const { notifyUser } = require("../services/notificationService");
+const { notifyUser, notifyUsers } = require("../services/notificationService");
 
 const STRIKE_SUSPENSIONS = [
   { threshold: 2, days: 3 },
@@ -7,6 +7,79 @@ const STRIKE_SUSPENSIONS = [
 ];
 const BAN_STRIKE_THRESHOLD = 4;
 const MAX_STRIKE_REASON_LENGTH = 500;
+
+const applyStrike = async (client, { userId, adminId, reason }) => {
+  const userRes = await client.query(
+    "SELECT id, role, status, suspended_until FROM users WHERE id = $1",
+    [userId]
+  );
+
+  if (userRes.rowCount === 0) {
+    const error = new Error("User not found");
+    error.status = 404;
+    throw error;
+  }
+
+  if (userRes.rows[0].role === "admin") {
+    const error = new Error("Cannot strike admin users");
+    error.status = 400;
+    throw error;
+  }
+
+  await client.query(
+    `INSERT INTO user_strikes (user_id, admin_id, reason)
+     VALUES ($1, $2, $3)`,
+    [userId, adminId, reason]
+  );
+
+  const countRes = await client.query(
+    "SELECT COUNT(*)::int AS count FROM user_strikes WHERE user_id = $1",
+    [userId]
+  );
+
+  const strikeCount = countRes.rows[0]?.count || 0;
+  let action = "warning";
+  let suspendedUntil = null;
+  let status = userRes.rows[0].status;
+
+  if (strikeCount >= BAN_STRIKE_THRESHOLD) {
+    await client.query(
+      `UPDATE users
+       SET status = 'banned',
+           suspended_until = NULL,
+           suspension_reason = $2
+       WHERE id = $1`,
+      [userId, reason]
+    );
+    action = "banned";
+    status = "banned";
+  } else {
+    const match = STRIKE_SUSPENSIONS.find(
+      (entry) => entry.threshold === strikeCount
+    );
+
+    if (match) {
+      const until = new Date(Date.now() + match.days * 24 * 60 * 60 * 1000);
+      const updateRes = await client.query(
+        `UPDATE users
+         SET suspended_until = CASE
+             WHEN suspended_until IS NULL OR suspended_until < $2 THEN $2
+             ELSE suspended_until
+           END,
+           suspension_reason = $3
+         WHERE id = $1
+         RETURNING suspended_until, status`,
+        [userId, until, reason]
+      );
+
+      suspendedUntil = updateRes.rows[0]?.suspended_until || until;
+      status = updateRes.rows[0]?.status || status;
+      action = `suspended_${match.days}_days`;
+    }
+  }
+
+  return { strikeCount, action, suspendedUntil, status };
+};
 
 // ================= GET ALL USERS =================
 const getUsers = async (req, res) => {
@@ -270,70 +343,17 @@ const addUserStrike = async (req, res) => {
       return res.status(400).json({ error: "Strike reason is too long" });
     }
 
-    const userRes = await pool.query(
-      "SELECT id, role, status, suspended_until FROM users WHERE id = $1",
-      [userId]
-    );
-
-    if (userRes.rowCount === 0) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    if (userRes.rows[0].role === "admin") {
-      return res.status(400).json({ error: "Cannot strike admin users" });
-    }
-
-    await pool.query(
-      `INSERT INTO user_strikes (user_id, admin_id, reason)
-       VALUES ($1, $2, $3)`,
-      [userId, adminId, reason]
-    );
-
-    const countRes = await pool.query(
-      "SELECT COUNT(*)::int AS count FROM user_strikes WHERE user_id = $1",
-      [userId]
-    );
-
-    const strikeCount = countRes.rows[0]?.count || 0;
-    let action = "warning";
-    let suspendedUntil = null;
-    let status = userRes.rows[0].status;
-
-    if (strikeCount >= BAN_STRIKE_THRESHOLD) {
-      await pool.query(
-        `UPDATE users
-         SET status = 'banned',
-             suspended_until = NULL,
-             suspension_reason = $2
-         WHERE id = $1`,
-        [userId, reason]
-      );
-      action = "banned";
-      status = "banned";
-    } else {
-      const match = STRIKE_SUSPENSIONS.find(
-        (entry) => entry.threshold === strikeCount
-      );
-
-      if (match) {
-        const until = new Date(Date.now() + match.days * 24 * 60 * 60 * 1000);
-        const updateRes = await pool.query(
-          `UPDATE users
-           SET suspended_until = CASE
-               WHEN suspended_until IS NULL OR suspended_until < $2 THEN $2
-               ELSE suspended_until
-             END,
-             suspension_reason = $3
-           WHERE id = $1
-           RETURNING suspended_until, status`,
-          [userId, until, reason]
-        );
-
-        suspendedUntil = updateRes.rows[0]?.suspended_until || until;
-        status = updateRes.rows[0]?.status || status;
-        action = `suspended_${match.days}_days`;
+    let strikeResult;
+    try {
+      strikeResult = await applyStrike(pool, { userId, adminId, reason });
+    } catch (applyErr) {
+      if (applyErr.status) {
+        return res.status(applyErr.status).json({ error: applyErr.message });
       }
+      throw applyErr;
     }
+
+    const { strikeCount, action, suspendedUntil, status } = strikeResult;
 
     res.json({ strikeCount, action, suspendedUntil, status });
 
@@ -924,6 +944,534 @@ const sendBroadcastNotification = async (req, res) => {
   }
 };
 
+const VALID_REPORT_STATUSES = new Set(["pending", "resolved", "dismissed", "all"]);
+const VALID_REPORT_TYPES = new Set(["user", "event", "chat_message", "all"]);
+
+const buildReportFilters = ({ status, type, search }) => {
+  const where = [];
+  const params = [];
+
+  if (status && status !== "all") {
+    params.push(status);
+    where.push(`r.status = $${params.length}`);
+  }
+
+  if (type && type !== "all") {
+    params.push(type);
+    where.push(`r.target_type = $${params.length}`);
+  }
+
+  if (search) {
+    params.push(`%${search.toLowerCase()}%`);
+    const p = `$${params.length}`;
+    where.push(
+      `(
+        LOWER(r.reason) LIKE ${p}
+        OR LOWER(COALESCE(r.details, '')) LIKE ${p}
+        OR LOWER(reporter.name) LIKE ${p}
+        OR LOWER(reporter.email) LIKE ${p}
+        OR LOWER(u.name) LIKE ${p}
+        OR LOWER(u.email) LIKE ${p}
+        OR LOWER(e.title) LIKE ${p}
+        OR LOWER(o.name) LIKE ${p}
+        OR LOWER(m.message) LIKE ${p}
+        OR LOWER(mu.name) LIKE ${p}
+        OR LOWER(mu.email) LIKE ${p}
+      )`
+    );
+  }
+
+  return {
+    whereClause: where.length ? `WHERE ${where.join(" AND ")}` : "",
+    params,
+  };
+};
+
+const getReports = async (req, res) => {
+  try {
+    const page = Math.max(parseInt(req.query.page || "1", 10), 1);
+    const limit = Math.max(parseInt(req.query.limit || "20", 10), 1);
+    const offset = (page - 1) * limit;
+
+    const status = (req.query.status || "pending").toString().toLowerCase();
+    const type = (req.query.type || "all").toString().toLowerCase();
+    const search = (req.query.search || "").toString().trim();
+
+    if (!VALID_REPORT_STATUSES.has(status)) {
+      return res.status(400).json({ error: "Invalid status filter" });
+    }
+
+    if (!VALID_REPORT_TYPES.has(type)) {
+      return res.status(400).json({ error: "Invalid type filter" });
+    }
+
+    const baseFrom = `
+      FROM reports r
+      LEFT JOIN users reporter ON reporter.id = r.reporter_id
+      LEFT JOIN users u ON r.target_type = 'user' AND r.target_id = u.id
+      LEFT JOIN events e ON r.target_type = 'event' AND r.target_id = e.id
+      LEFT JOIN users o ON e.organiser_id = o.id
+      LEFT JOIN chat_messages m ON r.target_type = 'chat_message' AND r.target_id = m.id
+      LEFT JOIN users mu ON m.sender_id = mu.id
+    `;
+
+    const { whereClause, params } = buildReportFilters({
+      status,
+      type,
+      search,
+    });
+
+    const countRes = await pool.query(
+      `SELECT COUNT(*) ${baseFrom} ${whereClause}`,
+      params
+    );
+    const total = parseInt(countRes.rows[0].count, 10);
+    const totalPages = Math.max(Math.ceil(total / limit), 1);
+
+    const listParams = [...params, limit, offset];
+    const listRes = await pool.query(
+      `
+      SELECT
+        r.*,
+        reporter.name AS reporter_name,
+        reporter.email AS reporter_email,
+        u.name AS target_user_name,
+        u.email AS target_user_email,
+        e.title AS target_event_title,
+        e.organiser_id AS organiser_id,
+        o.name AS organiser_name,
+        m.message AS target_message,
+        m.sender_id AS message_sender_id,
+        mu.name AS message_sender_name,
+        mu.email AS message_sender_email,
+        CASE
+          WHEN r.target_type = 'user' THEN r.target_id
+          WHEN r.target_type = 'chat_message' THEN m.sender_id
+          WHEN r.target_type = 'event' THEN e.organiser_id
+          ELSE NULL
+        END AS action_user_id,
+        CASE
+          WHEN r.target_type = 'event' THEN r.target_id
+          ELSE NULL
+        END AS action_event_id
+      ${baseFrom}
+      ${whereClause}
+      ORDER BY r.created_at DESC
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+      `,
+      listParams
+    );
+
+    res.json({
+      items: listRes.rows,
+      page,
+      totalPages,
+      total,
+    });
+  } catch (err) {
+    console.error("GET REPORTS ERROR:", err);
+    res.status(500).json({ error: "Failed to fetch reports" });
+  }
+};
+
+const dismissReport = async (req, res) => {
+  try {
+    const reportId = parseInt(req.params.id, 10);
+    const adminId = req.user?.id;
+    const note = (req.body?.note || "").toString().trim();
+
+    if (!reportId || Number.isNaN(reportId)) {
+      return res.status(400).json({ error: "Invalid report ID" });
+    }
+
+    if (!adminId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const result = await pool.query(
+      `
+      UPDATE reports
+      SET status = 'dismissed',
+          admin_note = $1,
+          action_taken = 'dismissed',
+          resolved_by = $2,
+          resolved_at = NOW(),
+          updated_at = NOW()
+      WHERE id = $3 AND status = 'pending'
+      RETURNING id
+      `,
+      [note || null, adminId, reportId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Report not found or not pending" });
+    }
+
+    res.json({ message: "Report dismissed" });
+  } catch (err) {
+    console.error("DISMISS REPORT ERROR:", err);
+    res.status(500).json({ error: "Failed to dismiss report" });
+  }
+};
+
+const resolveReport = async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const reportId = parseInt(req.params.id, 10);
+    const adminId = req.user?.id;
+    const action = (req.body?.action || "none").toString().trim().toLowerCase();
+    const note = (req.body?.note || "").toString().trim();
+
+    if (!reportId || Number.isNaN(reportId)) {
+      return res.status(400).json({ error: "Invalid report ID" });
+    }
+
+    if (!adminId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    if (!["none", "strike", "suspend", "cancel_event"].includes(action)) {
+      return res.status(400).json({ error: "Invalid action" });
+    }
+
+    await client.query("BEGIN");
+
+    const reportRes = await client.query(
+      `
+      SELECT
+        r.id,
+        r.status,
+        r.target_type,
+        r.target_id,
+        m.sender_id AS message_sender_id,
+        e.organiser_id AS organiser_id
+      FROM reports r
+      LEFT JOIN chat_messages m ON r.target_type = 'chat_message' AND r.target_id = m.id
+      LEFT JOIN events e ON r.target_type = 'event' AND r.target_id = e.id
+      WHERE r.id = $1
+      FOR UPDATE
+      `,
+      [reportId]
+    );
+
+    if (reportRes.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Report not found" });
+    }
+
+    const report = reportRes.rows[0];
+    if (report.status !== "pending") {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Report already resolved" });
+    }
+
+    let actionUserId = null;
+    let actionEventId = null;
+    if (report.target_type === "user") {
+      actionUserId = report.target_id;
+    } else if (report.target_type === "chat_message") {
+      actionUserId = report.message_sender_id;
+    } else if (report.target_type === "event") {
+      actionEventId = report.target_id;
+      actionUserId = report.organiser_id;
+    }
+
+    let actionTaken = action;
+
+    if (action === "strike") {
+      const strikeReason = (req.body?.strikeReason || note || "").toString().trim();
+      if (!actionUserId) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ error: "No user to strike" });
+      }
+      if (!strikeReason) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ error: "Strike reason is required" });
+      }
+
+      let strikeResult;
+      try {
+        strikeResult = await applyStrike(client, {
+          userId: actionUserId,
+          adminId,
+          reason: strikeReason,
+        });
+      } catch (applyErr) {
+        await client.query("ROLLBACK");
+        if (applyErr.status) {
+          return res.status(applyErr.status).json({ error: applyErr.message });
+        }
+        throw applyErr;
+      }
+      actionTaken = `strike_${strikeResult.action}`;
+
+      try {
+        await notifyUser(actionUserId, {
+          title: "Account notice",
+          body:
+            strikeResult.action === "warning"
+              ? `You received a strike. Reason: ${strikeReason}`
+              : strikeResult.action === "banned"
+                  ? `Your account has been banned. Reason: ${strikeReason}`
+                  : `Your account has been suspended. Reason: ${strikeReason}`,
+          data: {
+            type: "account_strike",
+            action: strikeResult.action,
+            strikeCount: strikeResult.strikeCount,
+            reason: strikeReason,
+          },
+        });
+      } catch (notifyErr) {
+        console.error("REPORT STRIKE NOTIFY ERROR:", notifyErr);
+      }
+    }
+
+    if (action === "suspend") {
+      const suspendDays = parseInt(req.body?.suspendDays, 10);
+      const suspendReason = (req.body?.suspendReason || note || "")
+        .toString()
+        .trim();
+
+      if (!actionUserId) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ error: "No user to suspend" });
+      }
+      if (!suspendDays || Number.isNaN(suspendDays) || suspendDays < 1) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ error: "Invalid suspension days" });
+      }
+      if (!suspendReason) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ error: "Suspension reason is required" });
+      }
+
+      const userRes = await client.query(
+        "SELECT role FROM users WHERE id = $1",
+        [actionUserId]
+      );
+      if (userRes.rowCount === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ error: "User not found" });
+      }
+      if (userRes.rows[0].role === "admin") {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ error: "Cannot suspend admin users" });
+      }
+
+      await client.query(
+        `
+        UPDATE users
+        SET suspended_until = NOW() + ($2 || ' days')::interval,
+            suspension_reason = $3
+        WHERE id = $1
+        `,
+        [actionUserId, suspendDays, suspendReason]
+      );
+
+      actionTaken = `suspend_${suspendDays}_days`;
+      try {
+        await notifyUser(actionUserId, {
+          title: "Account suspended",
+          body: `Your account has been suspended for ${suspendDays} days. Reason: ${suspendReason}`,
+          data: {
+            type: "account_suspension",
+            days: String(suspendDays),
+            reason: suspendReason,
+          },
+        });
+      } catch (notifyErr) {
+        console.error("REPORT SUSPEND NOTIFY ERROR:", notifyErr);
+      }
+    }
+
+    if (action === "cancel_event") {
+      const cancelReason = (req.body?.cancelReason || note || "")
+        .toString()
+        .trim();
+      if (!actionEventId) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ error: "No event to cancel" });
+      }
+
+      const result = await client.query(
+        "UPDATE events SET status = 'deleted' WHERE id = $1",
+        [actionEventId]
+      );
+
+      if (result.rowCount === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ error: "Event not found" });
+      }
+
+      actionTaken = "cancel_event";
+
+      if (actionUserId) {
+        try {
+          await notifyUser(actionUserId, {
+            title: "Event removed",
+            body: cancelReason
+              ? `Your event was removed. Reason: ${cancelReason}`
+              : "Your event was removed by admin.",
+            data: { type: "event_removed", eventId: String(actionEventId) },
+          });
+        } catch (notifyErr) {
+          console.error("REPORT EVENT NOTIFY ERROR:", notifyErr);
+        }
+      }
+    }
+
+    await client.query(
+      `
+      UPDATE reports
+      SET status = 'resolved',
+          admin_note = $1,
+          action_taken = $2,
+          resolved_by = $3,
+          resolved_at = NOW(),
+          updated_at = NOW()
+      WHERE id = $4
+      `,
+      [note || null, actionTaken, adminId, reportId]
+    );
+
+    await client.query("COMMIT");
+    res.json({ message: "Report resolved", actionTaken });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("RESOLVE REPORT ERROR:", err);
+    res.status(500).json({ error: "Failed to resolve report" });
+  } finally {
+    client.release();
+  }
+};
+
+const sendTargetedNotification = async (req, res) => {
+  try {
+    const { title, message, userIds } = req.body;
+
+    if (!title || !message) {
+      return res.status(400).json({ error: "Title and message are required" });
+    }
+
+    if (title.length > 100 || message.length > 500) {
+      return res.status(400).json({ error: "Title or message too long" });
+    }
+
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({ error: "userIds are required" });
+    }
+
+    const ids = userIds
+      .map((id) => parseInt(id, 10))
+      .filter((id) => id && !Number.isNaN(id));
+
+    const uniqueIds = [...new Set(ids)];
+
+    if (uniqueIds.length === 0) {
+      return res.status(400).json({ error: "Invalid user IDs" });
+    }
+
+    const userRes = await pool.query(
+      "SELECT id FROM users WHERE id = ANY($1) AND status = 'active'",
+      [uniqueIds]
+    );
+
+    const activeIds = userRes.rows.map((r) => r.id);
+    if (activeIds.length === 0) {
+      return res.status(400).json({ error: "No active users to notify" });
+    }
+
+    await notifyUsers(activeIds, {
+      title,
+      body: message,
+      data: {
+        type: "targeted",
+        sentAt: new Date().toISOString(),
+      },
+    });
+
+    res.json({
+      message: "Targeted notification sent",
+      deliveredTo: activeIds.length,
+    });
+  } catch (err) {
+    console.error("TARGETED NOTIFICATION ERROR:", err);
+    res.status(500).json({ error: "Failed to send targeted notification" });
+  }
+};
+
+const sendEventNotification = async (req, res) => {
+  try {
+    const { title, message, eventId } = req.body;
+    const eventIdInt = parseInt(eventId, 10);
+
+    if (!title || !message) {
+      return res.status(400).json({ error: "Title and message are required" });
+    }
+
+    if (!eventId || Number.isNaN(eventIdInt)) {
+      return res.status(400).json({ error: "Invalid event ID" });
+    }
+
+    if (title.length > 100 || message.length > 500) {
+      return res.status(400).json({ error: "Title or message too long" });
+    }
+
+    const eventRes = await pool.query(
+      "SELECT id, organiser_id FROM events WHERE id = $1",
+      [eventIdInt]
+    );
+
+    if (eventRes.rowCount === 0) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    const organiserId = eventRes.rows[0].organiser_id;
+
+    const volunteerRes = await pool.query(
+      "SELECT DISTINCT volunteer_id FROM applications WHERE event_id = $1",
+      [eventIdInt]
+    );
+    const volunteerIds = volunteerRes.rows
+      .map((r) => r.volunteer_id)
+      .filter(Boolean);
+
+    const rawIds = [organiserId, ...volunteerIds].filter(Boolean);
+
+    if (rawIds.length === 0) {
+      return res.status(400).json({ error: "No users to notify" });
+    }
+
+    const activeRes = await pool.query(
+      "SELECT id FROM users WHERE id = ANY($1) AND status = 'active'",
+      [rawIds]
+    );
+    const activeIds = activeRes.rows.map((r) => r.id);
+
+    if (activeIds.length === 0) {
+      return res.status(400).json({ error: "No active users to notify" });
+    }
+
+    await notifyUsers(activeIds, {
+      title,
+      body: message,
+      data: {
+        type: "event_broadcast",
+        eventId: String(eventIdInt),
+        sentAt: new Date().toISOString(),
+      },
+    });
+
+    res.json({
+      message: "Event notification sent",
+      deliveredTo: activeIds.length,
+    });
+  } catch (err) {
+    console.error("EVENT NOTIFICATION ERROR:", err);
+    res.status(500).json({ error: "Failed to send event notification" });
+  }
+};
+
 module.exports = {
   getUsers,
   getEvents,
@@ -949,4 +1497,9 @@ module.exports = {
   approveVerification,
   rejectVerification,
   sendBroadcastNotification,
+  getReports,
+  dismissReport,
+  resolveReport,
+  sendTargetedNotification,
+  sendEventNotification,
 };

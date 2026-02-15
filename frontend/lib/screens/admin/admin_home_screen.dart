@@ -11,6 +11,7 @@ import 'admin_stats_screen.dart';
 import 'admin_leaderboard_screen.dart';
 import 'admin_badges_screen.dart';
 import 'admin_verification_screen.dart';
+import 'admin_reports_screen.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -68,6 +69,14 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         onTap: () => Navigator.push(context,
             MaterialPageRoute(builder: (_) => const AdminApplicationsScreen())),
         color: Colors.purple,
+      ),
+      DashboardItem(
+        icon: Icons.flag,
+        title: 'Reports',
+        subtitle: 'Moderation queue',
+        onTap: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const AdminReportsScreen())),
+        color: Colors.redAccent,
       ),
       DashboardItem(
         icon: Icons.verified_user,

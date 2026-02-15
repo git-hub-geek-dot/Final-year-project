@@ -432,4 +432,155 @@ class AdminService {
       throw Exception("Failed to send broadcast notification");
     }
   }
+
+  // ================= TARGETED NOTIFICATIONS =================
+  static Future<void> sendTargetedNotification({
+    required List<int> userIds,
+    required String title,
+    required String message,
+  }) async {
+    final token = await TokenService.getToken();
+
+    final response = await http.post(
+      Uri.parse("${ApiConfig.baseUrl}/admin/notifications/users"),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({
+        "userIds": userIds,
+        "title": title,
+        "message": message,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      String error = "Failed to send targeted notification";
+      try {
+        final data = jsonDecode(response.body);
+        error = data["error"]?.toString() ?? error;
+      } catch (_) {}
+      throw Exception(error);
+    }
+  }
+
+  static Future<void> sendEventNotification({
+    required int eventId,
+    required String title,
+    required String message,
+  }) async {
+    final token = await TokenService.getToken();
+
+    final response = await http.post(
+      Uri.parse("${ApiConfig.baseUrl}/admin/notifications/event"),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({
+        "eventId": eventId,
+        "title": title,
+        "message": message,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      String error = "Failed to send event notification";
+      try {
+        final data = jsonDecode(response.body);
+        error = data["error"]?.toString() ?? error;
+      } catch (_) {}
+      throw Exception(error);
+    }
+  }
+
+  // ================= REPORTS =================
+  static Future<Map<String, dynamic>> getReports({
+    int page = 1,
+    int limit = 20,
+    String status = 'pending',
+    String type = 'all',
+    String search = '',
+  }) async {
+    final token = await TokenService.getToken();
+    final query = Uri.parse(
+      "${ApiConfig.baseUrl}/admin/reports?page=$page&limit=$limit&status=$status&type=$type&search=${Uri.encodeComponent(search)}",
+    );
+
+    final res = await http.get(
+      query,
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+    );
+
+    if (res.statusCode != 200) {
+      throw Exception("Failed to load reports");
+    }
+
+    return jsonDecode(res.body);
+  }
+
+  static Future<void> dismissReport({
+    required int reportId,
+    String note = '',
+  }) async {
+    final token = await TokenService.getToken();
+
+    final res = await http.post(
+      Uri.parse("${ApiConfig.baseUrl}/admin/reports/$reportId/dismiss"),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({"note": note}),
+    );
+
+    if (res.statusCode != 200) {
+      String error = "Failed to dismiss report";
+      try {
+        final data = jsonDecode(res.body);
+        error = data["error"]?.toString() ?? error;
+      } catch (_) {}
+      throw Exception(error);
+    }
+  }
+
+  static Future<void> resolveReport({
+    required int reportId,
+    required String action,
+    String note = '',
+    String? strikeReason,
+    int? suspendDays,
+    String? suspendReason,
+    String? cancelReason,
+  }) async {
+    final token = await TokenService.getToken();
+
+    final res = await http.post(
+      Uri.parse("${ApiConfig.baseUrl}/admin/reports/$reportId/resolve"),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({
+        "action": action,
+        "note": note,
+        if (strikeReason != null) "strikeReason": strikeReason,
+        if (suspendDays != null) "suspendDays": suspendDays,
+        if (suspendReason != null) "suspendReason": suspendReason,
+        if (cancelReason != null) "cancelReason": cancelReason,
+      }),
+    );
+
+    if (res.statusCode != 200) {
+      String error = "Failed to resolve report";
+      try {
+        final data = jsonDecode(res.body);
+        error = data["error"]?.toString() ?? error;
+      } catch (_) {}
+      throw Exception(error);
+    }
+  }
 }

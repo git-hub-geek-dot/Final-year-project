@@ -186,12 +186,56 @@ router.post(
 // ========== BROADCAST NOTIFICATIONS ==============
 // =================================================
 
-// 📢 Send broadcast notification
+// Send broadcast notification
 router.post(
   "/notifications/broadcast",
   authenticateToken,
   adminOnly,
   adminController.sendBroadcastNotification
+);
+
+// Send targeted notification to users
+router.post(
+  "/notifications/users",
+  authenticateToken,
+  adminOnly,
+  adminController.sendTargetedNotification
+);
+
+// Send notification to event users
+router.post(
+  "/notifications/event",
+  authenticateToken,
+  adminOnly,
+  adminController.sendEventNotification
+);
+
+// =================================================
+// ================= REPORTS =======================
+// =================================================
+
+// Get reports
+router.get(
+  "/reports",
+  authenticateToken,
+  adminOnly,
+  adminController.getReports
+);
+
+// Resolve report
+router.post(
+  "/reports/:id/resolve",
+  authenticateToken,
+  adminOnly,
+  adminController.resolveReport
+);
+
+// Dismiss report
+router.post(
+  "/reports/:id/dismiss",
+  authenticateToken,
+  adminOnly,
+  adminController.dismissReport
 );
 
 module.exports = router;

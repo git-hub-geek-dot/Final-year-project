@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/chat_service.dart';
 import '../../services/token_service.dart';
+import '../../services/report_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final int threadId;
@@ -162,6 +163,92 @@ class _ChatScreenState extends State<ChatScreen> {
     _messageController.clear();
   }
 
+  Future<void> _reportMessage(Map<String, dynamic> msg) async {
+    final messageId = msg["id"] as int?;
+    if (messageId == null) return;
+
+    final reasonController = TextEditingController();
+    final detailsController = TextEditingController();
+    String? errorText;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: const Text("Report message"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("Tell us why this message is being reported."),
+              const SizedBox(height: 12),
+              TextField(
+                controller: reasonController,
+                decoration: InputDecoration(
+                  labelText: "Reason",
+                  errorText: errorText,
+                ),
+                maxLength: 255,
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: detailsController,
+                decoration: const InputDecoration(
+                  labelText: "Details (optional)",
+                ),
+                maxLines: 3,
+                maxLength: 1000,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () {
+                final reason = reasonController.text.trim();
+                if (reason.isEmpty) {
+                  setState(() => errorText = "Reason is required");
+                  return;
+                }
+                Navigator.pop(ctx, true);
+              },
+              child: const Text("Submit"),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    final reason = reasonController.text.trim();
+    final details = detailsController.text.trim();
+
+    reasonController.dispose();
+    detailsController.dispose();
+
+    if (confirmed != true) return;
+
+    try {
+      await ReportService.submitReport(
+        targetType: "chat_message",
+        targetId: messageId,
+        reason: reason,
+        details: details.isEmpty ? null : details,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Report submitted")),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to report: $e")),
+      );
+    }
+  }
+
   @override
   void dispose() {
     _messageController.dispose();
@@ -188,22 +275,25 @@ class _ChatScreenState extends State<ChatScreen> {
                       return Align(
                         alignment:
                             isMe ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(vertical: 4),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isMe
-                                ? Colors.blueAccent.withOpacity(0.8)
-                                : Colors.grey.shade200,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            msg["message"] ?? "",
-                            style: TextStyle(
-                              color: isMe ? Colors.white : Colors.black87,
+                        child: GestureDetector(
+                          onLongPress: isMe ? null : () => _reportMessage(msg),
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isMe
+                                  ? Colors.blueAccent.withOpacity(0.8)
+                                  : Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              msg["message"] ?? "",
+                              style: TextStyle(
+                                color: isMe ? Colors.white : Colors.black87,
+                              ),
                             ),
                           ),
                         ),

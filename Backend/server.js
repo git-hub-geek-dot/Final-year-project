@@ -31,6 +31,8 @@ app.use("/api", require("./routes/profileRoutes"));
 app.use("/api", require("./routes/upload"));
 // Push notifications
 app.use("/api", require("./routes/notificationRoutes"));
+// Reports
+app.use("/api", require("./routes/reportRoutes"));
 // Chat
 app.use("/api", require("./routes/chatRoutes"));
 

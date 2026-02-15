@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/event_service.dart';
 import '../../services/token_service.dart';
+import '../../services/verification_service.dart';
 import '../../widgets/organiser_bottom_nav.dart';
 import 'create_event_screen.dart';
 import 'review_application_screen.dart';
@@ -75,6 +76,40 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
         loadError = "Failed to load events. Pull to refresh or tap Retry.";
       });
     }
+  }
+
+  Future<bool> _ensureVerifiedOrganiser() async {
+    final status = (await VerificationService.getStatus())?.toLowerCase();
+
+    if (status == "approved") {
+      return true;
+    }
+
+    if (!mounted) return false;
+
+    String message;
+    switch (status) {
+      case "pending":
+        message =
+            "Your verification is under review. You can create events after approval.";
+        break;
+      case "rejected":
+        message =
+            "Your verification was rejected. Please submit verification again to create events.";
+        break;
+      case "not_requested":
+        message = "You need to be verified before creating events.";
+        break;
+      default:
+        message =
+            "Unable to verify your account right now. Please try again.";
+        break;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+    return false;
   }
 
   String _status(Map e) =>
@@ -164,7 +199,10 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: InkWell(
-              onTap: () {
+              onTap: () async {
+                final canCreate = await _ensureVerifiedOrganiser();
+                if (!canCreate || !mounted) return;
+
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const CreateEventScreen()),
@@ -743,8 +781,8 @@ Map<String, dynamic>? _progressData(Map event) {
   final raw = accepted ?? applicants ?? 0;
   final ratio = (raw / requiredVolunteers).clamp(0.0, 1.0).toDouble();
   final label = accepted != null
-      ? '$accepted / $requiredVolunteers volunteers filled'
-      : '$raw / $requiredVolunteers applicants';
+      ? 'Approved: $accepted / $requiredVolunteers'
+      : 'Applicants: $raw / $requiredVolunteers';
 
   return {
     'ratio': ratio,

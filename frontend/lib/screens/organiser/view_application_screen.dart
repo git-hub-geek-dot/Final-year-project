@@ -12,10 +12,16 @@ import '../rating/rating_screen.dart';
 
 class ViewApplicationScreen extends StatefulWidget {
   final int applicationId;
+  final bool slotsFull;
+  final int approvedCount;
+  final int volunteersRequired;
 
   const ViewApplicationScreen({
     super.key,
     required this.applicationId,
+    this.slotsFull = false,
+    this.approvedCount = 0,
+    this.volunteersRequired = 0,
   });
 
   @override
@@ -26,12 +32,16 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
   bool loading = true;
   bool actionLoading = false;
   String? errorMessage;
+  late int approvedCount;
+  late int volunteersRequired;
 
   Map<String, dynamic>? application;
 
   @override
   void initState() {
     super.initState();
+    approvedCount = widget.approvedCount;
+    volunteersRequired = widget.volunteersRequired;
     loadApplicationDetails();
   }
 
@@ -87,6 +97,15 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
   }
 
   Future<void> updateStatus(String status) async {
+    final wantsApprove = status.toLowerCase() == "accepted" ||
+        status.toLowerCase() == "approved";
+    if (wantsApprove && _isApproveBlockedByCapacity()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_slotsFullMessage)),
+      );
+      return;
+    }
+
     try {
       setState(() => actionLoading = true);
 
@@ -127,8 +146,20 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
 
         Navigator.pop(context, true);
       } else {
+        final responseData = _decodeMap(response.body);
+        final backendApprovedCount = _asInt(responseData?["approved_count"]);
+        final backendVolunteersRequired =
+            _asInt(responseData?["volunteers_required"]);
+
+        if (backendVolunteersRequired > 0) {
+          setState(() {
+            approvedCount = backendApprovedCount;
+            volunteersRequired = backendVolunteersRequired;
+          });
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Failed: ${response.body}")),
+          SnackBar(content: Text(_responseErrorMessage(response.body))),
         );
       }
     } catch (e) {
@@ -228,6 +259,45 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
     return int.tryParse(value.toString()) ?? 0;
   }
 
+  Map<String, dynamic>? _decodeMap(String raw) {
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) return Map<String, dynamic>.from(decoded);
+    } catch (_) {}
+    return null;
+  }
+
+  String _responseErrorMessage(String rawBody) {
+    final decoded = _decodeMap(rawBody);
+    final error = decoded?["error"]?.toString();
+    final message = decoded?["message"]?.toString();
+    if (error != null && error.isNotEmpty) return error;
+    if (message != null && message.isNotEmpty) return message;
+    return "Failed to update application status.";
+  }
+
+  bool _isApprovedStatus(String status) {
+    return status == "accepted" || status == "approved";
+  }
+
+  bool _isApproveBlockedByCapacity() {
+    final currentStatus =
+        (application?["status"] ?? "pending").toString().toLowerCase();
+    if (_isApprovedStatus(currentStatus)) return false;
+    if (volunteersRequired > 0) {
+      return approvedCount >= volunteersRequired;
+    }
+    return widget.slotsFull;
+  }
+
+  String get _slotsFullMessage {
+    if (volunteersRequired > 0) {
+      return "Cannot approve. Slots are full ($approvedCount/$volunteersRequired).";
+    }
+    return "Cannot approve. Slots are full.";
+  }
+
   double _asDouble(dynamic value) {
     if (value == null) return 0;
     if (value is double) return value;
@@ -258,6 +328,9 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
         "-";
     final status = app?["status"]?.toString() ?? "pending";
     final normalizedStatus = status.toLowerCase();
+    final isAlreadyApproved = _isApprovedStatus(normalizedStatus);
+    final approveBlockedByCapacity =
+        !isAlreadyApproved && _isApproveBlockedByCapacity();
 
     final eventsCount = _asInt(
       app?["events_count"] ?? app?["committed_events"] ?? 1,
@@ -442,6 +515,43 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                                   ),
                                 ),
                               ],
+                              if (approveBlockedByCapacity) ...[
+                                SizedBox(height: compact ? 8 : 10),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 9,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFF4F4),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: const Color(0xFFFCA5A5),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.info_outline,
+                                        size: 16,
+                                        color: Color(0xFFB91C1C),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          _slotsFullMessage,
+                                          style: const TextStyle(
+                                            color: Color(0xFFB91C1C),
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                               SizedBox(height: compact ? 8 : 12),
                               Row(
                                 children: [
@@ -487,13 +597,16 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                                                 BorderRadius.circular(16),
                                           ),
                                         ),
-                                        onPressed: actionLoading
+                                        onPressed: actionLoading ||
+                                                approveBlockedByCapacity
                                             ? null
                                             : () => updateStatus("accepted"),
                                         child: Text(
                                           actionLoading
                                               ? "Please wait..."
-                                              : "Approve",
+                                              : approveBlockedByCapacity
+                                                  ? "Slots Full"
+                                                  : "Approve",
                                           style: TextStyle(
                                               fontSize: compact ? 16 : 18),
                                         ),

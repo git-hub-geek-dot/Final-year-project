@@ -19,6 +19,11 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
   bool loading = true;
   String? loadError;
   List applications = [];
+  int volunteersRequired = 0;
+  int approvedCount = 0;
+
+  bool get isSlotsFull =>
+      volunteersRequired > 0 && approvedCount >= volunteersRequired;
 
   @override
   void initState() {
@@ -34,8 +39,21 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
 
     try {
       final data = await EventService.fetchApplications(widget.eventId);
+      final events = await EventService.fetchMyEvents();
+      final event = events.cast<Map>().firstWhere(
+            (e) => _asInt(e["id"]) == widget.eventId,
+            orElse: () => {},
+          );
+      final requiredFromEvent = _asInt(event["volunteers_required"]);
+      final approvedFromEvent = _asInt(event["approved_count"]);
+      final approvedFromApplications = _approvedFromApplications(data);
+
       setState(() {
         applications = data;
+        volunteersRequired = requiredFromEvent;
+        approvedCount = approvedFromEvent > 0
+            ? approvedFromEvent
+            : approvedFromApplications;
         loading = false;
         loadError = null;
       });
@@ -66,6 +84,23 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
     if (raw == null) return DateTime.fromMillisecondsSinceEpoch(0);
     return DateTime.tryParse(raw.toString()) ??
         DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  int _asInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString()) ?? 0;
+  }
+
+  int _approvedFromApplications(List list) {
+    var count = 0;
+    for (final item in list) {
+      if (item is Map && _normalizedStatus(item) == "approved") {
+        count++;
+      }
+    }
+    return count;
   }
 
   List get visibleApplications {
@@ -195,7 +230,7 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
                           "Pending (${counts["pending"]})",
                           selectedStatus == "pending",
                           () {
-                          setState(() => selectedStatus = "pending");
+                            setState(() => selectedStatus = "pending");
                           },
                         ),
                         const SizedBox(width: 10),
@@ -203,7 +238,7 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
                           "Approved (${counts["approved"]})",
                           selectedStatus == "approved",
                           () {
-                          setState(() => selectedStatus = "approved");
+                            setState(() => selectedStatus = "approved");
                           },
                         ),
                         const SizedBox(width: 10),
@@ -211,7 +246,7 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
                           "Rejected (${counts["rejected"]})",
                           selectedStatus == "rejected",
                           () {
-                          setState(() => selectedStatus = "rejected");
+                            setState(() => selectedStatus = "rejected");
                           },
                         ),
                       ],
@@ -271,24 +306,26 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
                           ],
                         ),
                       )
-                : visibleApplications.isEmpty
-                    ? Center(child: Text(emptyMessage))
-                    : ListView.builder(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: visibleApplications.length,
-                        itemBuilder: (context, i) {
-                          final a = visibleApplications[i];
-                          return ApplicationCard(
-                            name: a["name"] ?? "Unknown",
-                            location: a["city"] ?? "-",
-                            status: _normalizedStatus(a),
-                            appliedAt: a["applied_at"],
-                            applicationId: a["id"],
-                            onRefresh: loadApplications,
-                          );
-                        },
-                      ),
+                    : visibleApplications.isEmpty
+                        ? Center(child: Text(emptyMessage))
+                        : ListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            itemCount: visibleApplications.length,
+                            itemBuilder: (context, i) {
+                              final a = visibleApplications[i];
+                              return ApplicationCard(
+                                name: a["name"] ?? "Unknown",
+                                location: a["city"] ?? "-",
+                                status: _normalizedStatus(a),
+                                appliedAt: a["applied_at"],
+                                applicationId: a["id"],
+                                slotsFull: isSlotsFull,
+                                approvedCount: approvedCount,
+                                volunteersRequired: volunteersRequired,
+                                onRefresh: loadApplications,
+                              );
+                            },
+                          ),
           ),
         ],
       ),
@@ -328,6 +365,9 @@ class ApplicationCard extends StatelessWidget {
   final String status;
   final dynamic appliedAt;
   final int applicationId;
+  final bool slotsFull;
+  final int approvedCount;
+  final int volunteersRequired;
   final VoidCallback onRefresh;
 
   const ApplicationCard({
@@ -337,6 +377,9 @@ class ApplicationCard extends StatelessWidget {
     required this.status,
     required this.appliedAt,
     required this.applicationId,
+    required this.slotsFull,
+    required this.approvedCount,
+    required this.volunteersRequired,
     required this.onRefresh,
   });
 
@@ -388,7 +431,6 @@ class ApplicationCard extends StatelessWidget {
         children: [
           const CircleAvatar(radius: 24),
           const SizedBox(width: 12),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -437,25 +479,47 @@ class ApplicationCard extends StatelessWidget {
                         fontSize: 11,
                       ),
                     ),
+                    if (slotsFull && status == "pending")
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEE2E2),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: const Color(0xFFFCA5A5)),
+                        ),
+                        child: Text(
+                          "Slots full ($approvedCount/$volunteersRequired)",
+                          style: const TextStyle(
+                            color: Color(0xFFB91C1C),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 4),
                 Text(
                   "📍 $location",
-                  style:
-                      const TextStyle(color: Colors.white70, fontSize: 12),
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
                 ),
               ],
             ),
           ),
-
           InkWell(
             onTap: () async {
               final updated = await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) =>
-                      ViewApplicationScreen(applicationId: applicationId),
+                  builder: (_) => ViewApplicationScreen(
+                    applicationId: applicationId,
+                    slotsFull: slotsFull,
+                    approvedCount: approvedCount,
+                    volunteersRequired: volunteersRequired,
+                  ),
                 ),
               );
 

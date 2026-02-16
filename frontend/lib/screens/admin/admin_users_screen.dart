@@ -15,10 +15,7 @@ class AdminUsersScreen extends StatefulWidget {
 class _AdminUsersScreenState extends State<AdminUsersScreen> {
   final List<dynamic> users = [];
   bool loading = true;
-  bool loadingMore = false;
   bool bulkLoading = false;
-  int page = 1;
-  int totalPages = 1;
   String? errorMessage;
 
   final Set<int> selectedUserIds = {};
@@ -36,34 +33,38 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   }
 
   Future<void> _fetchUsers({bool reset = false}) async {
-    if (loadingMore) return;
     if (reset) {
       setState(() {
         loading = true;
-        page = 1;
-        totalPages = 1;
         users.clear();
         errorMessage = null;
       });
-    } else {
-      setState(() => loadingMore = true);
     }
 
     try {
-      final data = await AdminService.getAllUsers(page: page, limit: 20);
-      final items = (data["items"] as List?) ?? [];
+      final allItems = <dynamic>[];
+      int currentPage = 1;
+      int lastPage = 1;
+
+      do {
+        final data =
+            await AdminService.getAllUsers(page: currentPage, limit: 20);
+        final items = (data["items"] as List?) ?? [];
+        lastPage = data["totalPages"] ?? currentPage;
+        allItems.addAll(items);
+        currentPage += 1;
+      } while (currentPage <= lastPage);
+
       setState(() {
-        users.addAll(items);
-        totalPages = data["totalPages"] ?? 1;
+        users
+          ..clear()
+          ..addAll(allItems);
         loading = false;
-        loadingMore = false;
-        page += 1;
         errorMessage = null;
       });
     } catch (_) {
       setState(() {
         loading = false;
-        loadingMore = false;
         if (reset) {
           errorMessage = "Failed to load users";
         }
@@ -401,6 +402,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     final canSelect = !isAdmin && userId != null;
     final selected = userId != null && selectedUserIds.contains(userId);
     final profileUrl = (user["profile_picture_url"] ?? "").toString();
+    final adminNote = (user["admin_note"] ?? "").toString().trim();
 
     // Get screen size for responsive design
     final screenWidth = MediaQuery.of(context).size.width;
@@ -515,6 +517,20 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                         ],
                       ],
                     ),
+
+                    if (adminNote.isNotEmpty) ...[
+                      SizedBox(height: isSmallScreen ? 4 : 6),
+                      Text(
+                        adminNote,
+                        maxLines: isSmallScreen ? 1 : 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: isSmallScreen ? 12 : 13,
+                          color: Colors.grey.shade700,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
 
                     // Suspension Info
                     if (isSuspended) ...[
@@ -1206,72 +1222,8 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                 : ListView.builder(
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 16),
-                                    itemCount: filteredUsers.length + 1,
+                                    itemCount: filteredUsers.length,
                                     itemBuilder: (context, i) {
-                                      if (i == filteredUsers.length) {
-                                        final canLoadMore = page <= totalPages;
-                                        return Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                              vertical: 16),
-                                          child: Center(
-                                            child: canLoadMore
-                                                ? ElevatedButton.icon(
-                                                    onPressed: loadingMore
-                                                        ? null
-                                                        : () => _fetchUsers(),
-                                                    icon: loadingMore
-                                                        ? const SizedBox(
-                                                            width: 16,
-                                                            height: 16,
-                                                            child:
-                                                                CircularProgressIndicator(
-                                                                    strokeWidth:
-                                                                        2),
-                                                          )
-                                                        : const Icon(
-                                                            Icons.expand_more),
-                                                    label: Text(loadingMore
-                                                        ? "Loading..."
-                                                        : "Load More Users"),
-                                                    style: ElevatedButton
-                                                        .styleFrom(
-                                                      padding: const EdgeInsets
-                                                          .symmetric(
-                                                          horizontal: 24,
-                                                          vertical: 12),
-                                                    ),
-                                                  )
-                                                : Container(
-                                                    padding:
-                                                        const EdgeInsets.all(
-                                                            16),
-                                                    decoration: BoxDecoration(
-                                                      color:
-                                                          Colors.grey.shade100,
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              8),
-                                                    ),
-                                                    child: const Row(
-                                                      mainAxisAlignment:
-                                                          MainAxisAlignment
-                                                              .center,
-                                                      children: [
-                                                        Icon(Icons.check_circle,
-                                                            color:
-                                                                Colors.green),
-                                                        SizedBox(width: 8),
-                                                        Text("All users loaded",
-                                                            style: TextStyle(
-                                                                color: Colors
-                                                                    .grey)),
-                                                      ],
-                                                    ),
-                                                  ),
-                                          ),
-                                        );
-                                      }
-
                                       return _buildEnhancedUserCard(
                                           filteredUsers[i]);
                                     },
@@ -1304,6 +1256,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     final isSuspended =
         suspendedUntil != null && suspendedUntil.isAfter(DateTime.now());
     final suspensionReason = (user["suspension_reason"] ?? "-").toString();
+    final adminNote = (user["admin_note"] ?? "").toString();
 
     showDialog(
       context: context,
@@ -1362,6 +1315,13 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             _detailRow("City", city),
             _detailRow("Contact", contact),
             _detailRow("Joined", createdAt),
+            const SizedBox(height: 8),
+            const Text(
+              "Admin Note",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Text(adminNote.isEmpty ? "—" : adminNote),
           ],
         ),
         actions: [
@@ -1369,9 +1329,77 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             onPressed: () => Navigator.pop(ctx),
             child: const Text("Close"),
           ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final note = await _promptUserNote(adminNote);
+              if (note == null) return;
+              final rawId = user["id"];
+              final userId =
+                  rawId is int ? rawId : int.tryParse(rawId.toString());
+              if (userId == null) return;
+              try {
+                await AdminService.updateUserNote(userId, note);
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Admin note updated")),
+                );
+                _fetchUsers(reset: true);
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("Update failed: $e")),
+                );
+              }
+            },
+            child: const Text("Edit Note"),
+          ),
         ],
       ),
     );
+  }
+
+  Future<String?> _promptUserNote(String initial) async {
+    final controller = TextEditingController(text: initial);
+    String? localError;
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocalState) => AlertDialog(
+          title: const Text("Edit Admin Note"),
+          content: TextField(
+            controller: controller,
+            maxLines: 4,
+            maxLength: 1000,
+            decoration: InputDecoration(
+              hintText: "Add a private admin note",
+              errorText: localError,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () {
+                final text = controller.text.trim();
+                if (text.length > 1000) {
+                  setLocalState(() => localError = "Note is too long");
+                  return;
+                }
+                Navigator.pop(ctx, text);
+              },
+              child: const Text("Save"),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    controller.dispose();
+    return result;
   }
 
   String _formatDateTime(DateTime value) {

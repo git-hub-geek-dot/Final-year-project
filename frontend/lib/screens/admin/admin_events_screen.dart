@@ -16,9 +16,6 @@ enum _DeleteAction { soft, hard }
 class _AdminEventsScreenState extends State<AdminEventsScreen> {
   final List<dynamic> events = [];
   bool loading = true;
-  bool loadingMore = false;
-  int page = 1;
-  int totalPages = 1;
   String? errorMessage;
   String search = "";
   String sortField = "event_date"; // title | status | event_date
@@ -105,34 +102,40 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
   }
 
   Future<void> _fetchEvents({bool reset = false}) async {
-    if (loadingMore) return;
     if (reset) {
       setState(() {
         loading = true;
-        page = 1;
-        totalPages = 1;
         events.clear();
         errorMessage = null;
       });
-    } else {
-      setState(() => loadingMore = true);
     }
 
     try {
-      final data = await AdminService.getAllEvents(page: page, limit: 20);
-      final items = (data["items"] as List?) ?? [];
+      final allItems = <dynamic>[];
+      int currentPage = 1;
+      int lastPage = 1;
+
+      do {
+        final data = await AdminService.getAllEvents(
+          page: currentPage,
+          limit: 20,
+        );
+        final items = (data["items"] as List?) ?? [];
+        lastPage = data["totalPages"] ?? currentPage;
+        allItems.addAll(items);
+        currentPage += 1;
+      } while (currentPage <= lastPage);
+
       setState(() {
-        events.addAll(items);
-        totalPages = data["totalPages"] ?? 1;
+        events
+          ..clear()
+          ..addAll(allItems);
         loading = false;
-        loadingMore = false;
-        page += 1;
         errorMessage = null;
       });
     } catch (_) {
       setState(() {
         loading = false;
-        loadingMore = false;
         if (reset) {
           errorMessage = "Failed to load events";
         }
@@ -213,36 +216,8 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
                             child: filtered.isEmpty
                                 ? const Center(child: Text("No events found"))
                                 : ListView.builder(
-                                    itemCount: filtered.length + 1,
+                                    itemCount: filtered.length,
                                     itemBuilder: (context, i) {
-                                      if (i == filtered.length) {
-                                        final canLoadMore = page <= totalPages;
-                                        return Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                              vertical: 12),
-                                          child: Center(
-                                            child: canLoadMore
-                                                ? ElevatedButton(
-                                                    onPressed: loadingMore
-                                                        ? null
-                                                        : () => _fetchEvents(),
-                                                    child: loadingMore
-                                                        ? const SizedBox(
-                                                            width: 18,
-                                                            height: 18,
-                                                            child:
-                                                                CircularProgressIndicator(
-                                                                    strokeWidth:
-                                                                        2),
-                                                          )
-                                                        : const Text(
-                                                            "Load More"),
-                                                  )
-                                                : const Text("No more events"),
-                                          ),
-                                        );
-                                      }
-
                                       final event = filtered[i];
                                       final isDeleted =
                                           event["status"] == "deleted";

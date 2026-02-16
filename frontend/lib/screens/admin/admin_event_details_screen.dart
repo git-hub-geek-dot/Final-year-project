@@ -27,10 +27,34 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
     loadStats();
   }
 
+  Future<List<dynamic>> _fetchAllApplications() async {
+    final allItems = <dynamic>[];
+    int currentPage = 1;
+    int lastPage = 1;
+
+    do {
+      final data = await AdminService.getAllApplications(
+        page: currentPage,
+        limit: 20,
+      );
+      final items = (data["items"] as List?) ?? [];
+      lastPage = data["totalPages"] ?? currentPage;
+      allItems.addAll(items);
+      currentPage += 1;
+    } while (currentPage <= lastPage);
+
+    return allItems;
+  }
+
   Future<void> loadStats() async {
     try {
-      final data = await AdminService.getAllApplications();
-      final list = (data["items"] as List?) ?? [];
+      if (mounted) {
+        setState(() {
+          loadingStats = true;
+        });
+      }
+
+      final list = await _fetchAllApplications();
       // Filter applications for this specific event
       final eventApplications =
           list.where((app) => app["event_id"] == widget.event["id"]).toList();

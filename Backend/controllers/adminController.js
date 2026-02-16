@@ -106,6 +106,7 @@ const getUsers = async (req, res) => {
          u."isVerified",
          u.suspended_until,
          u.suspension_reason,
+         u.admin_note,
          (SELECT COUNT(*)::int FROM user_strikes s WHERE s.user_id = u.id) AS strike_count,
          COALESCE(
            (
@@ -315,9 +316,38 @@ const getStatsTimeseries = async (req, res) => {
     } catch (notifyErr) {
       console.error("USER STATUS NOTIFY ERROR:", notifyErr);
     }
-  } catch (err) {
+ } catch (err) {
     console.error("UPDATE USER STATUS ERROR:", err);
     res.status(500).json({ error: "Failed to update user status" });
+  }
+};
+
+const updateUserNote = async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id, 10);
+    const note = (req.body?.note || "").toString().trim();
+
+    if (!userId || Number.isNaN(userId)) {
+      return res.status(400).json({ error: "Invalid user ID" });
+    }
+
+    if (note.length > 1000) {
+      return res.status(400).json({ error: "Note is too long" });
+    }
+
+    const result = await pool.query(
+      "UPDATE users SET admin_note = $1 WHERE id = $2 RETURNING id, admin_note",
+      [note || null, userId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({ message: "User note updated", user: result.rows[0] });
+  } catch (err) {
+    console.error("UPDATE USER NOTE ERROR:", err);
+    res.status(500).json({ error: "Failed to update user note" });
   }
 };
 
@@ -1479,6 +1509,7 @@ module.exports = {
   getStats,
   getStatsTimeseries,
   updateUserStatus,
+  updateUserNote,
   addUserStrike,
   resetUserStrikes,
   suspendUser,

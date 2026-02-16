@@ -75,27 +75,47 @@ async function main() {
     },
   });
 
-  await prisma.user.upsert({
-    where: { email: 'r@test.com' },
-    update: {},
-    create: {
-      name: 'organiser',
-      email: 'r@test.com',
-      password: hashedPassword,
-      role: 'organiser',
-    },
-  });
+  const organisers = [
+    { name: 'organiser1', email: 'org1@gmail.com' },
+    { name: 'organiser2', email: 'org2@gmail.com' },
+    { name: 'organiser3', email: 'org3@gmail.com' },
+    { name: 'organiser4', email: 'org4@gmail.com' },
+    { name: 'organiser5', email: 'org5@gmail.com' },
+  ];
 
-  await prisma.user.upsert({
-    where: { email: 'v@test.com' },
-    update: {},
-    create: {
-      name: 'volunteer',
-      email: 'v@test.com',
-      password: hashedPassword,
-      role: 'volunteer',
-    },
-  });
+  for (const organiser of organisers) {
+    await prisma.user.upsert({
+      where: { email: organiser.email },
+      update: {},
+      create: {
+        name: organiser.name,
+        email: organiser.email,
+        password: hashedPassword,
+        role: 'organiser',
+      },
+    });
+  }
+
+  const volunteers = [
+    { name: 'volunteer1', email: 'vol1@gmail.com' },
+    { name: 'volunteer2', email: 'vol2@gmail.com' },
+    { name: 'volunteer3', email: 'vol3@gmail.com' },
+    { name: 'volunteer4', email: 'vol4@gmail.com' },
+    { name: 'volunteer5', email: 'vol5@gmail.com' },
+  ];
+
+  for (const volunteer of volunteers) {
+    await prisma.user.upsert({
+      where: { email: volunteer.email },
+      update: {},
+      create: {
+        name: volunteer.name,
+        email: volunteer.email,
+        password: hashedPassword,
+        role: 'volunteer',
+      },
+    });
+  }
 
   console.log('✅ Users and categories seeded');
 }

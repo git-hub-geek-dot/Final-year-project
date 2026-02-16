@@ -23,6 +23,13 @@ router.post(
 );
 
 router.post(
+  "/users/:id/note",
+  authenticateToken,
+  adminOnly,
+  adminController.updateUserNote
+);
+
+router.post(
   "/users/:id/strikes",
   authenticateToken,
   adminOnly,

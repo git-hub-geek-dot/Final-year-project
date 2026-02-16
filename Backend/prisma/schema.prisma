@@ -301,6 +301,7 @@ model User {
   profilePictureUrl String? @map("profile_picture_url") // added (safe)
   suspendedUntil DateTime? @map("suspended_until") @db.Timestamp(6)
   suspensionReason String? @map("suspension_reason")
+  adminNote   String?     @map("admin_note")
   createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamp(6)
 
   applications Application[]

@@ -433,6 +433,28 @@ class AdminService {
     }
   }
 
+  static Future<void> updateUserNote(int userId, String note) async {
+    final token = await TokenService.getToken();
+
+    final res = await http.post(
+      Uri.parse("${ApiConfig.baseUrl}/admin/users/$userId/note"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
+      body: jsonEncode({"note": note}),
+    );
+
+    if (res.statusCode != 200) {
+      String message = "Failed to update note";
+      try {
+        final data = jsonDecode(res.body);
+        message = data["error"]?.toString() ?? message;
+      } catch (_) {}
+      throw Exception(message);
+    }
+  }
+
   // ================= TARGETED NOTIFICATIONS =================
   static Future<void> sendTargetedNotification({
     required List<int> userIds,

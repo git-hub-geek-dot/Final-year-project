@@ -17,9 +17,6 @@ class AdminApplicationsScreen extends StatefulWidget {
 class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
   final List<dynamic> apps = [];
   bool loading = true;
-  bool loadingMore = false;
-  int page = 1;
-  int totalPages = 1;
   String? errorMessage;
   String statusFilter = "all";
   String search = "";
@@ -33,35 +30,41 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
   }
 
   Future<void> _fetchApplications({bool reset = false}) async {
-    if (loadingMore) return;
 
     if (reset) {
       setState(() {
         loading = true;
-        page = 1;
-        totalPages = 1;
         apps.clear();
         errorMessage = null;
       });
-    } else {
-      setState(() => loadingMore = true);
     }
 
     try {
-      final data = await AdminService.getAllApplications(page: page, limit: 20);
-      final items = (data["items"] as List?) ?? [];
+      final allItems = <dynamic>[];
+      int currentPage = 1;
+      int lastPage = 1;
+
+      do {
+        final data = await AdminService.getAllApplications(
+          page: currentPage,
+          limit: 20,
+        );
+        final items = (data["items"] as List?) ?? [];
+        lastPage = data["totalPages"] ?? currentPage;
+        allItems.addAll(items);
+        currentPage += 1;
+      } while (currentPage <= lastPage);
+
       setState(() {
-        apps.addAll(items);
-        totalPages = data["totalPages"] ?? 1;
+        apps
+          ..clear()
+          ..addAll(allItems);
         loading = false;
-        loadingMore = false;
-        page += 1;
         errorMessage = null;
       });
     } catch (_) {
       setState(() {
         loading = false;
-        loadingMore = false;
         if (reset) {
           errorMessage = "Failed to load applications";
         }
@@ -278,39 +281,8 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
                             child: filtered.isEmpty
                                 ? const Center(child: Text("No applications found"))
                                 : ListView.builder(
-                                    itemCount: filtered.length + 1,
+                                    itemCount: filtered.length,
                                     itemBuilder: (context, i) {
-                                      if (i == filtered.length) {
-                                        final canLoadMore = page <= totalPages;
-                                        return Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 12,
-                                          ),
-                                          child: Center(
-                                            child: canLoadMore
-                                                ? ElevatedButton(
-                                                    onPressed: loadingMore
-                                                        ? null
-                                                        : () =>
-                                                            _fetchApplications(),
-                                                    child: loadingMore
-                                                        ? const SizedBox(
-                                                            width: 18,
-                                                            height: 18,
-                                                            child:
-                                                                CircularProgressIndicator(
-                                                              strokeWidth: 2,
-                                                            ),
-                                                          )
-                                                        : const Text("Load More"),
-                                                  )
-                                                : const Text(
-                                                    "No more applications",
-                                                  ),
-                                          ),
-                                        );
-                                      }
-
                                       final app = filtered[i];
                                       final isCancelled =
                                           app["status"] == "cancelled";

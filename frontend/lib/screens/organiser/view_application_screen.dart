@@ -231,6 +231,8 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
       case "accepted":
       case "approved":
         return Colors.green;
+      case "waitlisted":
+        return Colors.deepPurple;
       case "rejected":
         return Colors.red;
       default:
@@ -243,6 +245,8 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
       case "accepted":
       case "approved":
         return "Approved";
+      case "waitlisted":
+        return "Waitlisted";
       case "rejected":
         return "Rejected";
       case "pending":

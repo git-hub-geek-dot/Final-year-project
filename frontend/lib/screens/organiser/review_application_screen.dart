@@ -14,7 +14,8 @@ class ReviewApplicationsScreen extends StatefulWidget {
 }
 
 class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
-  String selectedStatus = "pending"; // pending | approved | rejected
+  String selectedStatus =
+      "pending"; // pending | approved | rejected | waitlisted
   String selectedSort = "newest"; // newest | oldest | name
   bool loading = true;
   String? loadError;
@@ -69,6 +70,7 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
     final status =
         (application["status"] ?? "pending").toString().toLowerCase();
     if (status == "accepted" || status == "approved") return "approved";
+    if (status == "waitlisted") return "waitlisted";
     if (status == "rejected") return "rejected";
     return "pending";
   }
@@ -139,6 +141,8 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
     switch (selectedStatus) {
       case "approved":
         return "No approved applications yet";
+      case "waitlisted":
+        return "No waitlisted applications yet";
       case "rejected":
         return "No rejected applications yet";
       case "pending":
@@ -151,6 +155,7 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
     var pending = 0;
     var approved = 0;
     var rejected = 0;
+    var waitlisted = 0;
 
     for (final application in applications) {
       final status = _normalizedStatus(application);
@@ -158,6 +163,8 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
         pending++;
       } else if (status == "approved") {
         approved++;
+      } else if (status == "waitlisted") {
+        waitlisted++;
       } else if (status == "rejected") {
         rejected++;
       }
@@ -166,6 +173,7 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
     return {
       "pending": pending,
       "approved": approved,
+      "waitlisted": waitlisted,
       "rejected": rejected,
     };
   }
@@ -239,6 +247,14 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
                           selectedStatus == "approved",
                           () {
                             setState(() => selectedStatus = "approved");
+                          },
+                        ),
+                        const SizedBox(width: 10),
+                        toggleButton(
+                          "Waitlisted (${counts["waitlisted"]})",
+                          selectedStatus == "waitlisted",
+                          () {
+                            setState(() => selectedStatus = "waitlisted");
                           },
                         ),
                         const SizedBox(width: 10),
@@ -387,6 +403,8 @@ class ApplicationCard extends StatelessWidget {
     switch (status) {
       case "approved":
         return "APPROVED";
+      case "waitlisted":
+        return "WAITLISTED";
       case "rejected":
         return "REJECTED";
       case "pending":
@@ -399,6 +417,8 @@ class ApplicationCard extends StatelessWidget {
     switch (status) {
       case "approved":
         return Colors.green.shade700;
+      case "waitlisted":
+        return Colors.deepPurple.shade700;
       case "rejected":
         return Colors.red.shade700;
       case "pending":

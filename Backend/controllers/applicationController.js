@@ -17,21 +17,60 @@ exports.applyToEvent = async (req, res) => {
       return res.status(409).json({ error: "Already applied" });
     }
 
-    // Apply
+    const eventResult = await pool.query(
+      `
+      SELECT id, status, volunteers_required
+      FROM events
+      WHERE id = $1
+      `,
+      [eventId]
+    );
+
+    if (eventResult.rows.length === 0) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    const event = eventResult.rows[0];
+    if (event.status !== "open") {
+      return res.status(400).json({ error: "Applications are closed" });
+    }
+
+    const volunteersRequired = Number(event.volunteers_required) || 0;
+    let nextStatus = "pending";
+
+    if (volunteersRequired > 0) {
+      const approvedCountResult = await pool.query(
+        `
+        SELECT COUNT(*)::int AS approved_count
+        FROM applications
+        WHERE event_id = $1
+          AND status IN ('accepted', 'approved')
+        `,
+        [eventId]
+      );
+
+      const approvedCount = approvedCountResult.rows[0]?.approved_count ?? 0;
+      if (approvedCount >= volunteersRequired) {
+        nextStatus = "waitlisted";
+      }
+    }
+
+    // Apply (pending by default, waitlisted if event is already full)
     const result = await pool.query(
       `
       INSERT INTO applications (event_id, volunteer_id, status)
-      VALUES ($1, $2, 'pending')
+      VALUES ($1, $2, $3)
       RETURNING id, status, applied_at
       `,
-      [eventId, volunteerId]
+      [eventId, volunteerId, nextStatus]
     );
 
     res.status(201).json({
       success: true,
       application_id: result.rows[0].id,
       status: result.rows[0].status,
-      applied_at: result.rows[0].applied_at
+      applied_at: result.rows[0].applied_at,
+      waitlisted: result.rows[0].status === "waitlisted",
     });
   } catch (err) {
     console.error("APPLY ERROR:", err);
@@ -58,9 +97,13 @@ exports.getApplicationStatus = async (req, res) => {
       return res.json({ applied: false });
     }
 
+    const status = result.rows[0].status === "waitlisted"
+      ? "pending"
+      : result.rows[0].status;
+
     res.json({
       applied: true,
-      status: result.rows[0].status
+      status
     });
   } catch (err) {
     console.error("STATUS ERROR:", err);
@@ -106,7 +149,10 @@ exports.getMyApplications = async (req, res) => {
       `
       SELECT 
         a.id,
-        a.status,
+        CASE
+          WHEN a.status = 'waitlisted' THEN 'pending'
+          ELSE a.status
+        END AS status,
         a.admin_cancel_reason,
         a.applied_at,
         COALESCE(

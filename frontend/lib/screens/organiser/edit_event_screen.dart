@@ -62,7 +62,11 @@ class _EditEventScreenState extends State<EditEventScreen> {
   @override
   void initState() {
     super.initState();
-    final e = widget.event;
+    _hydrateFromEvent(widget.event);
+    _loadMissingMetadataFromServer();
+  }
+
+  void _hydrateFromEvent(Map e) {
     final statusText =
         (e["computed_status"] ?? e["status"] ?? "").toString().toLowerCase();
     _isDraftEvent = statusText == "draft";
@@ -85,23 +89,105 @@ class _EditEventScreenState extends State<EditEventScreen> {
 
     selectedCategories
       ..clear()
-      ..addAll(
-        (e["categories"] as List?)
-                ?.map((item) => item.toString())
-                .where((item) => item.isNotEmpty) ??
-            const [],
-      );
+      ..addAll(_stringListFromAny(e["categories"]));
 
     responsibilities
       ..clear()
-      ..addAll(
-        (e["responsibilities"] as List?)
-                ?.map((item) => item.toString())
-                .where((item) => item.isNotEmpty) ??
-            const [],
-      );
+      ..addAll(_stringListFromAny(e["responsibilities"]));
 
     existingBanner = e["banner_url"]?.toString();
+  }
+
+  Future<void> _loadMissingMetadataFromServer() async {
+    if (selectedCategories.isNotEmpty && responsibilities.isNotEmpty) {
+      return;
+    }
+
+    final eventId = int.tryParse("${widget.event["id"]}");
+    if (eventId == null) return;
+
+    try {
+      Map<String, dynamic>? fresh;
+
+      final myEvents = await EventService.fetchMyEvents();
+      for (final item in myEvents) {
+        if (item is Map && _asInt(item["id"]) == eventId) {
+          fresh = Map<String, dynamic>.from(item);
+          break;
+        }
+      }
+
+      if (fresh == null) {
+        fresh = await EventService.fetchEventById(eventId);
+      }
+
+      if (!mounted) return;
+
+      final fetchedCategories = _stringListFromAny(fresh["categories"]);
+      final fetchedResponsibilities =
+          _stringListFromAny(fresh["responsibilities"]);
+
+      if (fetchedCategories.isEmpty && fetchedResponsibilities.isEmpty) return;
+
+      setState(() {
+        if (selectedCategories.isEmpty && fetchedCategories.isNotEmpty) {
+          selectedCategories
+            ..clear()
+            ..addAll(fetchedCategories);
+        }
+        if (responsibilities.isEmpty && fetchedResponsibilities.isNotEmpty) {
+          responsibilities
+            ..clear()
+            ..addAll(fetchedResponsibilities);
+        }
+      });
+    } catch (_) {
+      // silent fallback
+    }
+  }
+
+  List<String> _stringListFromAny(dynamic raw) {
+    if (raw == null) return const [];
+
+    if (raw is List) {
+      return raw
+          .map((item) {
+            if (item is Map) {
+              final map = Map<String, dynamic>.from(item);
+              return (map["name"] ??
+                      map["responsibility"] ??
+                      map["title"] ??
+                      "")
+                  .toString();
+            }
+            return item.toString();
+          })
+          .map((item) => item.trim())
+          .where((item) => item.isNotEmpty)
+          .toList();
+    }
+
+    final text = raw.toString().trim();
+    if (text.isEmpty) return const [];
+
+    if (text.startsWith("{") && text.endsWith("}")) {
+      final inner = text.substring(1, text.length - 1).trim();
+      if (inner.isEmpty) return const [];
+      return inner
+          .split(",")
+          .map((item) => item.replaceAll('"', "").trim())
+          .where((item) => item.isNotEmpty)
+          .toList();
+    }
+
+    return [text];
+  }
+
+  int _asInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString()) ?? 0;
   }
 
   String _fmtDate(DateTime d) =>
@@ -186,6 +272,15 @@ class _EditEventScreenState extends State<EditEventScreen> {
   }
 
   Future<void> handleUpdateEvent({bool publish = false}) async {
+    final inlineResponsibility = responsibilityController.text.trim();
+    if (inlineResponsibility.isNotEmpty &&
+        !responsibilities.any(
+          (item) => item.toLowerCase() == inlineResponsibility.toLowerCase(),
+        )) {
+      responsibilities.add(inlineResponsibility);
+      responsibilityController.clear();
+    }
+
     if (titleController.text.trim().isEmpty) {
       _toast("Event title is required");
       return;

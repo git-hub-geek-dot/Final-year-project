@@ -143,6 +143,25 @@ class EventService {
     }
   }
 
+  /// ================= EVENT DETAILS =================
+  static Future<Map<String, dynamic>> fetchEventById(int eventId) async {
+    final response = await http.get(
+      Uri.parse("${ApiConfig.baseUrl}/events/$eventId"),
+      headers: {
+        "Content-Type": "application/json",
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception("Failed to fetch event details");
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is Map<String, dynamic>) return decoded;
+    if (decoded is Map) return Map<String, dynamic>.from(decoded);
+    throw Exception("Invalid event details response");
+  }
+
   /// ================= APPLICATIONS =================
   static Future<List<dynamic>> fetchApplications(int eventId) async {
     final token = await TokenService.getToken();

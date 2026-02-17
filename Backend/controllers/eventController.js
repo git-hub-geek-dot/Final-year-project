@@ -235,9 +235,13 @@ exports.getMyEvents = async (req, res) => {
           0
         )::int AS approved_count,
         COALESCE(
-          array_agg(er.responsibility) FILTER (WHERE er.responsibility IS NOT NULL),
+          array_agg(DISTINCT er.responsibility) FILTER (WHERE er.responsibility IS NOT NULL),
           '{}'
         ) AS responsibilities,
+        COALESCE(
+          array_agg(DISTINCT c.name) FILTER (WHERE c.name IS NOT NULL),
+          '{}'
+        ) AS categories,
        CASE
   WHEN e.status = 'draft' THEN 'draft'
   WHEN e.status = 'deleted' THEN 'deleted_by_admin'
@@ -250,6 +254,8 @@ END AS computed_status
       FROM events e
       LEFT JOIN applications a ON a.event_id = e.id
       LEFT JOIN event_responsibilities er ON er.event_id = e.id
+      LEFT JOIN event_categories ec ON ec.event_id = e.id
+      LEFT JOIN categories c ON c.id = ec.category_id
       WHERE e.organiser_id = $1
         AND e.status IN ('draft', 'open', 'closed', 'completed', 'deleted')
       GROUP BY e.id
@@ -323,9 +329,13 @@ exports.getEventById = async (req, res) => {
         u.name AS organiser_name,
         u.profile_picture_url AS organiser_profile_picture_url,
         COALESCE(
-          array_agg(er.responsibility) FILTER (WHERE er.responsibility IS NOT NULL),
+          array_agg(DISTINCT er.responsibility) FILTER (WHERE er.responsibility IS NOT NULL),
           '{}'
         ) AS responsibilities,
+        COALESCE(
+          array_agg(DISTINCT c.name) FILTER (WHERE c.name IS NOT NULL),
+          '{}'
+        ) AS categories,
         CASE
           WHEN NOW() < (event_date + COALESCE(start_time, TIME '00:00:00')) THEN 'upcoming'
           WHEN NOW() BETWEEN (event_date + COALESCE(start_time, TIME '00:00:00'))
@@ -335,6 +345,8 @@ exports.getEventById = async (req, res) => {
       FROM events e
       JOIN users u ON e.organiser_id = u.id
       LEFT JOIN event_responsibilities er ON er.event_id = e.id
+      LEFT JOIN event_categories ec ON ec.event_id = e.id
+      LEFT JOIN categories c ON c.id = ec.category_id
       WHERE e.id = $1 AND e.status != 'deleted'
       GROUP BY e.id, u.name, u.profile_picture_url
       `,
@@ -419,6 +431,7 @@ exports.getOrganiserLeaderboard = async (req, res) => {
 // UPDATE EVENT (ORGANISER)
 // =======================================================
 exports.updateEvent = async (req, res) => {
+  const client = await pool.connect();
   try {
     const organiserId = req.user.id;
     const eventId = req.params.id;
@@ -437,11 +450,15 @@ exports.updateEvent = async (req, res) => {
       start_time,
       end_time,
       publish,
+      categories,
+      responsibilities,
     } = req.body;
 
     const publishNow = publish === true;
 
-    const result = await pool.query(
+    await client.query("BEGIN");
+
+    const result = await client.query(
       `
       UPDATE events
       SET
@@ -484,12 +501,122 @@ exports.updateEvent = async (req, res) => {
     );
 
     if (result.rowCount === 0) {
+      await client.query("ROLLBACK");
       return res.status(404).json({ error: "Event not found" });
     }
 
-    const updatedEvent = result.rows[0];
+    const hasResponsibilitiesPayload = Array.isArray(responsibilities);
+    const cleanedResponsibilities = hasResponsibilitiesPayload
+      ? responsibilities
+          .map((item) => (typeof item === "string" ? item.trim() : ""))
+          .filter(Boolean)
+      : null;
 
-    res.json(updatedEvent);
+    if (hasResponsibilitiesPayload) {
+      await client.query(
+        "DELETE FROM event_responsibilities WHERE event_id = $1",
+        [eventId]
+      );
+
+      if (cleanedResponsibilities.length > 0) {
+        const responsibilityValues = cleanedResponsibilities
+          .map((_, i) => `($1, $${i + 2})`)
+          .join(",");
+
+        await client.query(
+          `
+          INSERT INTO event_responsibilities (event_id, responsibility)
+          VALUES ${responsibilityValues}
+          `,
+          [eventId, ...cleanedResponsibilities]
+        );
+      }
+    }
+
+    const hasCategoriesPayload = Array.isArray(categories);
+    const numericCategoryIds = [];
+    const categoryNames = [];
+
+    if (hasCategoriesPayload) {
+      for (const item of categories) {
+        if (typeof item === "number" && Number.isInteger(item)) {
+          numericCategoryIds.push(item);
+        } else if (typeof item === "string" && item.trim().length > 0) {
+          categoryNames.push(item.trim());
+        }
+      }
+    }
+
+    if (categoryNames.length > 0) {
+      const categoryNameResult = await client.query(
+        `
+        SELECT id
+        FROM categories
+        WHERE name = ANY($1)
+        `,
+        [categoryNames]
+      );
+
+      for (const row of categoryNameResult.rows) {
+        numericCategoryIds.push(row.id);
+      }
+    }
+
+    const uniqueCategoryIds = [...new Set(numericCategoryIds)];
+
+    if (hasCategoriesPayload) {
+      await client.query("DELETE FROM event_categories WHERE event_id = $1", [
+        eventId,
+      ]);
+
+      if (uniqueCategoryIds.length > 0) {
+        const categoryValues = uniqueCategoryIds
+          .map((_, i) => `($1, $${i + 2})`)
+          .join(",");
+
+        await client.query(
+          `
+          INSERT INTO event_categories (event_id, category_id)
+          VALUES ${categoryValues}
+          `,
+          [eventId, ...uniqueCategoryIds]
+        );
+      }
+    }
+
+    const categoryListResult = await client.query(
+      `
+      SELECT c.name
+      FROM event_categories ec
+      JOIN categories c ON c.id = ec.category_id
+      WHERE ec.event_id = $1
+      ORDER BY c.name ASC
+      `,
+      [eventId]
+    );
+
+    await client.query("COMMIT");
+
+    const updatedEvent = result.rows[0];
+    const updatedCategories = categoryListResult.rows.map((r) => r.name);
+    const responsibilityListResult = await pool.query(
+      `
+      SELECT responsibility
+      FROM event_responsibilities
+      WHERE event_id = $1
+      ORDER BY id ASC
+      `,
+      [eventId]
+    );
+    const updatedResponsibilities = responsibilityListResult.rows.map(
+      (r) => r.responsibility
+    );
+
+    res.json({
+      ...updatedEvent,
+      categories: updatedCategories,
+      responsibilities: updatedResponsibilities,
+    });
 
     try {
       const volunteerResult = await pool.query(
@@ -507,8 +634,13 @@ exports.updateEvent = async (req, res) => {
       console.error("EVENT UPDATE NOTIFY ERROR:", notifyErr);
     }
   } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (_) {}
     console.error("UPDATE EVENT ERROR:", err);
     res.status(500).json({ error: "Failed to update event" });
+  } finally {
+    client.release();
   }
 };
 

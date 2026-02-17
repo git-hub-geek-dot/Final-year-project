@@ -187,7 +187,10 @@ const getApplications = async (req, res) => {
     const apps = await pool.query(
       `SELECT 
          a.id,
-         a.status,
+         CASE
+           WHEN a.status = 'accepted' THEN 'approved'
+           ELSE a.status
+         END AS status,
          a.admin_cancel_reason,
          a.applied_at,
          u.name AS volunteer_name,

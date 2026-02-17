@@ -58,7 +58,7 @@ const giveRating = async (req, res) => {
         SELECT id
         FROM applications
         WHERE event_id = $1 AND volunteer_id = $2
-          AND status IN ('accepted', 'completed')
+          AND status IN ('approved', 'accepted', 'completed')
         `,
         [event_id, raterId]
       );
@@ -75,7 +75,7 @@ const giveRating = async (req, res) => {
         SELECT id
         FROM applications
         WHERE event_id = $1 AND volunteer_id = $2
-          AND status IN ('accepted', 'completed')
+          AND status IN ('approved', 'accepted', 'completed')
         `,
         [event_id, ratee_id]
       );

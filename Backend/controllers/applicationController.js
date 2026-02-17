@@ -44,7 +44,7 @@ exports.applyToEvent = async (req, res) => {
         SELECT COUNT(*)::int AS approved_count
         FROM applications
         WHERE event_id = $1
-          AND status IN ('accepted', 'approved')
+          AND status IN ('approved', 'accepted')
         `,
         [eventId]
       );
@@ -97,9 +97,12 @@ exports.getApplicationStatus = async (req, res) => {
       return res.json({ applied: false });
     }
 
-    const status = result.rows[0].status === "waitlisted"
+    const rawStatus = (result.rows[0].status || "").toString().toLowerCase();
+    const status = rawStatus === "waitlisted"
       ? "pending"
-      : result.rows[0].status;
+      : rawStatus === "accepted"
+        ? "approved"
+        : rawStatus;
 
     res.json({
       applied: true,
@@ -120,7 +123,10 @@ exports.getEventApplications = async (req, res) => {
       `
       SELECT 
         a.id,
-        a.status,
+        CASE
+          WHEN a.status = 'accepted' THEN 'approved'
+          ELSE a.status
+        END AS status,
         a.applied_at,
         u.id AS volunteer_id,
         u.name,
@@ -151,6 +157,7 @@ exports.getMyApplications = async (req, res) => {
         a.id,
         CASE
           WHEN a.status = 'waitlisted' THEN 'pending'
+          WHEN a.status = 'accepted' THEN 'approved'
           ELSE a.status
         END AS status,
         a.admin_cancel_reason,
@@ -243,7 +250,10 @@ exports.getApplicationById = async (req, res) => {
       `
       SELECT 
         a.id,
-        a.status,
+        CASE
+          WHEN a.status = 'accepted' THEN 'approved'
+          ELSE a.status
+        END AS status,
         a.applied_at,
         a.event_id,
         a.volunteer_id,
@@ -276,14 +286,16 @@ exports.updateApplicationStatus = async (req, res) => {
   const client = await pool.connect();
   try {
     const applicationId = parseInt(req.params.id, 10);
-    const status = (req.body?.status || "").toString().toLowerCase();
+    const requestedStatus = (req.body?.status || "").toString().toLowerCase();
+    const status = requestedStatus === "accepted" ? "approved" : requestedStatus;
 
     if (!Number.isInteger(applicationId) || applicationId <= 0) {
       return res.status(400).json({ error: "Invalid application ID" });
     }
 
-    // allow only these values (matches your existing system)
-    const allowed = ["pending", "accepted", "rejected"];
+    // Canonical status vocabulary: pending | approved | rejected.
+    // Legacy clients may still send "accepted", which is normalized above.
+    const allowed = ["pending", "approved", "rejected"];
     if (!status || !allowed.includes(status)) {
       return res.status(400).json({
         error: `Invalid status. Allowed: ${allowed.join(", ")}`,
@@ -309,10 +321,10 @@ exports.updateApplicationStatus = async (req, res) => {
 
     const currentApplication = applicationResult.rows[0];
     const wasAlreadyApproved =
-      currentApplication.status === "accepted" ||
-      currentApplication.status === "approved";
+      currentApplication.status === "approved" ||
+      currentApplication.status === "accepted";
 
-    if (status === "accepted" && !wasAlreadyApproved) {
+    if (status === "approved" && !wasAlreadyApproved) {
       const eventResult = await client.query(
         `
         SELECT id, volunteers_required
@@ -336,7 +348,7 @@ exports.updateApplicationStatus = async (req, res) => {
         SELECT COUNT(*)::int AS approved_count
         FROM applications
         WHERE event_id = $1
-          AND status IN ('accepted', 'approved')
+          AND status IN ('approved', 'accepted')
           AND id <> $2
         `,
         [currentApplication.event_id, applicationId]
@@ -379,7 +391,7 @@ exports.updateApplicationStatus = async (req, res) => {
         [app.event_id]
       );
       const eventTitle = eventResult.rows[0]?.title || "your event";
-      const statusLabel = app.status === "accepted" ? "approved" : app.status;
+      const statusLabel = app.status;
 
       await notifyUser(app.volunteer_id, {
         title: "Application update",

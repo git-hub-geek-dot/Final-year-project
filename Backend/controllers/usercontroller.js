@@ -182,7 +182,7 @@ const getVolunteerDashboard = async (req, res) => {
       pool.query(
         `SELECT COUNT(*)::int AS total
          FROM applications
-         WHERE volunteer_id = $1 AND status = 'approved'`,
+         WHERE volunteer_id = $1 AND status IN ('approved', 'accepted')`,
         [userId]
       ),
       pool.query(
@@ -196,7 +196,7 @@ const getVolunteerDashboard = async (req, res) => {
          FROM applications a
          JOIN events e ON e.id = a.event_id
          WHERE a.volunteer_id = $1
-           AND a.status = 'approved'
+           AND a.status IN ('approved', 'accepted')
            AND e.start_time IS NOT NULL
            AND e.end_time IS NOT NULL`,
         [userId]
@@ -206,7 +206,7 @@ const getVolunteerDashboard = async (req, res) => {
          FROM applications a
          JOIN events e ON e.id = a.event_id
          WHERE a.volunteer_id = $1
-           AND a.status = 'approved'
+           AND a.status IN ('approved', 'accepted')
            AND e.event_date >= CURRENT_DATE
            AND e.status != 'deleted'
          ORDER BY e.event_date ASC

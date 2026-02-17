@@ -29,7 +29,7 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
   int? ratingScore;
   String? ratingComment;
 
-  /// null | pending | accepted | rejected
+  /// null | pending | approved | rejected
   String? applicationStatus;
 
   @override
@@ -345,7 +345,8 @@ Join on VolunteerX
             ),
           ),
           if ((widget.event["computed_status"] == "completed") &&
-              (applicationStatus == "accepted" ||
+              (applicationStatus == "approved" ||
+                  applicationStatus == "accepted" ||
                   applicationStatus == "completed")) ...[
             const SizedBox(height: 12),
             if (isLoadingRating)
@@ -762,6 +763,7 @@ Join on VolunteerX
     switch (status) {
       case "pending":
         return Colors.orange;
+      case "approved":
       case "accepted":
         return Colors.green;
       case "rejected":
@@ -772,6 +774,9 @@ Join on VolunteerX
   }
 
   String _statusText(String status) {
+    if (status == "approved") {
+      return "Application Approved";
+    }
     switch (status) {
       case "pending":
         return "⏳ Application Pending";

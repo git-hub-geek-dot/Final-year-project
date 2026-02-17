@@ -61,7 +61,9 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
 
         applications = applications.where((app) {
           final status = (app["status"] ?? "").toString().toLowerCase();
-          return status == "accepted" || status == "completed";
+          return status == "approved" ||
+              status == "accepted" ||
+              status == "completed";
         }).toList();
 
         setState(() => loading = false);

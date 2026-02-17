@@ -70,7 +70,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
 
         applications = applications.where((app) {
           final status = app["status"]?.toString().toLowerCase() ?? "";
-          if (status == "accepted") return true;
+          if (status == "approved" || status == "accepted") return true;
           return !_isPastEventDate(app["event_date"]?.toString());
         }).toList();
 
@@ -127,6 +127,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
 
   Color statusColor(String status) {
     switch (status.toLowerCase()) {
+      case "approved":
       case "accepted":
         return Colors.green;
       case "rejected":

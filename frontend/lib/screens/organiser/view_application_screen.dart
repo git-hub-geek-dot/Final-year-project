@@ -97,8 +97,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
   }
 
   Future<void> updateStatus(String status) async {
-    final wantsApprove = status.toLowerCase() == "accepted" ||
-        status.toLowerCase() == "approved";
+    final wantsApprove = status.toLowerCase() == "approved";
     if (wantsApprove && _isApproveBlockedByCapacity()) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(_slotsFullMessage)),
@@ -282,7 +281,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
   }
 
   bool _isApprovedStatus(String status) {
-    return status == "accepted" || status == "approved";
+    return status == "approved" || status == "accepted";
   }
 
   bool _isApproveBlockedByCapacity() {
@@ -604,7 +603,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                                         onPressed: actionLoading ||
                                                 approveBlockedByCapacity
                                             ? null
-                                            : () => updateStatus("accepted"),
+                                            : () => updateStatus("approved"),
                                         child: Text(
                                           actionLoading
                                               ? "Please wait..."

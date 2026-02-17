@@ -127,6 +127,7 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
 
   Color statusColor(String status) {
     switch (status.toLowerCase()) {
+      case "approved":
       case "accepted":
         return Colors.green;
       case "rejected":
@@ -226,7 +227,7 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
                                       child: Text("Pending"),
                                     ),
                                     DropdownMenuItem(
-                                      value: "accepted",
+                                      value: "approved",
                                       child: Text("Approved"),
                                     ),
                                     DropdownMenuItem(
@@ -279,120 +280,17 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
                           ),
                           Expanded(
                             child: filtered.isEmpty
-                                ? const Center(child: Text("No applications found"))
+                                ? Center(
+                                    child: Text(_emptyMessage()),
+                                  )
                                 : ListView.builder(
                                     itemCount: filtered.length,
                                     itemBuilder: (context, i) {
-                                      final app = filtered[i];
-                                      final isCancelled =
-                                          app["status"] == "cancelled";
-                                      final cancelReason =
-                                          (app["admin_cancel_reason"] ?? "")
-                                              .toString();
-                                      final eventDate =
-                                          _fmtDate(app["event_date"]);
-                                      final organiserName =
-                                          app["organiser_name"] ?? "-";
-
-                                      final statusText = statusLabel(
-                                        (app["status"] ?? "").toString(),
-                                      );
-                                      final subtitleText =
-                                          isCancelled && cancelReason.isNotEmpty
-                                              ? "${app["volunteer_name"]} | $statusText\nOrganiser: $organiserName | Date: $eventDate\nReason: $cancelReason"
-                                              : "${app["volunteer_name"]} | $statusText\nOrganiser: $organiserName | Date: $eventDate";
-
-                                      return Card(
-                                        child: ListTile(
-                                          title: Text(
-                                            (app["event_title"] ?? "-")
-                                                .toString(),
-                                          ),
-                                          subtitle: Text(subtitleText),
-                                          isThreeLine:
-                                              isCancelled && cancelReason.isNotEmpty,
-                                          onTap: () => _showDetails(context, app),
-                                          trailing: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                  horizontal: 10,
-                                                  vertical: 4,
-                                                ),
-                                                decoration: BoxDecoration(
-                                                  color: statusColor(
-                                                    (app["status"] ?? "")
-                                                        .toString(),
-                                                  ),
-                                                  borderRadius:
-                                                      BorderRadius.circular(12),
-                                                ),
-                                                child: Text(
-                                                  statusText,
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 12,
-                                                  ),
-                                                ),
-                                              ),
-                                              if (!isCancelled)
-                                                IconButton(
-                                                  icon: const Icon(
-                                                    Icons.cancel,
-                                                    color: Colors.red,
-                                                  ),
-                                                  onPressed: () async {
-                                                    final reason =
-                                                        await _askCancelReason();
-                                                    if (reason == null) return;
-                                                    final rawId = app["id"];
-                                                    final appId = rawId is int
-                                                        ? rawId
-                                                        : int.tryParse(
-                                                            rawId.toString(),
-                                                          );
-                                                    if (appId == null) return;
-                                                    try {
-                                                      await AdminService
-                                                          .cancelApplication(
-                                                        appId,
-                                                        reason,
-                                                      );
-                                                      if (!context.mounted) return;
-                                                      ScaffoldMessenger.of(context)
-                                                          .showSnackBar(
-                                                        const SnackBar(
-                                                          content: Text(
-                                                            "Application cancelled",
-                                                          ),
-                                                        ),
-                                                      );
-                                                      _fetchApplications(
-                                                        reset: true,
-                                                      );
-                                                    } catch (e) {
-                                                      if (!context.mounted) return;
-                                                      ScaffoldMessenger.of(context)
-                                                          .showSnackBar(
-                                                        SnackBar(
-                                                          content: Text(
-                                                            e.toString()
-                                                                .replaceFirst(
-                                                              "Exception: ",
-                                                              "",
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      );
-                                                    }
-                                                  },
-                                                ),
-                                            ],
-                                          ),
-                                        ),
-                                      );
+                                      final app =
+                                          Map<String, dynamic>.from(
+                                            filtered[i] as Map,
+                                          );
+                                      return _buildApplicationCard(context, app);
                                     },
                                   ),
                           ),
@@ -465,6 +363,282 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
           ),
           Expanded(child: Text(value)),
         ],
+      ),
+    );
+  }
+
+  String _emptyMessage() {
+    switch (statusFilter) {
+      case "pending":
+        return "No pending applications found";
+      case "approved":
+        return "No approved applications found";
+      case "rejected":
+        return "No rejected applications found";
+      case "cancelled":
+        return "No cancelled applications found";
+      case "all":
+      default:
+        return "No applications found";
+    }
+  }
+
+  IconData _statusIcon(String status) {
+    switch (status.toLowerCase()) {
+      case "approved":
+      case "accepted":
+        return Icons.check_circle;
+      case "rejected":
+        return Icons.block;
+      case "cancelled":
+        return Icons.cancel;
+      case "pending":
+      default:
+        return Icons.hourglass_top;
+    }
+  }
+
+  String _initialLetter(String text) {
+    final value = text.trim();
+    if (value.isEmpty) return "?";
+    return value[0].toUpperCase();
+  }
+
+  String _appliedAgo(dynamic value) {
+    if (value == null) return "Applied recently";
+    final parsed = DateTime.tryParse(value.toString());
+    if (parsed == null) return "Applied recently";
+
+    final diff = DateTime.now().difference(parsed.toLocal());
+    if (diff.inDays > 0) return "Applied ${diff.inDays}d ago";
+    if (diff.inHours > 0) return "Applied ${diff.inHours}h ago";
+    if (diff.inMinutes > 0) return "Applied ${diff.inMinutes}m ago";
+    return "Applied just now";
+  }
+
+  Future<void> _cancelApplication(
+    BuildContext context,
+    Map<String, dynamic> app,
+  ) async {
+    final reason = await _askCancelReason();
+    if (reason == null) return;
+
+    final rawId = app["id"];
+    final appId = rawId is int ? rawId : int.tryParse(rawId.toString());
+    if (appId == null) return;
+
+    try {
+      await AdminService.cancelApplication(appId, reason);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Application cancelled")),
+      );
+      _fetchApplications(reset: true);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString().replaceFirst("Exception: ", ""),
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _metaChip(IconData icon, String text) {
+    return Container(
+      margin: const EdgeInsets.only(right: 8, bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.grey.withAlpha(26),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Colors.black54),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: const TextStyle(fontSize: 12, color: Colors.black87),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statusChip(String status) {
+    final color = statusColor(status);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withAlpha(28),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withAlpha(90)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(_statusIcon(status), size: 14, color: color),
+          const SizedBox(width: 5),
+          Text(
+            statusLabel(status),
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildApplicationCard(
+    BuildContext context,
+    Map<String, dynamic> app,
+  ) {
+    final statusRaw = (app["status"] ?? "").toString().toLowerCase();
+    final status = statusRaw.isEmpty ? "pending" : statusRaw;
+    final isCancelled = status == "cancelled";
+    final cancelReason = (app["admin_cancel_reason"] ?? "").toString().trim();
+
+    final eventTitle = (app["event_title"] ?? "-").toString();
+    final volunteerName = (app["volunteer_name"] ?? "-").toString();
+    final volunteerEmail = (app["volunteer_email"] ?? "-").toString();
+    final organiserName = (app["organiser_name"] ?? "-").toString();
+    final eventDate = _fmtDate(app["event_date"]);
+    final appliedAgo = _appliedAgo(app["applied_at"]);
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      elevation: 1.5,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => _showDetails(context, app),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundColor: statusColor(status).withAlpha(30),
+                    child: Text(
+                      _initialLetter(volunteerName),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: statusColor(status),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          eventTitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          volunteerName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          volunteerEmail,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.black54,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _statusChip(status),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                children: [
+                  _metaChip(Icons.calendar_today, "Event: $eventDate"),
+                  _metaChip(Icons.business, "Organiser: $organiserName"),
+                  _metaChip(Icons.schedule, appliedAgo),
+                ],
+              ),
+              if (isCancelled && cancelReason.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withAlpha(18),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.red.withAlpha(60)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.info_outline,
+                        color: Colors.red,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          "Cancellation reason: $cancelReason",
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  TextButton.icon(
+                    onPressed: () => _showDetails(context, app),
+                    icon: const Icon(Icons.visibility, size: 18),
+                    label: const Text("View details"),
+                  ),
+                  const Spacer(),
+                  if (!isCancelled)
+                    OutlinedButton.icon(
+                      onPressed: () => _cancelApplication(context, app),
+                      icon: const Icon(Icons.cancel, size: 18),
+                      label: const Text("Cancel"),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red,
+                        side: const BorderSide(color: Colors.red),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

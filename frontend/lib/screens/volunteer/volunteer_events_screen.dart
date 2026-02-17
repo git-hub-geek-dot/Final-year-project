@@ -473,7 +473,9 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
               "")
             .toString()
             .toLowerCase();
-        final isApproved = appStatus == "accepted" || appStatus == "completed";
+        final isApproved = appStatus == "approved" ||
+            appStatus == "accepted" ||
+            appStatus == "completed";
 
             final matchesTab = selectedTab == "all"
               ? !isCompleted && appStatus != "rejected"

@@ -126,8 +126,13 @@ const initChatSocket = (io) => {
       }
     });
 
-    socket.on("sendMessage", async ({ threadId, message }) => {
+    socket.on("sendMessage", async ({ threadId, message, clientMessageId }) => {
       try {
+        const safeClientMessageId =
+          clientMessageId != null && String(clientMessageId).trim() !== ""
+            ? String(clientMessageId).trim()
+            : null;
+
         if (isTokenExpired(socket)) {
           socket.disconnect(true);
           return;
@@ -135,29 +140,61 @@ const initChatSocket = (io) => {
 
         const text = message ? String(message).trim() : "";
         if (!text) {
+          if (safeClientMessageId) {
+            socket.emit("messageFailed", {
+              clientMessageId: safeClientMessageId,
+              message: "Message is empty.",
+            });
+          }
           return;
         }
 
         if (text.length > MESSAGE_MAX_LENGTH) {
+          const errorMessage = "Message too long. Please shorten it.";
           socket.emit("rateLimited", {
-            message: "Message too long. Please shorten it.",
+            message: errorMessage,
           });
+          if (safeClientMessageId) {
+            socket.emit("messageFailed", {
+              clientMessageId: safeClientMessageId,
+              message: errorMessage,
+            });
+          }
           return;
         }
 
         if (!socket.user?.id) {
+          if (safeClientMessageId) {
+            socket.emit("messageFailed", {
+              clientMessageId: safeClientMessageId,
+              message: "Unauthorized.",
+            });
+          }
           return;
         }
 
         if (isRateLimited(socket.user.id)) {
+          const errorMessage = "Too many messages. Please slow down.";
           socket.emit("rateLimited", {
-            message: "Too many messages. Please slow down.",
+            message: errorMessage,
           });
+          if (safeClientMessageId) {
+            socket.emit("messageFailed", {
+              clientMessageId: safeClientMessageId,
+              message: errorMessage,
+            });
+          }
           return;
         }
 
         const userStatus = await ensureActiveUser(socket.user.id);
         if (!userStatus.ok) {
+          if (safeClientMessageId) {
+            socket.emit("messageFailed", {
+              clientMessageId: safeClientMessageId,
+              message: "Unauthorized.",
+            });
+          }
           socket.disconnect(true);
           return;
         }
@@ -172,6 +209,12 @@ const initChatSocket = (io) => {
         );
 
         if (threadResult.rows.length === 0) {
+          if (safeClientMessageId) {
+            socket.emit("messageFailed", {
+              clientMessageId: safeClientMessageId,
+              message: "Thread not found.",
+            });
+          }
           return;
         }
 
@@ -186,8 +229,17 @@ const initChatSocket = (io) => {
           [threadId, socket.user.id, text]
         );
 
-        const payload = insertResult.rows[0];
+        const payload = {
+          ...insertResult.rows[0],
+          client_message_id: safeClientMessageId,
+        };
         io.to(`thread:${threadId}`).emit("newMessage", payload);
+        if (safeClientMessageId) {
+          socket.emit("messageAck", {
+            clientMessageId: safeClientMessageId,
+            message: payload,
+          });
+        }
 
         const recipientId =
           thread.organiser_id === socket.user.id
@@ -205,6 +257,16 @@ const initChatSocket = (io) => {
         }
       } catch (err) {
         console.error("SEND MESSAGE SOCKET ERROR:", err);
+        const safeClientMessageId =
+          clientMessageId != null && String(clientMessageId).trim() !== ""
+            ? String(clientMessageId).trim()
+            : null;
+        if (safeClientMessageId) {
+          socket.emit("messageFailed", {
+            clientMessageId: safeClientMessageId,
+            message: "Message not sent. Please try again.",
+          });
+        }
       }
     });
   });

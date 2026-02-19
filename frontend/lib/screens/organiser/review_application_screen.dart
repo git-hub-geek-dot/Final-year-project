@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/event_service.dart';
 import '../../widgets/organiser_bottom_nav.dart';
 import 'view_application_screen.dart';
+import '../notifications/notifications_screen.dart';
 
 class ReviewApplicationsScreen extends StatefulWidget {
   final int eventId;
@@ -210,9 +211,10 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
                 ),
                 IconButton(
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Notifications screen coming soon.'),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const NotificationsScreen(),
                       ),
                     );
                   },

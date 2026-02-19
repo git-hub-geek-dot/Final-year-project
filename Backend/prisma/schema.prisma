@@ -210,6 +210,22 @@ model DeviceToken {
   @@map("device_tokens")
 }
 
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  title     String
+  body      String
+  data      Json?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  readAt    DateTime? @map("read_at") @db.Timestamp(6)
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_notifications_user_id")
+  @@index([userId, createdAt], map: "idx_notifications_user_created_at")
+  @@map("notifications")
+}
+
 model ChatThread {
   id          Int      @id @default(autoincrement())
   eventId     Int      @map("event_id")
@@ -218,6 +234,7 @@ model ChatThread {
   createdAt   DateTime @default(now()) @map("created_at")
 
   messages    ChatMessage[]
+  reads       ChatThreadRead[]
 
   @@unique([eventId, organiserId, volunteerId], map: "uniq_chat_thread")
   @@index([organiserId], map: "idx_chat_thread_organiser_id")
@@ -237,6 +254,19 @@ model ChatMessage {
   @@index([threadId], map: "idx_chat_message_thread_id")
   @@index([senderId], map: "idx_chat_message_sender_id")
   @@map("chat_messages")
+}
+
+model ChatThreadRead {
+  threadId   Int      @map("thread_id")
+  userId     Int      @map("user_id")
+  lastReadAt DateTime @default(now()) @map("last_read_at") @db.Timestamp(6)
+
+  thread     ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([threadId, userId])
+  @@index([userId], map: "idx_chat_thread_reads_user_id")
+  @@map("chat_thread_reads")
 }
 
 model Report {
@@ -312,6 +342,8 @@ model User {
   volunteerPreference VolunteerPreference?
   verificationRequests VerificationRequest[]
   deviceTokens DeviceToken[]
+  notifications Notification[]
+  chatReads     ChatThreadRead[]
   strikes       UserStrike[] @relation("UserStrikes")
   strikesGiven  UserStrike[] @relation("AdminStrikes")
   reportsFiled  Report[]     @relation("ReportReporter")

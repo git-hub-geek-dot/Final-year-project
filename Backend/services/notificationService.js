@@ -31,13 +31,37 @@ const sendToTokens = async (tokens, payload) => {
   });
 };
 
+const storeNotifications = async (userIds, payload) => {
+  const uniqueIds = [...new Set(userIds.filter(Boolean))];
+  if (uniqueIds.length === 0) return;
+
+  const title = (payload?.title || "").toString();
+  const body = (payload?.body || "").toString();
+  const data = payload?.data || {};
+
+  try {
+    await pool.query(
+      `
+      INSERT INTO notifications (user_id, title, body, data)
+      SELECT unnest($1::int[]), $2, $3, $4::jsonb
+      `,
+      [uniqueIds, title, body, JSON.stringify(data)]
+    );
+  } catch (err) {
+    console.error("STORE NOTIFICATION ERROR:", err);
+  }
+};
+
 const notifyUser = async (userId, payload) => {
-  const tokens = await getTokensByUserIds([userId]);
+  const ids = [userId];
+  await storeNotifications(ids, payload);
+  const tokens = await getTokensByUserIds(ids);
   await sendToTokens(tokens, payload);
 };
 
 const notifyUsers = async (userIds, payload) => {
   const uniqueIds = [...new Set(userIds.filter(Boolean))];
+  await storeNotifications(uniqueIds, payload);
   const tokens = await getTokensByUserIds(uniqueIds);
   await sendToTokens(tokens, payload);
 };

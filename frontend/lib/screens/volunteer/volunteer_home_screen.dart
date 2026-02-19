@@ -10,8 +10,10 @@ import '../../config/api_config.dart';
 import '../../config/goa_cities.dart';
 import '../../services/saved_events_service.dart';
 import '../../services/token_service.dart';
+import '../../services/notification_api_service.dart';
 import '../../theme/app_colors.dart';
 import '../chat/chat_inbox_screen.dart';
+import '../notifications/notifications_screen.dart';
 import '../../widgets/robust_image.dart';
 
 class VolunteerHomeScreen extends StatefulWidget {
@@ -31,6 +33,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
   Set<String> savedEventIds = {};
   String? userName;
   String? userCity;
+  int _unreadNotifications = 0;
 
   final GlobalKey _introKey = GlobalKey();
   final GlobalKey _upcomingHeaderKey = GlobalKey();
@@ -83,6 +86,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     fetchMyApplications();
     _loadSavedEvents();
     _loadProfileName();
+    _loadUnreadCount();
   }
 
   Future<void> _loadProfileName() async {
@@ -109,6 +113,18 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
       }
     } catch (_) {
       // Keep fallback name on error.
+    }
+  }
+
+  Future<void> _loadUnreadCount() async {
+    try {
+      final count = await NotificationApiService.fetchUnreadCount();
+      if (!mounted) return;
+      setState(() {
+        _unreadNotifications = count;
+      });
+    } catch (_) {
+      // Ignore unread count errors
     }
   }
 
@@ -287,6 +303,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
         await fetchMyApplications();
         await _loadSavedEvents();
         await _loadProfileName();
+        await _loadUnreadCount();
       },
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
@@ -1200,6 +1217,48 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                   builder: (_) => const ChatInboxScreen(),
                 ),
               );
+            },
+          ),
+          IconButton(
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.notifications),
+                if (_unreadNotifications > 0)
+                  Positioned(
+                    right: -2,
+                    top: -2,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 2,
+                      ),
+                      decoration: const BoxDecoration(
+                        color: Colors.redAccent,
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                      ),
+                      child: Text(
+                        _unreadNotifications > 99
+                            ? "99+"
+                            : _unreadNotifications.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const NotificationsScreen(),
+                ),
+              );
+              await _loadUnreadCount();
             },
           ),
         ],

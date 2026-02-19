@@ -14,6 +14,7 @@ import 'edit_profile_screen.dart';
 import 'get_verified_screen.dart';
 import 'organiser_activity_screen.dart';
 import 'my_events_screen.dart';
+import '../notifications/notifications_screen.dart';
 
 class OrganiserProfileScreen extends StatefulWidget {
   const OrganiserProfileScreen({super.key});
@@ -460,11 +461,11 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
                                 ),
                                 IconButton(
                                   onPressed: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Notifications screen coming soon.',
-                                        ),
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            const NotificationsScreen(),
                                       ),
                                     );
                                   },

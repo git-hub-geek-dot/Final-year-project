@@ -30,7 +30,17 @@ exports.getThreads = async (req, res) => {
         uo.name AS organiser_name,
         uv.name AS volunteer_name,
         m.message AS last_message,
-        m.created_at AS last_message_at
+        m.created_at AS last_message_at,
+        COALESCE(
+          (
+            SELECT COUNT(*)::int
+            FROM chat_messages m2
+            WHERE m2.thread_id = ct.id
+              AND m2.sender_id <> $1
+              AND (r.last_read_at IS NULL OR m2.created_at > r.last_read_at)
+          ),
+          0
+        ) AS unread_count
       FROM chat_threads ct
       JOIN events e ON e.id = ct.event_id
       JOIN users uo ON uo.id = ct.organiser_id
@@ -42,6 +52,8 @@ exports.getThreads = async (req, res) => {
         ORDER BY created_at DESC
         LIMIT 1
       ) m ON true
+      LEFT JOIN chat_thread_reads r
+        ON r.thread_id = ct.id AND r.user_id = $1
       WHERE ct.organiser_id = $1 OR ct.volunteer_id = $1
       ORDER BY m.created_at DESC NULLS LAST, ct.created_at DESC
       `,
@@ -127,6 +139,16 @@ exports.getMessages = async (req, res) => {
     if (!thread) {
       return res.status(404).json({ error: "Thread not found" });
     }
+
+    await pool.query(
+      `
+      INSERT INTO chat_thread_reads (thread_id, user_id, last_read_at)
+      VALUES ($1, $2, NOW())
+      ON CONFLICT (thread_id, user_id)
+      DO UPDATE SET last_read_at = EXCLUDED.last_read_at
+      `,
+      [threadId, userId]
+    );
 
     const result = await pool.query(
       `

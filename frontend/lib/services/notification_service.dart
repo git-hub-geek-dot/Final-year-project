@@ -5,6 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/api_config.dart';
+import 'notification_store.dart';
 import 'token_service.dart';
 
 class NotificationService {
@@ -13,6 +14,19 @@ class NotificationService {
       return;
     }
     await FirebaseMessaging.instance.requestPermission();
+
+    FirebaseMessaging.onMessage.listen((message) async {
+      await _recordMessage(message);
+    });
+
+    FirebaseMessaging.onMessageOpenedApp.listen((message) async {
+      await _recordMessage(message);
+    });
+
+    final initial = await FirebaseMessaging.instance.getInitialMessage();
+    if (initial != null) {
+      await _recordMessage(initial);
+    }
 
     FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
       await _sendTokenToBackend(token);
@@ -47,6 +61,29 @@ class NotificationService {
         "token": token,
         "platform": "android",
       }),
+    );
+  }
+
+  static Future<void> _recordMessage(RemoteMessage message) async {
+    final title = message.notification?.title ??
+        message.data["title"]?.toString() ??
+        "Notification";
+    final body = message.notification?.body ??
+        message.data["body"]?.toString() ??
+        message.data["message"]?.toString() ??
+        "";
+
+    final id = message.messageId ??
+        DateTime.now().millisecondsSinceEpoch.toString();
+
+    await NotificationStore.add(
+      NotificationItem(
+        id: id,
+        title: title,
+        body: body,
+        data: Map<String, dynamic>.from(message.data),
+        receivedAt: DateTime.now(),
+      ),
     );
   }
 }

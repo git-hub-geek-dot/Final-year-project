@@ -48,3 +48,113 @@ exports.sendTestNotification = async (req, res) => {
     res.status(500).json({ error: "Failed to send notification" });
   }
 };
+
+exports.getNotifications = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const page = Math.max(parseInt(req.query.page || "1", 10), 1);
+    const limit = Math.max(parseInt(req.query.limit || "20", 10), 1);
+    const offset = (page - 1) * limit;
+
+    const countRes = await pool.query(
+      "SELECT COUNT(*) FROM notifications WHERE user_id = $1",
+      [userId]
+    );
+    const total = parseInt(countRes.rows[0].count, 10);
+    const totalPages = Math.max(Math.ceil(total / limit), 1);
+
+    const listRes = await pool.query(
+      `
+      SELECT id, title, body, data, created_at, read_at
+      FROM notifications
+      WHERE user_id = $1
+      ORDER BY created_at DESC
+      LIMIT $2 OFFSET $3
+      `,
+      [userId, limit, offset]
+    );
+
+    res.json({
+      items: listRes.rows,
+      page,
+      totalPages,
+      total,
+    });
+  } catch (err) {
+    console.error("GET NOTIFICATIONS ERROR:", err);
+    res.status(500).json({ error: "Failed to fetch notifications" });
+  }
+};
+
+exports.getUnreadCount = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const result = await pool.query(
+      "SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND read_at IS NULL",
+      [userId]
+    );
+    const count = parseInt(result.rows[0].count, 10);
+    res.json({ unreadCount: count });
+  } catch (err) {
+    console.error("GET UNREAD COUNT ERROR:", err);
+    res.status(500).json({ error: "Failed to fetch unread count" });
+  }
+};
+
+exports.markNotificationRead = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const notificationId = parseInt(req.params.id, 10);
+
+    if (!notificationId || Number.isNaN(notificationId)) {
+      return res.status(400).json({ error: "Invalid notification id" });
+    }
+
+    const result = await pool.query(
+      `
+      UPDATE notifications
+      SET read_at = COALESCE(read_at, NOW())
+      WHERE id = $1 AND user_id = $2
+      RETURNING id, read_at
+      `,
+      [notificationId, userId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Notification not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("MARK NOTIFICATION READ ERROR:", err);
+    res.status(500).json({ error: "Failed to mark notification read" });
+  }
+};
+
+exports.markAllRead = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    await pool.query(
+      "UPDATE notifications SET read_at = NOW() WHERE user_id = $1 AND read_at IS NULL",
+      [userId]
+    );
+    res.json({ message: "All notifications marked as read" });
+  } catch (err) {
+    console.error("MARK ALL READ ERROR:", err);
+    res.status(500).json({ error: "Failed to mark all notifications read" });
+  }
+};
+
+exports.clearNotifications = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    await pool.query(
+      "DELETE FROM notifications WHERE user_id = $1",
+      [userId]
+    );
+    res.json({ message: "Notifications cleared" });
+  } catch (err) {
+    console.error("CLEAR NOTIFICATIONS ERROR:", err);
+    res.status(500).json({ error: "Failed to clear notifications" });
+  }
+};

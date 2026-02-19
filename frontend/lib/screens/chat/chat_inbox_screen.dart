@@ -36,6 +36,40 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
     }
   }
 
+  String _formatThreadTime(dynamic raw) {
+    if (raw == null) return "";
+    final dt = DateTime.tryParse(raw.toString());
+    if (dt == null) return "";
+    final now = DateTime.now();
+    final isToday =
+        dt.year == now.year && dt.month == now.month && dt.day == now.day;
+    if (isToday) {
+      final hh = dt.hour.toString().padLeft(2, '0');
+      final mm = dt.minute.toString().padLeft(2, '0');
+      return "$hh:$mm";
+    }
+    final month = _shortMonth(dt.month);
+    return "$month ${dt.day}";
+  }
+
+  String _shortMonth(int month) {
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+    return months[(month - 1).clamp(0, 11)];
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -59,7 +93,12 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                     final organiserId = item["organiser_id"] as int?;
                     final eventTitle = item["event_title"] ?? "Event";
                     final lastMessage =
-                        item["last_message"] ?? "Tap to open";
+                        item["last_message"] ?? "No messages yet";
+                    final unreadCount = item["unread_count"] is int
+                        ? item["unread_count"] as int
+                        : int.tryParse(item["unread_count"]?.toString() ?? "") ??
+                            0;
+                    final timeText = _formatThreadTime(item["last_message_at"]);
 
                     final isOrganiser = organiserId == userId;
                     final peerName = isOrganiser
@@ -75,9 +114,52 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                         ),
                       ),
                       title: Text(peerName.toString()),
-                      subtitle: Text("$eventTitle - $lastMessage"),
-                      onTap: () {
-                        Navigator.push(
+                      subtitle: Text(
+                        "$eventTitle\n$lastMessage",
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          if (timeText.isNotEmpty)
+                            Text(
+                              timeText,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          if (unreadCount > 0) ...[
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: const BoxDecoration(
+                                color: Colors.redAccent,
+                                borderRadius:
+                                    BorderRadius.all(Radius.circular(10)),
+                              ),
+                              child: Text(
+                                unreadCount > 99
+                                    ? "99+"
+                                    : unreadCount.toString(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      isThreeLine: true,
+                      onTap: () async {
+                        await Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (_) => ChatScreen(
@@ -86,6 +168,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                             ),
                           ),
                         );
+                        await loadThreads();
                       },
                     );
                   },

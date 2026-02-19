@@ -4,11 +4,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/event_service.dart';
 import '../../services/token_service.dart';
 import '../../services/verification_service.dart';
+import '../../services/notification_api_service.dart';
 import '../../widgets/organiser_bottom_nav.dart';
 import 'create_event_screen.dart';
 import 'review_application_screen.dart';
 import 'event_details_screen.dart';
 import '../chat/chat_inbox_screen.dart';
+import '../notifications/notifications_screen.dart';
 
 class OrganiserHomeScreen extends StatefulWidget {
   const OrganiserHomeScreen({super.key});
@@ -25,12 +27,14 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
   int? userId;
   int _selectedTab = 0; // 0: All, 1: Ongoing, 2: Upcoming, 3: Completed, 4: Draft
   String? loadError;
+  int _unreadNotifications = 0;
 
   @override
   void initState() {
     super.initState();
     _loadCachedEvents();
     loadEvents();
+    _loadUnreadCount();
   }
 
   Future<void> _loadCachedEvents() async {
@@ -67,6 +71,7 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
         loading = false;
         loadError = null;
       });
+      await _loadUnreadCount();
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_cacheEventsKey, jsonEncode(data));
     } catch (_) {
@@ -75,6 +80,18 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
         loading = false;
         loadError = "Failed to load events. Pull to refresh or tap Retry.";
       });
+    }
+  }
+
+  Future<void> _loadUnreadCount() async {
+    try {
+      final count = await NotificationApiService.fetchUnreadCount();
+      if (!mounted) return;
+      setState(() {
+        _unreadNotifications = count;
+      });
+    } catch (_) {
+      // Ignore unread count errors
     }
   }
 
@@ -176,18 +193,49 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
                       ),
                     ),
                     IconButton(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Notifications screen coming soon.',
-                            ),
+                      onPressed: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const NotificationsScreen(),
                           ),
                         );
+                        await _loadUnreadCount();
                       },
-                      icon: const Icon(
-                        Icons.notifications,
-                        color: Colors.white,
+                      icon: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          const Icon(
+                            Icons.notifications,
+                            color: Colors.white,
+                          ),
+                          if (_unreadNotifications > 0)
+                            Positioned(
+                              right: -2,
+                              top: -2,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 5,
+                                  vertical: 2,
+                                ),
+                                decoration: const BoxDecoration(
+                                  color: Colors.redAccent,
+                                  borderRadius:
+                                      BorderRadius.all(Radius.circular(12)),
+                                ),
+                                child: Text(
+                                  _unreadNotifications > 99
+                                      ? "99+"
+                                      : _unreadNotifications.toString(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ],

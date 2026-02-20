@@ -5,7 +5,9 @@ import '../../config/api_config.dart';
 import '../../services/token_service.dart';
 import '../../services/rating_service.dart';
 import '../../services/saved_events_service.dart';
+import '../../services/verification_service.dart';
 import 'view_organiser_profile_screen.dart';
+import 'get_verified_screen.dart';
 import 'package:share_plus/share_plus.dart';
 import '../rating/rating_screen.dart';
 import '../../widgets/robust_image.dart';
@@ -28,6 +30,7 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
   bool hasRated = false;
   int? ratingScore;
   String? ratingComment;
+  String? verificationStatus;
 
   /// null | pending | approved | rejected
   String? applicationStatus;
@@ -39,6 +42,16 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
     _loadSavedState();
     _loadOrganiserPhoto();
     _fetchMyRating();
+    _loadVerificationStatus();
+  }
+
+  Future<void> _loadVerificationStatus() async {
+    final status = await VerificationService.getStatus();
+    if (mounted) {
+      setState(() {
+        verificationStatus = status;
+      });
+    }
   }
 
   Future<void> _fetchMyRating() async {
@@ -195,6 +208,22 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
           applicationStatus = nextStatus;
           isApplying = false;
         });
+      } else if (response.statusCode == 403) {
+        // Verification required error from backend
+        final data = jsonDecode(response.body);
+        _snack(data["message"] ?? "Verification required to apply");
+        setState(() {
+          isApplying = false;
+        });
+        // Redirect to get verified page
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const VolunteerGetVerifiedScreen(),
+          ),
+        );
       } else {
         _snack("Unable to apply");
         setState(() {
@@ -327,12 +356,9 @@ Join on VolunteerX
           _iconRow(Icons.location_on, widget.event["location"] ?? "N/A"),
           _iconRow(
             Icons.calendar_today,
-            widget.event["event_date"]?.toString().split("T")[0] ?? "",
+            _formatDateRange(),
           ),
-          _iconRow(
-            Icons.access_time,
-            "${_formatTime(widget.event["start_time"])} - ${_formatTime(widget.event["end_time"])}",
-          ),
+          ..._buildScheduleRows(),
           _iconRow(
             Icons.people,
             "Volunteers Needed: ${widget.event["volunteers_required"] ?? "N/A"}",
@@ -614,6 +640,87 @@ Join on VolunteerX
   }
 
   // ================= HELPERS =================
+  List<Widget> _buildScheduleRows() {
+    final dailySchedules = widget.event["daily_schedules"];
+    
+    // If there are daily schedules, display them
+    if (dailySchedules != null && dailySchedules is List && dailySchedules.isNotEmpty) {
+      // Check if it's a multi-day event
+      if (dailySchedules.length > 1) {
+        // Multi-day: show "Day 1:", "Day 2:", etc. with date and time
+        int dayNumber = 1;
+        return dailySchedules.map<Widget>((schedule) {
+          final dateStr = schedule["date"]?.toString().split("T")[0] ?? "";
+          final formattedDate = _formatDateToDDMMYYYY(dateStr);
+          final startTime = _formatTime(schedule["start_time"]);
+          final endTime = _formatTime(schedule["end_time"]);
+          final dayLabel = "Day $dayNumber:";
+          dayNumber++;
+          return _iconRow(
+            Icons.access_time,
+            "$dayLabel $formattedDate - $startTime-$endTime",
+          );
+        }).toList();
+      } else {
+        // Single day: show just time (no date, no day label)
+        final schedule = dailySchedules[0];
+        final startTime = _formatTime(schedule["start_time"]);
+        final endTime = _formatTime(schedule["end_time"]);
+        return [
+          _iconRow(
+            Icons.access_time,
+            "$startTime-$endTime",
+          ),
+        ];
+      }
+    }
+    
+    // Fall back to single time display
+    return [
+      _iconRow(
+        Icons.access_time,
+        "${_formatTime(widget.event["start_time"])}-${_formatTime(widget.event["end_time"])}",
+      ),
+    ];
+  }
+
+  String _formatDateToDDMMYYYY(String dateStr) {
+    if (dateStr.isEmpty) return "N/A";
+    try {
+      final parts = dateStr.split("-");
+      if (parts.length == 3) {
+        return "${parts[2]}/${parts[1]}/${parts[0]}"; // dd/mm/yyyy
+      }
+      return dateStr;
+    } catch (_) {
+      return dateStr;
+    }
+  }
+
+  String _formatDateRange() {
+    final startDateRaw = widget.event["event_date"]?.toString();
+    final endDateRaw = widget.event["end_date"]?.toString();
+    
+    if (startDateRaw == null || startDateRaw.isEmpty) return "N/A";
+    
+    final startDate = startDateRaw.split("T")[0];
+    
+    // If no end date or same as start date, show single date
+    if (endDateRaw == null || endDateRaw.isEmpty) {
+      return startDate;
+    }
+    
+    final endDate = endDateRaw.split("T")[0];
+    
+    // If dates are the same, show single date
+    if (startDate == endDate) {
+      return startDate;
+    }
+    
+    // Show date range for multi-day events
+    return "$startDate to $endDate";
+  }
+
   String _formatTime(dynamic timeValue) {
     if (timeValue == null) return "N/A";
     try {
@@ -795,6 +902,12 @@ Join on VolunteerX
 
   // ================= TERMS =================
   void _showTerms(BuildContext context) {
+    // Check verification status first
+    if (verificationStatus != "approved") {
+      _showVerificationRequiredDialog(context);
+      return;
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -867,6 +980,64 @@ Join on VolunteerX
           },
         );
       },
+    );
+  }
+
+  void _showVerificationRequiredDialog(BuildContext context) {
+    String message;
+    String actionText;
+    VoidCallback? action;
+
+    switch (verificationStatus) {
+      case "pending":
+        message = "Your verification is under review. You can apply for events after approval.";
+        actionText = "OK";
+        action = () => Navigator.pop(context);
+        break;
+      case "rejected":
+        message = "Your verification was rejected. Please submit verification again to apply for events.";
+        actionText = "Get Verified";
+        action = () {
+          Navigator.pop(context);
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const VolunteerGetVerifiedScreen(),
+            ),
+          );
+        };
+        break;
+      default: // "not_requested" or null
+        message = "You need to be verified before applying for events.";
+        actionText = "Get Verified";
+        action = () {
+          Navigator.pop(context);
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const VolunteerGetVerifiedScreen(),
+            ),
+          );
+        };
+        break;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Verification Required"),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: action,
+            child: Text(actionText),
+          ),
+        ],
+      ),
     );
   }
 }

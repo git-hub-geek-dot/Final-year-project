@@ -589,7 +589,7 @@ Widget eventCard(
                 const SizedBox(height: 6),
                 Text('Location: ${event['location'] ?? 'N/A'}'),
                 Text(
-                  'Date: ${event['event_date'] == null ? 'N/A' : event['event_date'].toString().split('T')[0]}',
+                  'Date: ${_formatDateRange(event)}',
                 ),
                 if (progress != null) ...[
                   const SizedBox(height: 10),
@@ -875,4 +875,28 @@ List<String> _healthSignals(
   }
 
   return signals;
+}
+
+String _formatDateRange(Map event) {
+  final startDateRaw = event['event_date']?.toString();
+  final endDateRaw = event['end_date']?.toString();
+  
+  if (startDateRaw == null || startDateRaw.isEmpty) return 'N/A';
+  
+  final startDate = startDateRaw.split('T')[0];
+  
+  // If no end date, show single date
+  if (endDateRaw == null || endDateRaw.isEmpty) {
+    return startDate;
+  }
+  
+  final endDate = endDateRaw.split('T')[0];
+  
+  // If dates are the same, show single date
+  if (startDate == endDate) {
+    return startDate;
+  }
+  
+  // Show date range for multi-day events
+  return '$startDate to $endDate';
 }

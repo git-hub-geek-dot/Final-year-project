@@ -68,6 +68,7 @@ exports.createEvent = async (req, res) => {
       start_time,
       end_time,
       is_draft,
+      daily_schedules, // NEW: array of {date, start_time, end_time}
     } = req.body;
 
     if (!title) {
@@ -224,6 +225,35 @@ exports.createEvent = async (req, res) => {
       }
     }
 
+    // Insert daily schedules if provided
+    if (Array.isArray(daily_schedules) && daily_schedules.length > 0) {
+      const validSchedules = daily_schedules.filter(
+        (schedule) => schedule.date && schedule.start_time && schedule.end_time
+      );
+
+      if (validSchedules.length > 0) {
+        const scheduleValues = validSchedules
+          .map(
+            (_, i) =>
+              `($1, $${i * 3 + 2}, $${i * 3 + 3}, $${i * 3 + 4})`
+          )
+          .join(",");
+
+        const scheduleParams = [createdEvent.id];
+        validSchedules.forEach((schedule) => {
+          scheduleParams.push(schedule.date, schedule.start_time, schedule.end_time);
+        });
+
+        await pool.query(
+          `
+          INSERT INTO daily_schedules (event_id, date, start_time, end_time)
+          VALUES ${scheduleValues}
+          `,
+          scheduleParams
+        );
+      }
+    }
+
     res.status(201).json({
       message: "Event created successfully",
       event: createdEvent,
@@ -262,12 +292,22 @@ exports.getMyEvents = async (req, res) => {
           array_agg(DISTINCT c.name) FILTER (WHERE c.name IS NOT NULL),
           '{}'
         ) AS categories,
+        COALESCE(
+          jsonb_agg(
+            jsonb_build_object(
+              'date', ds.date,
+              'start_time', ds.start_time,
+              'end_time', ds.end_time
+            ) ORDER BY ds.date
+          ) FILTER (WHERE ds.date IS NOT NULL),
+          '[]'::jsonb
+        ) AS daily_schedules,
        CASE
   WHEN e.status = 'draft' THEN 'draft'
   WHEN e.status = 'deleted' THEN 'deleted_by_admin'
-  WHEN NOW() < (event_date + COALESCE(start_time, TIME '00:00:00')) THEN 'upcoming'
-  WHEN NOW() BETWEEN (event_date + COALESCE(start_time, TIME '00:00:00'))
-                  AND (COALESCE(end_date, event_date) + COALESCE(end_time, TIME '23:59:59')) THEN 'ongoing'
+  WHEN NOW() < (e.event_date + COALESCE(e.start_time, TIME '00:00:00')) THEN 'upcoming'
+  WHEN NOW() BETWEEN (e.event_date + COALESCE(e.start_time, TIME '00:00:00'))
+                  AND (COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')) THEN 'ongoing'
   ELSE 'completed'
 END AS computed_status
 
@@ -276,6 +316,7 @@ END AS computed_status
       LEFT JOIN event_responsibilities er ON er.event_id = e.id
       LEFT JOIN event_categories ec ON ec.event_id = e.id
       LEFT JOIN categories c ON c.id = ec.category_id
+      LEFT JOIN daily_schedules ds ON ds.event_id = e.id
       WHERE e.organiser_id = $1
         AND e.status IN ('draft', 'open', 'closed', 'completed', 'deleted')
       GROUP BY e.id
@@ -310,10 +351,20 @@ exports.getAllEvents = async (req, res) => {
           array_agg(DISTINCT c.name) FILTER (WHERE c.name IS NOT NULL),
           '{}'
         ) AS categories,
+        COALESCE(
+          jsonb_agg(
+            jsonb_build_object(
+              'date', ds.date,
+              'start_time', ds.start_time,
+              'end_time', ds.end_time
+            ) ORDER BY ds.date
+          ) FILTER (WHERE ds.date IS NOT NULL),
+          '[]'::jsonb
+        ) AS daily_schedules,
         CASE
-          WHEN NOW() < (event_date + COALESCE(start_time, TIME '00:00:00')) THEN 'upcoming'
-          WHEN NOW() BETWEEN (event_date + COALESCE(start_time, TIME '00:00:00'))
-                          AND (COALESCE(end_date, event_date) + COALESCE(end_time, TIME '23:59:59')) THEN 'ongoing'
+          WHEN NOW() < (e.event_date + COALESCE(e.start_time, TIME '00:00:00')) THEN 'upcoming'
+          WHEN NOW() BETWEEN (e.event_date + COALESCE(e.start_time, TIME '00:00:00'))
+                          AND (COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')) THEN 'ongoing'
           ELSE 'completed'
         END AS computed_status
       FROM events e
@@ -323,6 +374,7 @@ exports.getAllEvents = async (req, res) => {
       LEFT JOIN event_responsibilities er ON er.event_id = e.id
       LEFT JOIN event_categories ec ON ec.event_id = e.id
       LEFT JOIN categories c ON c.id = ec.category_id
+      LEFT JOIN daily_schedules ds ON ds.event_id = e.id
       WHERE e.status = 'open'
       GROUP BY e.id, u.name, u.profile_picture_url
       ORDER BY event_date ASC
@@ -356,10 +408,20 @@ exports.getEventById = async (req, res) => {
           array_agg(DISTINCT c.name) FILTER (WHERE c.name IS NOT NULL),
           '{}'
         ) AS categories,
+        COALESCE(
+          jsonb_agg(
+            jsonb_build_object(
+              'date', ds.date,
+              'start_time', ds.start_time,
+              'end_time', ds.end_time
+            ) ORDER BY ds.date
+          ) FILTER (WHERE ds.date IS NOT NULL),
+          '[]'::jsonb
+        ) AS daily_schedules,
         CASE
-          WHEN NOW() < (event_date + COALESCE(start_time, TIME '00:00:00')) THEN 'upcoming'
-          WHEN NOW() BETWEEN (event_date + COALESCE(start_time, TIME '00:00:00'))
-                          AND (COALESCE(end_date, event_date) + COALESCE(end_time, TIME '23:59:59')) THEN 'ongoing'
+          WHEN NOW() < (e.event_date + COALESCE(e.start_time, TIME '00:00:00')) THEN 'upcoming'
+          WHEN NOW() BETWEEN (e.event_date + COALESCE(e.start_time, TIME '00:00:00'))
+                          AND (COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')) THEN 'ongoing'
           ELSE 'completed'
         END AS computed_status
       FROM events e
@@ -367,6 +429,7 @@ exports.getEventById = async (req, res) => {
       LEFT JOIN event_responsibilities er ON er.event_id = e.id
       LEFT JOIN event_categories ec ON ec.event_id = e.id
       LEFT JOIN categories c ON c.id = ec.category_id
+      LEFT JOIN daily_schedules ds ON ds.event_id = e.id
       WHERE e.id = $1 AND e.status != 'deleted'
       GROUP BY e.id, u.name, u.profile_picture_url
       `,
@@ -484,6 +547,7 @@ exports.updateEvent = async (req, res) => {
       publish,
       categories,
       responsibilities,
+      daily_schedules, // NEW: array of {date, start_time, end_time}
     } = req.body;
 
     const publishNow = publish === true;
@@ -621,6 +685,42 @@ exports.updateEvent = async (req, res) => {
           VALUES ${categoryValues}
           `,
           [eventId, ...uniqueCategoryIds]
+        );
+      }
+    }
+
+    // Update daily schedules if provided
+    if (Array.isArray(daily_schedules)) {
+      // Delete existing schedules
+      await client.query(
+        "DELETE FROM daily_schedules WHERE event_id = $1",
+        [eventId]
+      );
+
+      // Insert new schedules
+      const validSchedules = daily_schedules.filter(
+        (schedule) => schedule.date && schedule.start_time && schedule.end_time
+      );
+
+      if (validSchedules.length > 0) {
+        const scheduleValues = validSchedules
+          .map(
+            (_, i) =>
+              `($1, $${i * 3 + 2}, $${i * 3 + 3}, $${i * 3 + 4})`
+          )
+          .join(",");
+
+        const scheduleParams = [eventId];
+        validSchedules.forEach((schedule) => {
+          scheduleParams.push(schedule.date, schedule.start_time, schedule.end_time);
+        });
+
+        await client.query(
+          `
+          INSERT INTO daily_schedules (event_id, date, start_time, end_time)
+          VALUES ${scheduleValues}
+          `,
+          scheduleParams
         );
       }
     }

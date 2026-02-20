@@ -127,7 +127,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
         .toString()
         .toUpperCase();
     final eventDateText = _fmtDate(event["event_date"]);
-    final endDateText = _fmtDate(event["end_date"]);
+    final eventDateRangeText = _formatEventDateRange(event);
     final deadlineText = _fmtDate(event["application_deadline"]);
     final startTimeText = _fmtTime(event["start_time"]);
     final endTimeText = _fmtTime(event["end_time"]);
@@ -251,8 +251,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                     const SizedBox(height: 12),
                     _infoRow(Icons.location_on, event["location"]),
                     _infoRow(Icons.category, event["event_type"]),
-                    _infoRow(Icons.calendar_today, "Start: $eventDateText"),
-                    _infoRow(Icons.event, "End: $endDateText"),
+                    _infoRow(Icons.calendar_today, eventDateRangeText),
                     _infoRow(Icons.access_time,
                         "Time: $startTimeText - $endTimeText"),
                     _infoRow(
@@ -507,6 +506,30 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
         ],
       ),
     );
+  }
+
+  static String _formatEventDateRange(Map event) {
+    final startDateRaw = event["event_date"]?.toString();
+    final endDateRaw = event["end_date"]?.toString();
+    
+    if (startDateRaw == null || startDateRaw.isEmpty) return "-";
+    
+    final startDate = startDateRaw.split("T")[0];
+    
+    // If no end date, show single date
+    if (endDateRaw == null || endDateRaw.isEmpty) {
+      return startDate;
+    }
+    
+    final endDate = endDateRaw.split("T")[0];
+    
+    // If dates are the same, show single date
+    if (startDate == endDate) {
+      return startDate;
+    }
+    
+    // Show date range for multi-day events
+    return "$startDate to $endDate";
   }
 
   static String _fmtDate(dynamic value) {

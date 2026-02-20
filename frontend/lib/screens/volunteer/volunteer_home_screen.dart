@@ -839,7 +839,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
       );
     }
 
-    final date = _formatDate(event["event_date"]?.toString());
+    final date = _formatDateRange(event);
     final time =
         "${_formatTime(event["start_time"])} - ${_formatTime(event["end_time"])}";
     final progressLabel = _recommendedProgressLabel(event);
@@ -973,7 +973,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
   }
 
   Widget _recommendedCard(Map<String, dynamic> event, {Key? key}) {
-    final date = _formatDate(event["event_date"]?.toString());
+    final date = _formatDateRange(event);
     final time =
         "${_formatTime(event["start_time"])} - ${_formatTime(event["end_time"])}";
     final rawStatus = _applicationStatusForEvent(event);
@@ -1242,11 +1242,36 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     );
   }
 
-  String _formatDate(String? rawDate) {
-    if (rawDate == null || rawDate.isEmpty) return "";
-    final parsed = DateTime.tryParse(rawDate);
-    if (parsed == null) return "";
-    return "${parsed.day.toString().padLeft(2, "0")} ${_monthName(parsed.month)} ${parsed.year}";
+  String _formatDateRange(Map<String, dynamic> event) {
+    final startDateRaw = event["event_date"]?.toString();
+    final endDateRaw = event["end_date"]?.toString();
+    
+    if (startDateRaw == null || startDateRaw.isEmpty) return "";
+    
+    final startParsed = DateTime.tryParse(startDateRaw);
+    if (startParsed == null) return "";
+    
+    final startFormatted = "${startParsed.day.toString().padLeft(2, "0")} ${_monthName(startParsed.month)} ${startParsed.year}";
+    
+    // If no end date, show single date
+    if (endDateRaw == null || endDateRaw.isEmpty) {
+      return startFormatted;
+    }
+    
+    final endParsed = DateTime.tryParse(endDateRaw);
+    if (endParsed == null) return startFormatted;
+    
+    // If dates are the same, show single date
+    final startDateOnly = DateTime(startParsed.year, startParsed.month, startParsed.day);
+    final endDateOnly = DateTime(endParsed.year, endParsed.month, endParsed.day);
+    
+    if (startDateOnly == endDateOnly) {
+      return startFormatted;
+    }
+    
+    // Show date range for multi-day events
+    final endFormatted = "${endParsed.day.toString().padLeft(2, "0")} ${_monthName(endParsed.month)} ${endParsed.year}";
+    return "$startFormatted - $endFormatted";
   }
 
   String _formatTime(dynamic rawTime) {

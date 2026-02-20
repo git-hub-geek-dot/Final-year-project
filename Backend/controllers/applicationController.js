@@ -10,6 +10,23 @@ exports.applyToEvent = async (req, res) => {
     const eventId = req.params.id;
     const volunteerId = req.user.id;
 
+    // Check if user is verified
+    const userCheck = await pool.query(
+      'SELECT "isVerified" FROM users WHERE id = $1',
+      [volunteerId]
+    );
+
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (!userCheck.rows[0].isVerified) {
+      return res.status(403).json({ 
+        error: "Verification required",
+        message: "You must be verified to apply for events"
+      });
+    }
+
     // Prevent double apply
     const existing = await pool.query(
       "SELECT id FROM applications WHERE event_id = $1 AND volunteer_id = $2",

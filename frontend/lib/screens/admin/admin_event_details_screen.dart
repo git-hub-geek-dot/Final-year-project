@@ -335,7 +335,7 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
                           event["description"] ?? "No description"),
                       _detailRow(
                           "Location", event["location"] ?? "No location"),
-                      _detailRow("Event Date", _fmtDate(event["event_date"])),
+                      _detailRow("Event Date", _formatEventDateRange(event)),
                       _detailRow("Start Time", _fmtTime(event["start_time"])),
                       _detailRow("End Time", _fmtTime(event["end_time"])),
                       _detailRow("Max Volunteers",
@@ -449,6 +449,30 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
         ],
       ),
     );
+  }
+
+  static String _formatEventDateRange(Map event) {
+    final startDateRaw = event["event_date"]?.toString();
+    final endDateRaw = event["end_date"]?.toString();
+    
+    if (startDateRaw == null || startDateRaw.isEmpty) return "-";
+    
+    final startDate = startDateRaw.split("T")[0];
+    
+    // If no end date, show single date
+    if (endDateRaw == null || endDateRaw.isEmpty) {
+      return startDate;
+    }
+    
+    final endDate = endDateRaw.split("T")[0];
+    
+    // If dates are the same, show single date
+    if (startDate == endDate) {
+      return startDate;
+    }
+    
+    // Show date range for multi-day events
+    return "$startDate to $endDate";
   }
 
   static String _fmtDate(dynamic value) {

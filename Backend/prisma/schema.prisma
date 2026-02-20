@@ -129,9 +129,24 @@ model Event {
   eventCategories       EventCategory[]
   responsibilities      EventResponsibility[]
   ratings               Rating[]
+  dailySchedules        DailySchedule[]
 
   @@index([status], map: "idx_events_status")
   @@map("events")
+}
+
+model DailySchedule {
+  id         Int       @id @default(autoincrement())
+  eventId    Int       @map("event_id")
+  date       DateTime  @db.Date
+  startTime  DateTime  @map("start_time") @db.Time(6)
+  endTime    DateTime  @map("end_time") @db.Time(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+
+  event      Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId], map: "idx_daily_schedules_event_id")
+  @@map("daily_schedules")
 }
 
 model EventResponsibility {

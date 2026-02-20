@@ -1,5 +1,8 @@
 const pool = require("../config/db");
 const { notifyUser } = require("../services/notificationService");
+const {
+  notifyCompletedEventsForVolunteer,
+} = require("../services/eventCompletionNotificationService");
 
 // ================= APPLY TO EVENT =================
 exports.applyToEvent = async (req, res) => {
@@ -118,6 +121,24 @@ exports.getApplicationStatus = async (req, res) => {
 exports.getEventApplications = async (req, res) => {
   try {
     const eventId = req.params.id;
+    const organiserId = req.user?.id;
+
+    if (req.user?.role !== "organiser") {
+      return res.status(403).json({ error: "Only organisers can view event applications" });
+    }
+
+    const ownerCheck = await pool.query(
+      `
+      SELECT id
+      FROM events
+      WHERE id = $1 AND organiser_id = $2
+      `,
+      [eventId, organiserId]
+    );
+
+    if (ownerCheck.rowCount === 0) {
+      return res.status(404).json({ error: "Event not found" });
+    }
 
     const result = await pool.query(
       `
@@ -151,6 +172,12 @@ exports.getMyApplications = async (req, res) => {
   try {
     const volunteerId = req.user.id;
 
+    try {
+      await notifyCompletedEventsForVolunteer(volunteerId);
+    } catch (notifyErr) {
+      console.error("VOLUNTEER COMPLETION NOTIFY ERROR:", notifyErr);
+    }
+
     const result = await pool.query(
       `
       SELECT 
@@ -168,9 +195,29 @@ exports.getMyApplications = async (req, res) => {
           'pending'
         ) AS compensation_status,
         e.id AS event_id,
+        e.organiser_id,
         e.title,
         e.location,
         e.event_date,
+        e.end_date,
+        e.end_time,
+        e.status AS event_status,
+        (
+          e.status NOT IN ('draft', 'deleted')
+          AND (
+            e.status = 'completed'
+            OR NOW() >= (
+              COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')
+            )
+          )
+        ) AS event_completed,
+        EXISTS (
+          SELECT 1
+          FROM ratings r
+          WHERE r.event_id = a.event_id
+            AND r.rater_id = a.volunteer_id
+            AND r.ratee_id = e.organiser_id
+        ) AS has_rated,
         e.event_type,
         e.payment_per_day,
         COALESCE(
@@ -182,7 +229,7 @@ exports.getMyApplications = async (req, res) => {
       LEFT JOIN event_categories ec ON ec.event_id = e.id
       LEFT JOIN categories c ON c.id = ec.category_id
       WHERE a.volunteer_id = $1
-      GROUP BY a.id, a.status, a.applied_at, a.compensation_status, e.id, e.title, e.location, e.event_date, e.event_type, e.payment_per_day
+      GROUP BY a.id, a.status, a.applied_at, a.compensation_status, e.id, e.organiser_id, e.title, e.location, e.event_date, e.end_date, e.end_time, e.status, e.event_type, e.payment_per_day
       ORDER BY a.applied_at DESC
       `,
       [volunteerId]
@@ -245,6 +292,11 @@ exports.updateCompensationStatus = async (req, res) => {
 exports.getApplicationById = async (req, res) => {
   try {
     const applicationId = req.params.id;
+    const organiserId = req.user?.id;
+
+    if (req.user?.role !== "organiser") {
+      return res.status(403).json({ error: "Only organisers can view application details" });
+    }
 
     const result = await pool.query(
       `
@@ -257,15 +309,30 @@ exports.getApplicationById = async (req, res) => {
         a.applied_at,
         a.event_id,
         a.volunteer_id,
+        e.status AS event_status,
+        e.event_date,
+        e.end_date,
+        e.end_time,
+        (
+          e.status NOT IN ('draft', 'deleted')
+          AND (
+            e.status = 'completed'
+            OR NOW() >= (
+              COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')
+            )
+          )
+        ) AS event_completed,
         u.name,
         u.email,
         u.city,
         u.contact_number
       FROM applications a
       JOIN users u ON u.id = a.volunteer_id
+      JOIN events e ON e.id = a.event_id
       WHERE a.id = $1
+        AND e.organiser_id = $2
       `,
-      [applicationId]
+      [applicationId, organiserId]
     );
 
     if (result.rows.length === 0) {
@@ -286,8 +353,13 @@ exports.updateApplicationStatus = async (req, res) => {
   const client = await pool.connect();
   try {
     const applicationId = parseInt(req.params.id, 10);
+    const organiserId = req.user?.id;
     const requestedStatus = (req.body?.status || "").toString().toLowerCase();
     const status = requestedStatus === "accepted" ? "approved" : requestedStatus;
+
+    if (req.user?.role !== "organiser") {
+      return res.status(403).json({ error: "Only organisers can update application status" });
+    }
 
     if (!Number.isInteger(applicationId) || applicationId <= 0) {
       return res.status(400).json({ error: "Invalid application ID" });
@@ -306,12 +378,19 @@ exports.updateApplicationStatus = async (req, res) => {
 
     const applicationResult = await client.query(
       `
-      SELECT id, status, event_id, volunteer_id, applied_at
-      FROM applications
-      WHERE id = $1
+      SELECT
+        a.id,
+        a.status,
+        a.event_id,
+        a.volunteer_id,
+        a.applied_at
+      FROM applications a
+      JOIN events e ON e.id = a.event_id
+      WHERE a.id = $1
+        AND e.organiser_id = $2
       FOR UPDATE
       `,
-      [applicationId]
+      [applicationId, organiserId]
     );
 
     if (applicationResult.rows.length === 0) {

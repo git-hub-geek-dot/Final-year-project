@@ -308,6 +308,47 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
     return double.tryParse(value.toString()) ?? 0;
   }
 
+  bool _asBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    final text = value?.toString().toLowerCase().trim();
+    return text == "true" || text == "1" || text == "t" || text == "yes";
+  }
+
+  DateTime? _parseDate(dynamic value) {
+    if (value == null) return null;
+    return DateTime.tryParse(value.toString());
+  }
+
+  DateTime _dateWithTime(DateTime date, dynamic rawTime) {
+    final text = rawTime?.toString() ?? "";
+    if (text.isEmpty) {
+      return DateTime(date.year, date.month, date.day, 23, 59, 59);
+    }
+
+    final parts = text.split(":");
+    final hour = parts.isNotEmpty ? int.tryParse(parts[0]) ?? 0 : 0;
+    final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+    final second = parts.length > 2 ? int.tryParse(parts[2]) ?? 0 : 0;
+    return DateTime(date.year, date.month, date.day, hour, minute, second);
+  }
+
+  bool _isEventCompleted(Map<String, dynamic>? app) {
+    if (app == null) return false;
+
+    if (_asBool(app["event_completed"])) return true;
+
+    final status = (app["event_status"] ?? "").toString().toLowerCase();
+    if (status == "completed") return true;
+    if (status == "draft" || status == "deleted") return false;
+
+    final eventDate = _parseDate(app["event_date"]);
+    if (eventDate == null) return false;
+    final endDate = _parseDate(app["end_date"]) ?? eventDate;
+    final endDateTime = _dateWithTime(endDate, app["end_time"]);
+    return DateTime.now().isAfter(endDateTime);
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
@@ -334,6 +375,9 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
     final isAlreadyApproved = _isApprovedStatus(normalizedStatus);
     final approveBlockedByCapacity =
         !isAlreadyApproved && _isApproveBlockedByCapacity();
+    final showRatingAction =
+        normalizedStatus == "accepted" || normalizedStatus == "approved";
+    final canRateVolunteer = showRatingAction && _isEventCompleted(app);
 
     final eventsCount = _asInt(
       app?["events_count"] ?? app?["committed_events"] ?? 1,
@@ -492,8 +536,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                                   ),
                                 ),
                               ),
-                              if (normalizedStatus == "accepted" ||
-                                  normalizedStatus == "approved") ...[
+                              if (showRatingAction) ...[
                                 SizedBox(height: compact ? 8 : 10),
                                 SizedBox(
                                   width: double.infinity,
@@ -508,15 +551,31 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                                         borderRadius: BorderRadius.circular(16),
                                       ),
                                     ),
-                                    onPressed: openRating,
+                                    onPressed:
+                                        canRateVolunteer ? openRating : null,
                                     icon: const Icon(Icons.star_border),
                                     label: Text(
-                                      "Rate Volunteer",
+                                      canRateVolunteer
+                                          ? "Rate Volunteer"
+                                          : "Rate After Completion",
                                       style: TextStyle(
                                           fontSize: compact ? 16 : 18),
                                     ),
                                   ),
                                 ),
+                                if (!canRateVolunteer) ...[
+                                  SizedBox(height: compact ? 6 : 8),
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      "Rating unlocks after event completion.",
+                                      style: TextStyle(
+                                        color: Colors.grey.shade600,
+                                        fontSize: compact ? 12 : 13,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ],
                               if (approveBlockedByCapacity) ...[
                                 SizedBox(height: compact ? 8 : 10),

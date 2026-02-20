@@ -645,13 +645,21 @@ const getVolunteerLeaderboard = async (req, res) => {
       SELECT 
         u.id,
         u.name,
-        COUNT(a.id) AS completed_events
+        COUNT(a.id)::int AS completed_events
       FROM users u
       JOIN applications a ON a.volunteer_id = u.id
+      JOIN events e ON e.id = a.event_id
       WHERE u.role = 'volunteer'
-        AND a.status = 'completed'
-      GROUP BY u.id
-      ORDER BY completed_events DESC
+        AND a.status IN ('approved', 'accepted', 'completed')
+        AND e.status != 'deleted'
+        AND (
+          e.status = 'completed'
+          OR NOW() >= (
+            COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')
+          )
+        )
+      GROUP BY u.id, u.name
+      ORDER BY completed_events DESC, u.name ASC
     `);
 
     res.json(result.rows);
@@ -668,13 +676,19 @@ const getOrganiserLeaderboard = async (req, res) => {
       SELECT 
         u.id,
         u.name,
-        COUNT(e.id) AS completed_events
+        COUNT(e.id)::int AS completed_events
       FROM users u
       JOIN events e ON e.organiser_id = u.id
       WHERE u.role = 'organiser'
-        AND e.status = 'completed'
-      GROUP BY u.id
-      ORDER BY completed_events DESC
+        AND e.status != 'deleted'
+        AND (
+          e.status = 'completed'
+          OR NOW() >= (
+            COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')
+          )
+        )
+      GROUP BY u.id, u.name
+      ORDER BY completed_events DESC, u.name ASC
     `);
 
     res.json(result.rows);
@@ -693,13 +707,21 @@ const getOrganiserLeaderboard = async (req, res) => {
 
     for (const badge of badges) {
       if (badge.role === "volunteer") {
-        // Volunteers: count completed applications
+        // Volunteers: count applications for events that are completed or ended by time.
         const usersRes = await pool.query(`
           SELECT u.id, COUNT(a.id)::int AS completed
           FROM users u
           JOIN applications a ON a.volunteer_id = u.id
+          JOIN events e ON e.id = a.event_id
           WHERE u.role = 'volunteer'
-            AND a.status = 'completed'
+            AND a.status IN ('approved', 'accepted', 'completed')
+            AND e.status != 'deleted'
+            AND (
+              e.status = 'completed'
+              OR NOW() >= (
+                COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')
+              )
+            )
           GROUP BY u.id
         `);
 
@@ -718,13 +740,19 @@ const getOrganiserLeaderboard = async (req, res) => {
       }
 
       if (badge.role === "organiser") {
-        // Organisers: count completed events
+        // Organisers: count events that are completed or ended by time.
         const usersRes = await pool.query(`
           SELECT u.id, COUNT(e.id)::int AS completed
           FROM users u
           JOIN events e ON e.organiser_id = u.id
           WHERE u.role = 'organiser'
-            AND e.status = 'completed'
+            AND e.status != 'deleted'
+            AND (
+              e.status = 'completed'
+              OR NOW() >= (
+                COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')
+              )
+            )
           GROUP BY u.id
         `);
 

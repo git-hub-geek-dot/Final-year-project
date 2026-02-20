@@ -1,5 +1,8 @@
 const pool = require("../config/db");
 const { notifyUsers } = require("../services/notificationService");
+const {
+  notifyCompletedEventsForOrganiser,
+} = require("../services/eventCompletionNotificationService");
 
 /*
 EVENTS TABLE (SOURCE OF TRUTH)
@@ -74,13 +77,22 @@ exports.createEvent = async (req, res) => {
     }
 
     const saveAsDraft = is_draft === true;
+    const hasVolunteersInput =
+      volunteers_required !== undefined &&
+      volunteers_required !== null &&
+      volunteers_required.toString().trim() !== "";
+    const parsedVolunteers = hasVolunteersInput
+      ? Number.parseInt(volunteers_required, 10)
+      : null;
+    const hasValidVolunteers =
+      Number.isInteger(parsedVolunteers) && parsedVolunteers >= 1;
 
     if (
       !saveAsDraft &&
       (!location ||
         !event_date ||
         !end_date ||
-        !volunteers_required ||
+        !hasVolunteersInput ||
         !application_deadline ||
         !event_type ||
         !start_time ||
@@ -88,6 +100,12 @@ exports.createEvent = async (req, res) => {
     ) {
       return res.status(400).json({
         error: "Missing required event fields",
+      });
+    }
+
+    if (hasVolunteersInput && !hasValidVolunteers) {
+      return res.status(400).json({
+        error: "volunteers_required must be at least 1",
       });
     }
 
@@ -102,11 +120,7 @@ exports.createEvent = async (req, res) => {
     }
 
     const safeEventType = event_type === "paid" ? "paid" : "unpaid";
-    const parsedVolunteers = Number.parseInt(volunteers_required, 10);
-    const safeVolunteersRequired =
-      Number.isInteger(parsedVolunteers) && parsedVolunteers >= 0
-        ? parsedVolunteers
-        : 0;
+    const safeVolunteersRequired = hasVolunteersInput ? parsedVolunteers : 0;
     const safePaymentPerDay =
       safeEventType === "paid" && payment_per_day ? payment_per_day : null;
 
@@ -225,6 +239,12 @@ exports.createEvent = async (req, res) => {
 // =======================================================
 exports.getMyEvents = async (req, res) => {
   try {
+    try {
+      await notifyCompletedEventsForOrganiser(req.user.id);
+    } catch (notifyErr) {
+      console.error("ORGANISER COMPLETION NOTIFY ERROR:", notifyErr);
+    }
+
     const result = await pool.query(
       `
       SELECT
@@ -382,8 +402,14 @@ exports.getVolunteerLeaderboard = async (req, res) => {
       JOIN applications a ON a.volunteer_id = u.id
       JOIN events e ON e.id = a.event_id
       WHERE u.role = 'volunteer'
-        AND a.status = 'completed'
-        AND e.status = 'completed'
+        AND a.status IN ('approved', 'accepted', 'completed')
+        AND e.status != 'deleted'
+        AND (
+          e.status = 'completed'
+          OR NOW() >= (
+            COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')
+          )
+        )
         AND COALESCE(e.end_date, e.event_date) >= CURRENT_DATE - ($1::int - 1)
       GROUP BY u.id, u.name
       ORDER BY completed_events DESC, u.name ASC
@@ -412,7 +438,13 @@ exports.getOrganiserLeaderboard = async (req, res) => {
       FROM users u
       JOIN events e ON e.organiser_id = u.id
       WHERE u.role = 'organiser'
-        AND e.status = 'completed'
+        AND e.status != 'deleted'
+        AND (
+          e.status = 'completed'
+          OR NOW() >= (
+            COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')
+          )
+        )
         AND COALESCE(e.end_date, e.event_date) >= CURRENT_DATE - ($1::int - 1)
       GROUP BY u.id, u.name
       ORDER BY completed_events DESC, u.name ASC
@@ -455,6 +487,15 @@ exports.updateEvent = async (req, res) => {
     } = req.body;
 
     const publishNow = publish === true;
+    const parsedVolunteers = Number.parseInt(volunteers_required, 10);
+    const hasValidVolunteers =
+      Number.isInteger(parsedVolunteers) && parsedVolunteers >= 1;
+
+    if (!hasValidVolunteers) {
+      return res.status(400).json({
+        error: "volunteers_required must be at least 1",
+      });
+    }
 
     await client.query("BEGIN");
 
@@ -488,7 +529,7 @@ exports.updateEvent = async (req, res) => {
         event_date,
         end_date,
         application_deadline,
-        volunteers_required,
+        parsedVolunteers,
         event_type,
         payment_per_day,
         banner_url,
@@ -693,7 +734,10 @@ exports.publishEvent = async (req, res) => {
     if (!event.application_deadline) {
       missingFields.push("application_deadline");
     }
-    if (event.volunteers_required == null) {
+    if (
+      event.volunteers_required == null ||
+      Number(event.volunteers_required) < 1
+    ) {
       missingFields.push("volunteers_required");
     }
     if (!event.event_type || !["paid", "unpaid"].includes(event.event_type)) {

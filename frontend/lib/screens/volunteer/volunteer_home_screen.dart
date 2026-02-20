@@ -46,7 +46,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
   double? _recommendedHeaderHeight;
   double? _upcomingCardHeight;
   double? _recommendedCardHeight;
-  
+
   String searchQuery = "";
   String selectedFeed = "all"; // all | confirmed | pending
   String selectedTimeline = "upcoming"; // upcoming | ongoing
@@ -240,6 +240,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
+    final pendingRatings = _getPendingRatingApplications();
     final upcomingAccepted = _getUpcomingAcceptedEvents();
     final ongoingAccepted = _getOngoingAcceptedEvents();
     final isOngoing = selectedTimeline == "ongoing";
@@ -250,8 +251,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     final media = MediaQuery.of(context);
     const listPadding = 16.0 + 24.0;
     const listSpacing = 16.0 + 8.0 + 16.0 + 8.0;
-    final fixedHeights =
-        (_introHeight ?? 0) +
+    final fixedHeights = (_introHeight ?? 0) +
         (_upcomingHeaderHeight ?? 0) +
         (_recommendedHeaderHeight ?? 0) +
         listPadding +
@@ -270,28 +270,28 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     final recommendedCardHeight =
         _recommendedCardHeight ?? _upcomingCardHeight ?? 110;
 
-    final primaryShown = primaryEvents.isEmpty
-        ? 1
-        : primaryEvents.length.clamp(1, 2);
+    final primaryShown =
+        primaryEvents.isEmpty ? 1 : primaryEvents.length.clamp(1, 2);
     available -= primaryShown * upcomingCardHeight;
     if (available < 0) {
       available = 0;
     }
 
     final recommendedShown = recommended.isEmpty
-      ? 0
-      : (() {
-        final computed =
-          (available / recommendedCardHeight).floor().clamp(1, recommended.length);
-        final minShown = 3;
-        final maxShownWhenNoPrimary = 5;
-        final base = primaryEvents.isEmpty
-          ? computed.clamp(minShown, maxShownWhenNoPrimary)
-          : computed < minShown
-            ? minShown
-            : computed;
-        return base.clamp(1, recommended.length);
-        })();
+        ? 0
+        : (() {
+            final computed = (available / recommendedCardHeight)
+                .floor()
+                .clamp(1, recommended.length);
+            final minShown = 3;
+            final maxShownWhenNoPrimary = 5;
+            final base = primaryEvents.isEmpty
+                ? computed.clamp(minShown, maxShownWhenNoPrimary)
+                : computed < minShown
+                    ? minShown
+                    : computed;
+            return base.clamp(1, recommended.length);
+          })();
     final primaryPreview = primaryEvents.take(primaryShown).toList();
     final recommendedPreview = recommended.take(recommendedShown).toList();
     final showUpcomingViewAll = primaryEvents.length > primaryShown;
@@ -326,6 +326,10 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
               ),
             ],
           ),
+          if (pendingRatings.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _pendingRatingReminderCard(pendingRatings),
+          ],
           const SizedBox(height: 16),
           Container(
             key: _upcomingHeaderKey,
@@ -336,9 +340,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      isOngoing
-                          ? "My Ongoing Events"
-                          : "My Upcoming Events",
+                      isOngoing ? "My Ongoing Events" : "My Upcoming Events",
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -379,8 +381,9 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
             _upcomingEventCard(
               null,
               key: _upcomingCardKey,
-              emptyLabel:
-                  isOngoing ? "No ongoing events yet" : "No upcoming events yet",
+              emptyLabel: isOngoing
+                  ? "No ongoing events yet"
+                  : "No upcoming events yet",
             ),
           ...primaryPreview.asMap().entries.map(
                 (entry) => _upcomingEventCard(
@@ -403,18 +406,17 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
           Container(
             key: _recommendedHeaderKey,
             child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                "Recommended for You",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  "Recommended for You",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 8),
-          if (recommended.isEmpty)
-            const Text("No recommendations available"),
+          if (recommended.isEmpty) const Text("No recommendations available"),
           ...recommendedPreview.asMap().entries.map(
                 (entry) => _recommendedCard(
                   entry.value,
@@ -481,8 +483,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
 
   List<Map<String, dynamic>> _getUpcomingAcceptedEvents() {
     final eventById = {
-      for (final event in events)
-        event["id"]?.toString(): event,
+      for (final event in events) event["id"]?.toString(): event,
     };
 
     final upcoming = myApplications
@@ -491,8 +492,8 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
           return status == "accepted" || status == "approved";
         })
         .map((app) {
-          final eventId = app["event_id"]?.toString() ??
-              app["event"]?["id"]?.toString();
+          final eventId =
+              app["event_id"]?.toString() ?? app["event"]?["id"]?.toString();
           final base = eventById[eventId] ?? app;
           return Map<String, dynamic>.from(base);
         })
@@ -511,8 +512,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
 
   List<Map<String, dynamic>> _getOngoingAcceptedEvents() {
     final eventById = {
-      for (final event in events)
-        event["id"]?.toString(): event,
+      for (final event in events) event["id"]?.toString(): event,
     };
 
     final ongoing = myApplications
@@ -521,8 +521,8 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
           return status == "accepted" || status == "approved";
         })
         .map((app) {
-          final eventId = app["event_id"]?.toString() ??
-              app["event"]?["id"]?.toString();
+          final eventId =
+              app["event_id"]?.toString() ?? app["event"]?["id"]?.toString();
           final base = eventById[eventId] ?? app;
           return Map<String, dynamic>.from(base);
         })
@@ -537,6 +537,158 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     });
 
     return ongoing;
+  }
+
+  bool _asBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    final text = value?.toString().toLowerCase().trim();
+    return text == "true" || text == "1" || text == "t" || text == "yes";
+  }
+
+  bool _isEventCompletedForRating(Map<String, dynamic> app) {
+    if (_asBool(app["event_completed"])) return true;
+
+    final status = (app["event_status"] ?? "").toString().toLowerCase();
+    if (status == "completed") return true;
+    if (status == "draft" || status == "deleted") return false;
+
+    final startDate = _parseEventDate(app["event_date"]?.toString());
+    if (startDate == null) return false;
+    final endDate = _parseEventDate(app["end_date"]?.toString()) ?? startDate;
+    final endTime = app["end_time"]?.toString() ?? "";
+    final endDateTime = endTime.trim().isEmpty
+        ? DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59)
+        : _dateWithTime(endDate, endTime);
+    return DateTime.now().isAfter(endDateTime);
+  }
+
+  List<Map<String, dynamic>> _getPendingRatingApplications() {
+    final list = myApplications
+        .whereType<Map>()
+        .map((raw) => Map<String, dynamic>.from(raw))
+        .where((app) {
+      final status = (app["status"] ?? "").toString().toLowerCase();
+      final isEligibleStatus =
+          status == "approved" || status == "accepted" || status == "completed";
+      if (!isEligibleStatus) return false;
+
+      if (_asBool(app["has_rated"])) return false;
+
+      final organiserId = app["organiser_id"];
+      if (organiserId == null) return false;
+
+      return _isEventCompletedForRating(app);
+    }).toList();
+
+    list.sort((a, b) {
+      final aDate = _parseEventDate(a["event_date"]?.toString());
+      final bDate = _parseEventDate(b["event_date"]?.toString());
+      if (aDate == null && bDate == null) return 0;
+      if (aDate == null) return 1;
+      if (bDate == null) return -1;
+      return bDate.compareTo(aDate);
+    });
+
+    return list;
+  }
+
+  Future<void> _openPendingRatingEvent(Map<String, dynamic> app) async {
+    final rawId = app["event_id"];
+    final eventId =
+        rawId is int ? rawId : int.tryParse(rawId?.toString() ?? "");
+
+    if (eventId == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Event details not available")),
+      );
+      return;
+    }
+
+    try {
+      final response = await http.get(
+        Uri.parse("${ApiConfig.baseUrl}/events/$eventId"),
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        final event = decoded is Map<String, dynamic>
+            ? decoded
+            : Map<String, dynamic>.from(decoded as Map);
+
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ViewEventScreen(event: event),
+          ),
+        );
+
+        await fetchMyApplications();
+        await _loadSavedEvents();
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to open event details")),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to open event details")),
+      );
+    }
+  }
+
+  Widget _pendingRatingReminderCard(List<Map<String, dynamic>> pendingRatings) {
+    final count = pendingRatings.length;
+    final firstTitle = (pendingRatings.first["title"] ?? "event").toString();
+    final subtitle = count == 1
+        ? "Share your feedback for $firstTitle."
+        : "$count completed events are waiting for your rating.";
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7E6),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF5C26B)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.star_rate_rounded, color: Color(0xFFB45309)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Pending Rating Reminder",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF7C2D12),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: Color(0xFF7C2D12),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () => _openPendingRatingEvent(pendingRatings.first),
+            child: const Text("Rate now"),
+          ),
+        ],
+      ),
+    );
   }
 
   DateTime? _parseEventDate(String? rawDate) {
@@ -605,8 +757,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
           if (_isPastEventDate(e["event_date"]?.toString())) {
             return false;
           }
-          final status =
-              statusByEventId[e["id"]?.toString() ?? ""] ?? "";
+          final status = statusByEventId[e["id"]?.toString() ?? ""] ?? "";
           return status.isEmpty; // only unapplied events
         })
         .map((e) => Map<String, dynamic>.from(e))
@@ -617,30 +768,34 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
       // User has applied to events, prioritize by category match
       upcoming.sort((a, b) {
         // Check if events match user's interested categories
-        final aCategories = a["categories"] is List ? a["categories"] as List : [];
-        final bCategories = b["categories"] is List ? b["categories"] as List : [];
-        
-        final aHasMatch = aCategories.any((cat) => 
-          interestedCategories.contains(cat?.toString().toLowerCase().trim() ?? ""));
-        final bHasMatch = bCategories.any((cat) => 
-          interestedCategories.contains(cat?.toString().toLowerCase().trim() ?? ""));
-        
+        final aCategories =
+            a["categories"] is List ? a["categories"] as List : [];
+        final bCategories =
+            b["categories"] is List ? b["categories"] as List : [];
+
+        final aHasMatch = aCategories.any((cat) => interestedCategories
+            .contains(cat?.toString().toLowerCase().trim() ?? ""));
+        final bHasMatch = bCategories.any((cat) => interestedCategories
+            .contains(cat?.toString().toLowerCase().trim() ?? ""));
+
         // Category match comes first
         if (aHasMatch && !bHasMatch) return -1;
         if (!aHasMatch && bHasMatch) return 1;
-        
+
         // If both match or both don't match, sort by distance
-        if (userCity != null && userCity!.isNotEmpty && GoaCities.isKnownCity(userCity!)) {
+        if (userCity != null &&
+            userCity!.isNotEmpty &&
+            GoaCities.isKnownCity(userCity!)) {
           final aLocation = a["location"]?.toString() ?? "";
           final bLocation = b["location"]?.toString() ?? "";
-          
+
           final aDistance = GoaCities.calculateDistance(userCity!, aLocation);
           final bDistance = GoaCities.calculateDistance(userCity!, bLocation);
-          
+
           final distanceCompare = aDistance.compareTo(bDistance);
           if (distanceCompare != 0) return distanceCompare;
         }
-        
+
         // If same category match and distance, sort by date
         final aDate = DateTime.tryParse(a["event_date"]?.toString() ?? "");
         final bDate = DateTime.tryParse(b["event_date"]?.toString() ?? "");
@@ -1066,7 +1221,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     if (normalizedUrl != null && normalizedUrl.contains("localhost")) {
       normalizedUrl = normalizedUrl.replaceAll("localhost", "10.0.2.2");
     }
-    
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: Container(

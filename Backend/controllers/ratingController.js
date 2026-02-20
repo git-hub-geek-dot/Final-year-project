@@ -143,21 +143,14 @@ const getRatingSummary = async (req, res) => {
   try {
     const userId = req.params.id;
 
-    // Calculate average rating per event, then average those
+    // Fair summary: average across all received ratings.
     const result = await pool.query(
       `
-      WITH event_averages AS (
-        SELECT
-          event_id,
-          AVG(score) AS event_avg_rating
-        FROM ratings
-        WHERE ratee_id = $1
-        GROUP BY event_id
-      )
       SELECT
-        COALESCE(AVG(event_avg_rating), 0) AS avg_rating,
-        (SELECT COUNT(*)::int FROM ratings WHERE ratee_id = $1) AS review_count
-      FROM event_averages
+        COALESCE(AVG(score), 0) AS avg_rating,
+        COUNT(*)::int AS review_count
+      FROM ratings
+      WHERE ratee_id = $1
       `,
       [userId]
     );

@@ -325,10 +325,144 @@ const updateVolunteerPreferences = async (req, res) => {
   }
 };
 
+// ================= MY BADGES (AUTH USER) =================
+const getMyBadges = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const role = req.user?.role;
+
+    if (!userId || !role) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    let completedCountResult;
+
+    if (role === "volunteer") {
+      completedCountResult = await pool.query(
+        `
+        SELECT COUNT(a.id)::int AS completed_count
+        FROM applications a
+        JOIN events e ON e.id = a.event_id
+        WHERE a.volunteer_id = $1
+          AND a.status IN ('approved', 'accepted', 'completed')
+          AND e.status != 'deleted'
+          AND (
+            e.status = 'completed'
+            OR NOW() >= (
+              COALESCE(e.end_date, e.event_date)
+              + COALESCE(e.end_time, TIME '23:59:59')
+            )
+          )
+        `,
+        [userId]
+      );
+    } else if (role === "organiser") {
+      completedCountResult = await pool.query(
+        `
+        SELECT COUNT(e.id)::int AS completed_count
+        FROM events e
+        WHERE e.organiser_id = $1
+          AND e.status != 'deleted'
+          AND (
+            e.status = 'completed'
+            OR NOW() >= (
+              COALESCE(e.end_date, e.event_date)
+              + COALESCE(e.end_time, TIME '23:59:59')
+            )
+          )
+        `,
+        [userId]
+      );
+    } else {
+      return res.json({
+        role,
+        completedCount: 0,
+        progress: 0,
+        currentBadge: null,
+        nextBadge: null,
+        badges: [],
+      });
+    }
+
+    const completedCount = completedCountResult.rows[0]?.completed_count ?? 0;
+
+    // Keep earned badge rows up to date for this user and role.
+    await pool.query(
+      `
+      INSERT INTO user_badges (user_id, badge_id)
+      SELECT $1, b.id
+      FROM badges b
+      WHERE b.role = $2
+        AND b.threshold <= $3
+      ON CONFLICT DO NOTHING
+      `,
+      [userId, role, completedCount]
+    );
+
+    const allBadgesResult = await pool.query(
+      `
+      SELECT id, name, description, threshold
+      FROM badges
+      WHERE role = $1
+      ORDER BY threshold ASC
+      `,
+      [role]
+    );
+
+    const earnedResult = await pool.query(
+      `
+      SELECT b.id, b.name, b.description, b.threshold, ub.awarded_at
+      FROM user_badges ub
+      JOIN badges b ON b.id = ub.badge_id
+      WHERE ub.user_id = $1
+        AND b.role = $2
+      ORDER BY b.threshold ASC
+      `,
+      [userId, role]
+    );
+
+    const allBadges = allBadgesResult.rows;
+    const earnedBadges = earnedResult.rows;
+    const earnedSet = new Set(earnedBadges.map((b) => b.id));
+
+    const badges = allBadges.map((badge) => ({
+      ...badge,
+      earned: earnedSet.has(badge.id),
+    }));
+
+    const currentBadge =
+      earnedBadges.length > 0 ? earnedBadges[earnedBadges.length - 1] : null;
+    const nextBadge =
+      allBadges.find((badge) => badge.threshold > completedCount) || null;
+    const progress = nextBadge
+      ? Math.min(completedCount / nextBadge.threshold, 1)
+      : 1;
+
+    return res.json({
+      role,
+      completedCount,
+      progress,
+      currentBadge,
+      nextBadge,
+      badges,
+    });
+  } catch (error) {
+    console.error("Get my badges error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch badges",
+    });
+  }
+};
+
 module.exports = {
   deleteUser,
   getOrganiserProfile,
   updateUser,
   getVolunteerDashboard,
   updateVolunteerPreferences,
+  getMyBadges,
 };

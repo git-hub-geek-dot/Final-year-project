@@ -15,6 +15,7 @@ import 'get_verified_screen.dart';
 import 'organiser_activity_screen.dart';
 import 'my_events_screen.dart';
 import '../notifications/notifications_screen.dart';
+import '../volunteer/my_badges_screen.dart';
 
 class OrganiserProfileScreen extends StatefulWidget {
   const OrganiserProfileScreen({super.key});
@@ -604,6 +605,19 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
                                   MaterialPageRoute(
                                     builder: (_) =>
                                         const AccountSettingsScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                            _profileOption(
+                              context: context,
+                              icon: Icons.emoji_events,
+                              text: "My Badges",
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const MyBadgesScreen(),
                                   ),
                                 );
                               },

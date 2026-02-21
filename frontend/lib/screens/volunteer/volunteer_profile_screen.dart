@@ -11,6 +11,7 @@ import '../auth/login_screen.dart';
 
 import 'edit_profile_screen.dart';
 import 'my_applications_screen.dart';
+import 'my_badges_screen.dart';
 import 'saved_events_screen.dart';
 import 'payment_history_screen.dart';
 import 'invite_friends_screen.dart';
@@ -888,6 +889,19 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
                                   MaterialPageRoute(
                                     builder: (_) =>
                                         const SavedEventsScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+
+                            _tile(
+                              Icons.emoji_events,
+                              "My Badges",
+                              () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const MyBadgesScreen(),
                                   ),
                                 );
                               },

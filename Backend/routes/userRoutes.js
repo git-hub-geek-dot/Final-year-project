@@ -4,6 +4,7 @@ const {
   updateUser,
   getVolunteerDashboard,
   updateVolunteerPreferences,
+  getMyBadges,
 } = require("../controllers/usercontroller");
 const { getOrganiserPublicProfile } = require("../controllers/organiserController");
 
@@ -25,5 +26,8 @@ router.get("/volunteer/dashboard", authMiddleware, getVolunteerDashboard);
 
 // UPDATE volunteer preferences (auth)
 router.put("/volunteer/preferences", authMiddleware, updateVolunteerPreferences);
+
+// GET authenticated user's badges
+router.get("/users/me/badges", authMiddleware, getMyBadges);
 
 module.exports = router;

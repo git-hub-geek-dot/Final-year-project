@@ -153,7 +153,7 @@ const getEvents = async (req, res) => {
     const totalPages = Math.max(Math.ceil(total / limit), 1);
 
     const events = await pool.query(
-      `SELECT e.*, u.name AS organizer_name
+      `SELECT e.*, u.name AS organiser_name
        FROM events e
        JOIN users u ON e.organiser_id = u.id
        ORDER BY e.id DESC
@@ -187,6 +187,7 @@ const getApplications = async (req, res) => {
     const apps = await pool.query(
       `SELECT 
          a.id,
+         a.event_id,
          CASE
            WHEN a.status = 'accepted' THEN 'approved'
            ELSE a.status
@@ -287,23 +288,35 @@ const getStatsTimeseries = async (req, res) => {
   }
 };
 
- const updateUserStatus = async (req, res) => {
+const updateUserStatus = async (req, res) => {
   try {
-    const userId = req.params.id;
+    const userId = parseInt(req.params.id, 10);
     const { status } = req.body;
 
-        if (!["active", "inactive", "banned"].includes(status)) {
+    if (!userId || Number.isNaN(userId)) {
+      return res.status(400).json({ error: "Invalid user ID" });
+    }
+
+    if (!["active", "inactive", "banned"].includes(status)) {
       return res.status(400).json({ error: "Invalid status" });
+    }
+
+    const userRes = await pool.query("SELECT id, role FROM users WHERE id = $1", [
+      userId,
+    ]);
+
+    if (userRes.rowCount === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (userRes.rows[0].role === "admin") {
+      return res.status(400).json({ error: "Cannot change admin user status" });
     }
 
     const result = await pool.query(
       "UPDATE users SET status = $1 WHERE id = $2 RETURNING id, status",
       [status, userId]
     );
-
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: "User not found" });
-    }
 
     res.json({
       message: "User status updated",
@@ -319,7 +332,7 @@ const getStatsTimeseries = async (req, res) => {
     } catch (notifyErr) {
       console.error("USER STATUS NOTIFY ERROR:", notifyErr);
     }
- } catch (err) {
+  } catch (err) {
     console.error("UPDATE USER STATUS ERROR:", err);
     res.status(500).json({ error: "Failed to update user status" });
   }

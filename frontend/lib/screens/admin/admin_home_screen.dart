@@ -546,7 +546,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  value: selectedRole,
+                  initialValue: selectedRole,
                   decoration: const InputDecoration(
                     labelText: 'Target Audience',
                     border: OutlineInputBorder(),
@@ -599,7 +599,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
-                                'Notification sent to ${selectedRole == 'all' ? 'all users' : selectedRole + 's'}!',
+                                'Notification sent to ${selectedRole == 'all' ? 'all users' : '${selectedRole}s'}!',
                               ),
                               backgroundColor: Colors.green,
                             ),

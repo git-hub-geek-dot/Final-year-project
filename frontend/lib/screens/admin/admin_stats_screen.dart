@@ -367,21 +367,21 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
   }
 
   String _formatLastUpdated(DateTime? value) {
-    if (value == null) return "Last updated: -";
+    if (value == null) return "-";
     final now = DateTime.now();
     final diff = now.difference(value);
 
-    if (diff.inSeconds < 10) return "Last updated: just now";
+    if (diff.inSeconds < 10) return "just now";
     if (diff.inSeconds < 60) {
-      return "Last updated: ${diff.inSeconds}s ago";
+      return "${diff.inSeconds}s ago";
     }
     if (diff.inMinutes < 60) {
-      return "Last updated: ${diff.inMinutes}m ago";
+      return "${diff.inMinutes}m ago";
     }
     if (diff.inHours < 24) {
-      return "Last updated: ${diff.inHours}h ago";
+      return "${diff.inHours}h ago";
     }
-    return "Last updated: ${value.toLocal()}".split(".")[0];
+    return value.toLocal().toString().split(".")[0];
   }
 
 }

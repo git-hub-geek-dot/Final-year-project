@@ -86,12 +86,15 @@ async function main() {
   for (const organiser of organisers) {
     await prisma.user.upsert({
       where: { email: organiser.email },
-      update: {},
+      update: {
+        isVerified: true,
+      },
       create: {
         name: organiser.name,
         email: organiser.email,
         password: hashedPassword,
         role: 'organiser',
+        isVerified: true,
       },
     });
   }
@@ -107,15 +110,28 @@ async function main() {
   for (const volunteer of volunteers) {
     await prisma.user.upsert({
       where: { email: volunteer.email },
-      update: {},
+      update: {
+        isVerified: true,
+      },
       create: {
         name: volunteer.name,
         email: volunteer.email,
         password: hashedPassword,
         role: 'volunteer',
+        isVerified: true,
       },
     });
   }
+
+  // Ensure any existing organiser/volunteer accounts are marked verified.
+  await prisma.user.updateMany({
+    where: {
+      role: { in: ['organiser', 'volunteer'] },
+    },
+    data: {
+      isVerified: true,
+    },
+  });
 
   console.log('✅ Users and categories seeded');
 }

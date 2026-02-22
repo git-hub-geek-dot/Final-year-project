@@ -309,7 +309,7 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
                                                       const SizedBox(width: 4),
                                                       Expanded(
                                                         child: Text(
-                                                          "Organiser: ${event["organiser_name"] ?? "N/A"}",
+                                                          "Organiser: ${event["organiser_name"] ?? event["organizer_name"] ?? "N/A"}",
                                                           style:
                                                               const TextStyle(
                                                                   color: Colors

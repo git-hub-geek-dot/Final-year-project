@@ -55,9 +55,10 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
       }
 
       final list = await _fetchAllApplications();
-      // Filter applications for this specific event
-      final eventApplications =
-          list.where((app) => app["event_id"] == widget.event["id"]).toList();
+      final eventId = _toInt(widget.event["id"]);
+      final eventApplications = eventId == null
+          ? <dynamic>[]
+          : list.where((app) => _toInt(app["event_id"]) == eventId).toList();
 
       int a = eventApplications.length;
       int ap = 0, p = 0, r = 0;
@@ -338,10 +339,18 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
                       _detailRow("Event Date", _formatEventDateRange(event)),
                       _detailRow("Start Time", _fmtTime(event["start_time"])),
                       _detailRow("End Time", _fmtTime(event["end_time"])),
-                      _detailRow("Max Volunteers",
-                          event["max_volunteers"]?.toString() ?? "Unlimited"),
                       _detailRow(
-                          "Organiser", event["organiser_name"] ?? "Unknown"),
+                        "Max Volunteers",
+                        (event["volunteers_required"] ?? event["max_volunteers"])
+                                ?.toString() ??
+                            "Unlimited",
+                      ),
+                      _detailRow(
+                        "Organiser",
+                        event["organiser_name"] ??
+                            event["organizer_name"] ??
+                            "Unknown",
+                      ),
                       _detailRow("Created", _fmtDate(event["created_at"])),
 
                       const SizedBox(height: 24),
@@ -495,6 +504,13 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
 
     // If no "T" separator, return the time as-is (assuming it's already in time format)
     return text;
+  }
+
+  int? _toInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString());
   }
 }
 

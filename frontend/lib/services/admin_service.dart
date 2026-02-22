@@ -312,8 +312,13 @@ class AdminService {
       },
       body: jsonEncode(body),
     );
-    if (response.statusCode != 200) {
-      throw Exception("Failed to create badge");
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      String error = "Failed to create badge";
+      try {
+        final data = jsonDecode(response.body);
+        error = data["error"]?.toString() ?? error;
+      } catch (_) {}
+      throw Exception(error);
     }
   }
 

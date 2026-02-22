@@ -63,15 +63,38 @@ class _AdminBadgesScreenState extends State<AdminBadgesScreen> {
                 TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
                 TextButton(
                   onPressed: () async {
-                    await AdminService.createBadge({
-                      "name": name.text,
-                      "description": desc.text,
-                      "role": role,
-                      "threshold": int.parse(threshold.text),
-                    });
-                    // ignore: use_build_context_synchronously
-                    Navigator.pop(context);
-                    refresh();
+                    final badgeName = name.text.trim();
+                    final badgeDescription = desc.text.trim();
+                    final thresholdValue = int.tryParse(threshold.text.trim());
+
+                    if (badgeName.isEmpty ||
+                        badgeDescription.isEmpty ||
+                        thresholdValue == null ||
+                        thresholdValue < 1) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("Enter valid name, description and threshold"),
+                        ),
+                      );
+                      return;
+                    }
+
+                    try {
+                      await AdminService.createBadge({
+                        "name": badgeName,
+                        "description": badgeDescription,
+                        "role": role,
+                        "threshold": thresholdValue,
+                      });
+                      if (!context.mounted) return;
+                      Navigator.pop(context);
+                      refresh();
+                    } catch (e) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Failed to create badge: $e")),
+                      );
+                    }
                   },
                   child: const Text("Create"),
                 ),

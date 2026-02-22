@@ -116,13 +116,3 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen>
     );
   }
 }
-
-/// ✅ ADDED (exactly as provided, no changes)
-Map<int, List<String>> buildBadgeMap(List<dynamic> rows) {
-  final map = <int, List<String>>{};
-  for (final r in rows) {
-    map.putIfAbsent(r["user_id"], () => []);
-    map[r["user_id"]]!.add(r["name"]);
-  }
-  return map;
-}

@@ -177,7 +177,7 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
                         final matchStatus =
                             statusFilter == "all" || a["status"] == statusFilter;
                         final matchEvent = widget.eventId == null ||
-                            a["event_id"] == widget.eventId;
+                            _toInt(a["event_id"]) == widget.eventId;
 
                         final searchText = search.toLowerCase();
                         final volunteerName =
@@ -655,6 +655,13 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
     final text = value.toString();
     if (text.isEmpty) return "-";
     return text.replaceAll("T", " ").split(".")[0];
+  }
+
+  int? _toInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString());
   }
 
   int _compareApps(Map a, Map b) {

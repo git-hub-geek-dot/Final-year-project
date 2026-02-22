@@ -647,18 +647,18 @@ Join on VolunteerX
     if (dailySchedules != null && dailySchedules is List && dailySchedules.isNotEmpty) {
       // Check if it's a multi-day event
       if (dailySchedules.length > 1) {
-        // Multi-day: show "Day 1:", "Day 2:", etc. with date and time
+        // Multi-day: show day, date, and time on one line
         int dayNumber = 1;
         return dailySchedules.map<Widget>((schedule) {
           final dateStr = schedule["date"]?.toString().split("T")[0] ?? "";
           final formattedDate = _formatDateToDDMMYYYY(dateStr);
           final startTime = _formatTime(schedule["start_time"]);
           final endTime = _formatTime(schedule["end_time"]);
-          final dayLabel = "Day $dayNumber:";
+          final dayLabel = "Day $dayNumber";
           dayNumber++;
           return _iconRow(
             Icons.access_time,
-            "$dayLabel $formattedDate - $startTime-$endTime",
+            "$dayLabel | $formattedDate | $startTime-$endTime",
           );
         }).toList();
       } else {
@@ -669,7 +669,7 @@ Join on VolunteerX
         return [
           _iconRow(
             Icons.access_time,
-            "$startTime-$endTime",
+            "Time | $startTime-$endTime",
           ),
         ];
       }
@@ -679,7 +679,7 @@ Join on VolunteerX
     return [
       _iconRow(
         Icons.access_time,
-        "${_formatTime(widget.event["start_time"])}-${_formatTime(widget.event["end_time"])}",
+        "Time | ${_formatTime(widget.event["start_time"])}-${_formatTime(widget.event["end_time"])}",
       ),
     ];
   }

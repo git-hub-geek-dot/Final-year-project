@@ -56,6 +56,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
   final List<String> selectedCategories = [];
   final List<String> responsibilities = [];
+  final List<Map<String, dynamic>> dailySchedules = [];
 
   String _fmtDate(DateTime d) =>
       "${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
@@ -149,6 +150,58 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     });
   }
 
+  void _generateDailySchedules() {
+    if (eventStartDate == null || eventEndDate == null) {
+      _toast("Select start and end dates first");
+      return;
+    }
+
+    setState(() {
+      dailySchedules.clear();
+      
+      DateTime current = eventStartDate!;
+      int dayIndex = 0;
+      
+      while (current.isBefore(eventEndDate!) || current.isAtSameMomentAs(eventEndDate!)) {
+        dayIndex++;
+        dailySchedules.add({
+          'date': _fmtDate(current),
+          'start_time': eventStartTime != null ? _fmtTime(eventStartTime!) : '09:00:00',
+          'end_time': eventEndTime != null ? _fmtTime(eventEndTime!) : '17:00:00',
+          'dayNumber': dayIndex,
+        });
+        
+        current = current.add(const Duration(days: 1));
+      }
+    });
+  }
+
+  void _removeScheduleDay(int index) {
+    setState(() {
+      dailySchedules.removeAt(index);
+      // Re-number remaining days
+      for (int i = index; i < dailySchedules.length; i++) {
+        dailySchedules[i]['dayNumber'] = i + 1;
+      }
+    });
+  }
+
+  Future<void> _editScheduleTime(int index, bool isStartTime) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
+    if (picked != null) {
+      setState(() {
+        if (isStartTime) {
+          dailySchedules[index]['start_time'] = _fmtTime(picked);
+        } else {
+          dailySchedules[index]['end_time'] = _fmtTime(picked);
+        }
+      });
+    }
+  }
+
   Future<void> _submitEvent({required bool saveAsDraft}) async {
     final canCreate = await _ensureVerifiedOrganiser();
     if (!canCreate) return;
@@ -226,6 +279,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         startTime: eventStartTime == null ? null : _fmtTime(eventStartTime!),
         endTime: eventEndTime == null ? null : _fmtTime(eventEndTime!),
         isDraft: saveAsDraft,
+        dailySchedules: dailySchedules.isNotEmpty ? dailySchedules : null,
       );
 
       if (success && mounted) {
@@ -293,6 +347,97 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             _dateTile(
                 "Application Deadline", applicationDeadline, pickDeadline),
           ]),
+          // Daily Schedules Section for Multi-day Events
+          if (eventStartDate != null && eventEndDate != null && eventStartDate != eventEndDate)
+            _sectionCard("Daily Schedules", [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12.0),
+                child: ElevatedButton.icon(
+                  onPressed: _generateDailySchedules,
+                  icon: const Icon(Icons.add),
+                  label: const Text("Generate schedules from dates"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF3B82F6),
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+              if (dailySchedules.isNotEmpty)
+                Column(
+                  children: dailySchedules.asMap().entries.map((entry) {
+                    int index = entry.key;
+                    Map<String, dynamic> schedule = entry.value;
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  "Day ${schedule['dayNumber']}: ${schedule['date']}",
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                if (dailySchedules.length > 1)
+                                  IconButton(
+                                    icon: const Icon(Icons.delete, color: Colors.red),
+                                    onPressed: () => _removeScheduleDay(index),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: InkWell(
+                                    onTap: () => _editScheduleTime(index, true),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        border: Border.all(color: Colors.grey),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        "Start: ${schedule['start_time'].substring(0, 5)}",
+                                        style: const TextStyle(fontSize: 13),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: InkWell(
+                                    onTap: () => _editScheduleTime(index, false),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        border: Border.all(color: Colors.grey),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        "End: ${schedule['end_time'].substring(0, 5)}",
+                                        style: const TextStyle(fontSize: 13),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+            ]),
           _sectionCard("Event Banner (Optional)", [
             InkWell(
               onTap: pickBannerImage,

@@ -64,6 +64,7 @@ class EventService {
     String? startTime,
     String? endTime,
     bool isDraft = false,
+    List<Map<String, dynamic>>? dailySchedules,
   }) async {
     final token = await TokenService.getToken();
     if (token == null) {
@@ -92,6 +93,7 @@ class EventService {
         "start_time": startTime,
         "end_time": endTime,
         "is_draft": isDraft,
+        "daily_schedules": dailySchedules ?? [],
       }),
     );
 
@@ -198,6 +200,7 @@ class EventService {
     String? startTime,
     String? endTime,
     bool publish = false,
+    List<Map<String, dynamic>>? dailySchedules,
   }) async {
     final token = await TokenService.getToken();
     if (token == null) throw Exception("No token");
@@ -224,6 +227,7 @@ class EventService {
         "start_time": startTime,
         "end_time": endTime,
         "publish": publish,
+        "daily_schedules": dailySchedules ?? [],
       }),
     );
 

@@ -55,6 +55,16 @@ exports.applyToEvent = async (req, res) => {
       return res.status(400).json({ error: "Applications are closed" });
     }
 
+    // Check application deadline
+    if (event.application_deadline) {
+      const deadlineDate = new Date(event.application_deadline);
+      const now = new Date();
+      
+      if (now > deadlineDate) {
+        return res.status(400).json({ error: "Application deadline has passed" });
+      }
+    }
+
     const volunteersRequired = Number(event.volunteers_required) || 0;
     let nextStatus = "pending";
 

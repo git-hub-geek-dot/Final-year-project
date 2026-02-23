@@ -25,7 +25,8 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
   bool loading = true;
   List events = [];
   int? userId;
-  int _selectedTab = 0; // 0: All, 1: Ongoing, 2: Upcoming, 3: Completed, 4: Draft
+  int _selectedTab =
+      0; // 0: All, 1: Ongoing, 2: Upcoming, 3: Completed, 4: Draft, 5: Cancelled
   String? loadError;
   int _unreadNotifications = 0;
 
@@ -118,8 +119,7 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
         message = "You need to be verified before creating events.";
         break;
       default:
-        message =
-            "Unable to verify your account right now. Please try again.";
+        message = "Unable to verify your account right now. Please try again.";
         break;
     }
 
@@ -129,8 +129,13 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
     return false;
   }
 
-  String _status(Map e) =>
-      (e['computed_status'] ?? e['status'] ?? 'upcoming').toString();
+  String _status(Map e) {
+    final status = (e['computed_status'] ?? e['status'] ?? 'upcoming')
+        .toString()
+        .toLowerCase();
+    if (status == 'closed') return 'cancelled';
+    return status;
+  }
 
   List getUpcomingEvents() =>
       events.where((e) => _status(e) == 'upcoming').toList();
@@ -143,6 +148,9 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
 
   List getDraftEvents() => events.where((e) => _status(e) == 'draft').toList();
 
+  List getCancelledEvents() =>
+      events.where((e) => _status(e) == 'cancelled').toList();
+
   List getDeletedEvents() =>
       events.where((e) => _status(e) == 'deleted_by_admin').toList();
 
@@ -152,18 +160,19 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
     final ongoing = getOngoingEvents();
     final completed = getCompletedEvents();
     final draft = getDraftEvents();
+    final cancelled = getCancelledEvents();
 
     return Scaffold(
       body: Column(
         children: [
           Container(
-            height: 180,
-            padding: const EdgeInsets.fromLTRB(20, 50, 20, 20),
+            height: 122,
+            padding: const EdgeInsets.fromLTRB(20, 28, 20, 14),
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
               ),
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(40)),
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -243,7 +252,7 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: InkWell(
@@ -303,6 +312,8 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
                     _tabButton('Completed', 3, count: completed.length),
                     const SizedBox(width: 8),
                     _tabButton('Draft', 4, count: draft.length),
+                    const SizedBox(width: 8),
+                    _tabButton('Cancelled', 5, count: cancelled.length),
                   ],
                 ),
               ),
@@ -326,11 +337,13 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
                               decoration: BoxDecoration(
                                 color: const Color(0xFFFFF4F4),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: const Color(0xFFFFD7D7)),
+                                border:
+                                    Border.all(color: const Color(0xFFFFD7D7)),
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.error_outline, color: Colors.red),
+                                  const Icon(Icons.error_outline,
+                                      color: Colors.red),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
@@ -349,13 +362,18 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
                         if (_selectedTab == 0)
                           _section('All Events', events)
                         else if (_selectedTab == 1)
-                          _section('Ongoing Events', ongoing, isCompleted: false)
+                          _section('Ongoing Events', ongoing,
+                              isCompleted: false)
                         else if (_selectedTab == 2)
-                          _section('Upcoming Events', upcoming, isCompleted: false)
+                          _section('Upcoming Events', upcoming,
+                              isCompleted: false)
                         else if (_selectedTab == 3)
-                          _section('Completed Events', completed, isCompleted: true)
-                        else
+                          _section('Completed Events', completed,
+                              isCompleted: true)
+                        else if (_selectedTab == 4)
                           _section('Draft Events', draft, isDraft: true),
+                        if (_selectedTab == 5)
+                          _section('Cancelled Events', cancelled),
                       ],
                     ),
                   ),
@@ -493,6 +511,7 @@ Widget eventCard(
   final signals = _healthSignals(event, statusKey, progress);
   final isEventCompleted = statusKey == 'completed';
   final isEventDraft = statusKey == 'draft';
+  final isEventCancelled = statusKey == 'cancelled';
 
   return InkWell(
     onTap: () {
@@ -656,8 +675,8 @@ Widget eventCard(
                         event['rating'] != null
                             ? "${event['rating']} (${event['review_count'] ?? 0})"
                             : 'No ratings yet',
-                        style:
-                            const TextStyle(fontSize: 12, color: Colors.black54),
+                        style: const TextStyle(
+                            fontSize: 12, color: Colors.black54),
                       ),
                     ],
                   ),
@@ -665,18 +684,20 @@ Widget eventCard(
               ],
             ),
           ),
-          if (isMine && !isEventCompleted && !isEventDraft)
+          if (isMine && !isEventCompleted && !isEventDraft && !isEventCancelled)
             InkWell(
               onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => ReviewApplicationsScreen(eventId: event['id']),
+                    builder: (_) =>
+                        ReviewApplicationsScreen(eventId: event['id']),
                   ),
                 );
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
@@ -699,10 +720,13 @@ Widget eventCard(
   );
 }
 
-String _eventStatus(Map event) =>
-    (event['computed_status'] ?? event['status'] ?? 'upcoming')
-        .toString()
-        .toLowerCase();
+String _eventStatus(Map event) {
+  final status = (event['computed_status'] ?? event['status'] ?? 'upcoming')
+      .toString()
+      .toLowerCase();
+  if (status == 'closed') return 'cancelled';
+  return status;
+}
 
 String _statusLabel(String status) {
   switch (status) {
@@ -714,6 +738,8 @@ String _statusLabel(String status) {
       return 'Completed';
     case 'draft':
       return 'Draft';
+    case 'cancelled':
+      return 'Cancelled';
     default:
       return 'Upcoming';
   }
@@ -729,6 +755,8 @@ Color _statusColor(String status) {
       return const Color(0xFF6D28D9);
     case 'draft':
       return Colors.grey.shade700;
+    case 'cancelled':
+      return const Color(0xFFDC2626);
     default:
       return Colors.black87;
   }
@@ -744,6 +772,8 @@ Color _statusBg(String status) {
       return const Color(0xFFEDE9FE);
     case 'draft':
       return Colors.grey.shade200;
+    case 'cancelled':
+      return const Color(0xFFFEE2E2);
     default:
       return Colors.grey.shade200;
   }
@@ -779,8 +809,17 @@ Map<String, dynamic>? _urgencyBadge(Map event, String status) {
     };
   }
 
+  if (status == 'cancelled') {
+    return {
+      'text': 'Cancelled by organiser',
+      'color': const Color(0xFFB91C1C),
+      'bg': const Color(0xFFFEE2E2),
+    };
+  }
+
   if (status == 'upcoming' && eventDate != null) {
-    final days = eventDate.difference(DateTime(now.year, now.month, now.day)).inDays;
+    final days =
+        eventDate.difference(DateTime(now.year, now.month, now.day)).inDays;
     if (days <= 0) {
       return {
         'text': 'Starts today',
@@ -798,7 +837,8 @@ Map<String, dynamic>? _urgencyBadge(Map event, String status) {
   }
 
   if (status == 'upcoming' && deadline != null) {
-    final days = deadline.difference(DateTime(now.year, now.month, now.day)).inDays;
+    final days =
+        deadline.difference(DateTime(now.year, now.month, now.day)).inDays;
     if (days <= 1) {
       return {
         'text': days < 0 ? 'Deadline passed' : 'Deadline soon',
@@ -812,7 +852,8 @@ Map<String, dynamic>? _urgencyBadge(Map event, String status) {
 }
 
 Map<String, dynamic>? _progressData(Map event) {
-  final requiredVolunteers = _readIntFromKeys(event, ['volunteers_required']) ?? 0;
+  final requiredVolunteers =
+      _readIntFromKeys(event, ['volunteers_required']) ?? 0;
   if (requiredVolunteers <= 0) return null;
 
   final accepted = _readIntFromKeys(
@@ -821,7 +862,12 @@ Map<String, dynamic>? _progressData(Map event) {
   );
   final applicants = _readIntFromKeys(
     event,
-    ['applications_count', 'applicants_count', 'applied_count', 'total_applications'],
+    [
+      'applications_count',
+      'applicants_count',
+      'applied_count',
+      'total_applications'
+    ],
   );
 
   if (accepted == null && applicants == null) return null;
@@ -854,7 +900,9 @@ List<String> _healthSignals(
   }
 
   final deadline = _parseEventDate(event['application_deadline']);
-  if (status == 'upcoming' && deadline != null && deadline.isBefore(DateTime.now())) {
+  if (status == 'upcoming' &&
+      deadline != null &&
+      deadline.isBefore(DateTime.now())) {
     signals.add('Application deadline passed');
   }
 
@@ -880,23 +928,23 @@ List<String> _healthSignals(
 String _formatDateRange(Map event) {
   final startDateRaw = event['event_date']?.toString();
   final endDateRaw = event['end_date']?.toString();
-  
+
   if (startDateRaw == null || startDateRaw.isEmpty) return 'N/A';
-  
+
   final startDate = startDateRaw.split('T')[0];
-  
+
   // If no end date, show single date
   if (endDateRaw == null || endDateRaw.isEmpty) {
     return startDate;
   }
-  
+
   final endDate = endDateRaw.split('T')[0];
-  
+
   // If dates are the same, show single date
   if (startDate == endDate) {
     return startDate;
   }
-  
+
   // Show date range for multi-day events
   return '$startDate to $endDate';
 }

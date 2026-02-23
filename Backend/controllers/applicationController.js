@@ -430,22 +430,30 @@ exports.updateApplicationStatus = async (req, res) => {
       currentApplication.status === "approved" ||
       currentApplication.status === "accepted";
 
+    const eventResult = await client.query(
+      `
+      SELECT id, status, volunteers_required
+      FROM events
+      WHERE id = $1
+      FOR UPDATE
+      `,
+      [currentApplication.event_id]
+    );
+
+    if (eventResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    const eventStatus = (eventResult.rows[0].status || "").toString().toLowerCase();
+    if (eventStatus !== "open") {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        error: "Applications are closed for this event.",
+      });
+    }
+
     if (status === "approved" && !wasAlreadyApproved) {
-      const eventResult = await client.query(
-        `
-        SELECT id, volunteers_required
-        FROM events
-        WHERE id = $1
-        FOR UPDATE
-        `,
-        [currentApplication.event_id]
-      );
-
-      if (eventResult.rows.length === 0) {
-        await client.query("ROLLBACK");
-        return res.status(404).json({ error: "Event not found" });
-      }
-
       const volunteersRequired =
         Number(eventResult.rows[0].volunteers_required) || 0;
 

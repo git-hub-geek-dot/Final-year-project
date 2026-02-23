@@ -9,6 +9,8 @@ const {
   getVolunteerLeaderboard,
   getOrganiserLeaderboard,
   updateEvent,
+  cancelEvent,
+  announceEvent,
   publishEvent,
 } = require("../controllers/eventController");
 
@@ -26,6 +28,8 @@ router.get("/events/my-events", authMiddleware, getMyEvents);
 router.get("/events/leaderboard/organisers", authMiddleware, getOrganiserLeaderboard);
 router.get("/events/leaderboard/volunteers", authMiddleware, getVolunteerLeaderboard);
 router.put("/events/:id", authMiddleware, updateEvent);
+router.put("/events/:id/cancel", authMiddleware, cancelEvent);
+router.post("/events/:id/announce", authMiddleware, announceEvent);
 router.put("/events/:id/publish", authMiddleware, publishEvent);
 router.get(
   "/events/:id/applications",

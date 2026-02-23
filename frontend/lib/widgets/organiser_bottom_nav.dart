@@ -31,21 +31,58 @@ class OrganiserBottomNav extends StatelessWidget {
     Navigator.pushReplacementNamed(context, '/organiser-profile');
   }
 
+  Widget _navIcon(IconData icon, int index) {
+    final isActive = index == currentIndex;
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: isActive
+          ? BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(12),
+            )
+          : null,
+      child: Icon(icon),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return BottomNavigationBar(
-      currentIndex: currentIndex,
-      selectedItemColor: const Color(0xFF22C55E),
-      unselectedItemColor: Colors.grey,
-      onTap: (index) => _onTap(context, index),
-      items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.leaderboard),
-          label: 'Leaderboard',
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
         ),
-        BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-      ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Theme(
+          data: Theme.of(context).copyWith(
+            canvasColor: Colors.transparent,
+          ),
+          child: BottomNavigationBar(
+            type: BottomNavigationBarType.fixed,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            currentIndex: currentIndex,
+            selectedItemColor: Colors.white,
+            unselectedItemColor: Colors.white70,
+            selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700),
+            onTap: (index) => _onTap(context, index),
+            items: [
+              BottomNavigationBarItem(
+                  icon: _navIcon(Icons.home, 0), label: 'Home'),
+              BottomNavigationBarItem(
+                icon: _navIcon(Icons.leaderboard, 1),
+                label: 'Leaderboard',
+              ),
+              BottomNavigationBarItem(
+                icon: _navIcon(Icons.person, 2),
+                label: 'Profile',
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -305,6 +305,7 @@ exports.getMyEvents = async (req, res) => {
        CASE
   WHEN e.status = 'draft' THEN 'draft'
   WHEN e.status = 'deleted' THEN 'deleted_by_admin'
+  WHEN e.status = 'closed' THEN 'cancelled'
   WHEN NOW() < (e.event_date + COALESCE(e.start_time, TIME '00:00:00')) THEN 'upcoming'
   WHEN NOW() BETWEEN (e.event_date + COALESCE(e.start_time, TIME '00:00:00'))
                   AND (COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')) THEN 'ongoing'
@@ -362,6 +363,7 @@ exports.getAllEvents = async (req, res) => {
           '[]'::jsonb
         ) AS daily_schedules,
         CASE
+          WHEN e.status = 'closed' THEN 'cancelled'
           WHEN NOW() < (e.event_date + COALESCE(e.start_time, TIME '00:00:00')) THEN 'upcoming'
           WHEN NOW() BETWEEN (e.event_date + COALESCE(e.start_time, TIME '00:00:00'))
                           AND (COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')) THEN 'ongoing'
@@ -419,6 +421,7 @@ exports.getEventById = async (req, res) => {
           '[]'::jsonb
         ) AS daily_schedules,
         CASE
+          WHEN e.status = 'closed' THEN 'cancelled'
           WHEN NOW() < (e.event_date + COALESCE(e.start_time, TIME '00:00:00')) THEN 'upcoming'
           WHEN NOW() BETWEEN (e.event_date + COALESCE(e.start_time, TIME '00:00:00'))
                           AND (COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')) THEN 'ongoing'
@@ -782,6 +785,194 @@ exports.updateEvent = async (req, res) => {
     res.status(500).json({ error: "Failed to update event" });
   } finally {
     client.release();
+  }
+};
+
+// =======================================================
+// CANCEL EVENT (ORGANISER)
+// =======================================================
+exports.cancelEvent = async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const organiserId = req.user.id;
+    const eventId = req.params.id;
+    const reason = (req.body?.reason || "").toString().trim();
+
+    if (!reason) {
+      return res.status(400).json({
+        error: "Cancellation reason is required",
+      });
+    }
+
+    if (reason.length > 500) {
+      return res.status(400).json({
+        error: "Cancellation reason is too long",
+      });
+    }
+
+    await client.query("BEGIN");
+
+    const eventResult = await client.query(
+      `
+      SELECT id, title, status
+      FROM events
+      WHERE id = $1 AND organiser_id = $2
+      FOR UPDATE
+      `,
+      [eventId, organiserId]
+    );
+
+    if (eventResult.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    const event = eventResult.rows[0];
+
+    if (event.status === "deleted") {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Event is deleted by admin" });
+    }
+
+    if (event.status === "completed") {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Completed events cannot be cancelled" });
+    }
+
+    if (event.status === "closed") {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Event is already cancelled" });
+    }
+
+    await client.query(
+      `
+      UPDATE events
+      SET status = 'closed'
+      WHERE id = $1 AND organiser_id = $2
+      `,
+      [eventId, organiserId]
+    );
+
+    const cancelledApplications = await client.query(
+      `
+      UPDATE applications
+      SET status = 'cancelled',
+          admin_cancel_reason = $1
+      WHERE event_id = $2
+        AND status IN ('pending', 'accepted', 'approved', 'waitlisted')
+      RETURNING volunteer_id
+      `,
+      [reason, eventId]
+    );
+
+    await client.query("COMMIT");
+
+    res.json({
+      message: "Event cancelled successfully",
+      reason,
+    });
+
+    try {
+      const volunteerIds = [
+        ...new Set(cancelledApplications.rows.map((r) => r.volunteer_id)),
+      ];
+      if (volunteerIds.length > 0) {
+        await notifyUsers(volunteerIds, {
+          title: "Event cancelled",
+          body: `${event.title} was cancelled by organiser. Reason: ${reason}`,
+          data: { type: "event_cancelled", eventId: String(eventId), reason },
+        });
+      }
+    } catch (notifyErr) {
+      console.error("EVENT CANCEL NOTIFY ERROR:", notifyErr);
+    }
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (_) {}
+    console.error("CANCEL EVENT ERROR:", err);
+    res.status(500).json({ error: "Failed to cancel event" });
+  } finally {
+    client.release();
+  }
+};
+
+// =======================================================
+// ANNOUNCE EVENT (ORGANISER)
+// =======================================================
+exports.announceEvent = async (req, res) => {
+  try {
+    if (req.user?.role !== "organiser") {
+      return res.status(403).json({ error: "Only organisers can announce events" });
+    }
+
+    const organiserId = req.user.id;
+    const eventId = Number.parseInt(req.params.id, 10);
+    const message = (req.body?.message || "").toString().trim();
+
+    if (!Number.isInteger(eventId) || eventId <= 0) {
+      return res.status(400).json({ error: "Invalid event id" });
+    }
+
+    if (!message) {
+      return res.status(400).json({ error: "Announcement message is required" });
+    }
+
+    if (message.length > 500) {
+      return res.status(400).json({ error: "Announcement message is too long" });
+    }
+
+    const eventResult = await pool.query(
+      `
+      SELECT id, title, status
+      FROM events
+      WHERE id = $1 AND organiser_id = $2
+      `,
+      [eventId, organiserId]
+    );
+
+    if (eventResult.rowCount === 0) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    const event = eventResult.rows[0];
+    if (event.status === "draft") {
+      return res.status(400).json({ error: "Draft events cannot send announcements" });
+    }
+    if (event.status === "deleted") {
+      return res.status(400).json({ error: "Deleted events cannot send announcements" });
+    }
+
+    const volunteerResult = await pool.query(
+      `
+      SELECT DISTINCT volunteer_id
+      FROM applications
+      WHERE event_id = $1
+        AND status IN ('pending', 'approved', 'accepted', 'waitlisted', 'completed')
+      `,
+      [eventId]
+    );
+
+    const volunteerIds = volunteerResult.rows
+      .map((row) => row.volunteer_id)
+      .filter(Boolean);
+
+    await notifyUsers(volunteerIds, {
+      title: `Announcement: ${event.title}`,
+      body: message,
+      data: {
+        type: "event_announcement",
+        eventId: String(eventId),
+      },
+    });
+
+    res.json({
+      message: "Announcement sent successfully",
+      recipients: volunteerIds.length,
+    });
+  } catch (err) {
+    console.error("ANNOUNCE EVENT ERROR:", err);
+    res.status(500).json({ error: "Failed to send announcement" });
   }
 };
 

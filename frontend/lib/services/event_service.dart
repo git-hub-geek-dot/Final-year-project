@@ -234,6 +234,89 @@ class EventService {
     return response.statusCode == 200;
   }
 
+  /// ================= CANCEL EVENT =================
+  static Future<void> cancelEvent({
+    required int id,
+    required String reason,
+  }) async {
+    final token = await TokenService.getToken();
+    if (token == null) throw Exception("No token");
+
+    final response = await http.put(
+      Uri.parse("${ApiConfig.baseUrl}/events/$id/cancel"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
+      body: jsonEncode({
+        "reason": reason,
+      }),
+    );
+
+    if (response.statusCode == 200) return;
+
+    String message = "Failed to cancel event";
+    try {
+      final dynamic data = jsonDecode(response.body);
+      if (data is Map<String, dynamic>) {
+        final parsed = data["error"] ?? data["message"];
+        if (parsed != null && parsed.toString().trim().isNotEmpty) {
+          message = parsed.toString();
+        }
+      }
+    } catch (_) {}
+
+    throw Exception(message);
+  }
+
+  /// ================= ANNOUNCE EVENT =================
+  static Future<int> announceEvent({
+    required int id,
+    required String message,
+  }) async {
+    final token = await TokenService.getToken();
+    if (token == null) throw Exception("No token");
+
+    final trimmedMessage = message.trim();
+    if (trimmedMessage.isEmpty) {
+      throw Exception("Announcement message is required");
+    }
+
+    final response = await http.post(
+      Uri.parse("${ApiConfig.baseUrl}/events/$id/announce"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
+      body: jsonEncode({
+        "message": trimmedMessage,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      try {
+        final dynamic decoded = jsonDecode(response.body);
+        if (decoded is Map && decoded["recipients"] is num) {
+          return (decoded["recipients"] as num).toInt();
+        }
+      } catch (_) {}
+      return 0;
+    }
+
+    String errorMessage = "Failed to send announcement";
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map) {
+        final parsed = decoded["error"] ?? decoded["message"];
+        if (parsed != null && parsed.toString().trim().isNotEmpty) {
+          errorMessage = parsed.toString();
+        }
+      }
+    } catch (_) {}
+
+    throw Exception(errorMessage);
+  }
+
   /// ================= PUBLISH DRAFT =================
   static Future<void> publishDraftEvent(int id) async {
     final token = await TokenService.getToken();

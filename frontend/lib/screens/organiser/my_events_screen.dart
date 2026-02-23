@@ -12,7 +12,8 @@ class MyEventsScreen extends StatefulWidget {
 class _MyEventsScreenState extends State<MyEventsScreen> {
   List events = [];
   bool loading = true;
-  int _selectedFilter = 0; // 0: All, 1: Draft, 2: Upcoming, 3: Ongoing, 4: Completed
+  int _selectedFilter =
+      0; // 0: All, 1: Draft, 2: Cancelled, 3: Upcoming, 4: Ongoing, 5: Completed
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = "";
 
@@ -37,8 +38,13 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
     }
   }
 
-  String _getStatus(Map event) =>
-      event["computed_status"] ?? event["status"] ?? "upcoming";
+  String _getStatus(Map event) {
+    final status = (event["computed_status"] ?? event["status"] ?? "upcoming")
+        .toString()
+        .toLowerCase();
+    if (status == "closed") return "cancelled";
+    return status;
+  }
 
   List _getFilteredEvents() {
     var filtered = events.where((e) {
@@ -47,10 +53,12 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
         case 1:
           return status == "draft";
         case 2:
-          return status == "upcoming";
+          return status == "cancelled";
         case 3:
-          return status == "ongoing";
+          return status == "upcoming";
         case 4:
+          return status == "ongoing";
+        case 5:
           return status == "completed";
         default:
           return true;
@@ -68,6 +76,7 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
     return {
       "total": events.length,
       "draft": events.where((e) => _getStatus(e) == "draft").length,
+      "cancelled": events.where((e) => _getStatus(e) == "cancelled").length,
       "upcoming": events.where((e) => _getStatus(e) == "upcoming").length,
       "ongoing": events.where((e) => _getStatus(e) == "ongoing").length,
       "completed": events.where((e) => _getStatus(e) == "completed").length,
@@ -95,217 +104,221 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 child: Column(
                   children: [
-                  // 📊 STATS HEADER
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
-                      ),
-                      borderRadius: BorderRadius.vertical(
-                        bottom: Radius.circular(20),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _statCard("${stats['total']}", "Total"),
-                        _statCard("${stats['draft']}", "Draft"),
-                        _statCard("${stats['upcoming']}", "Upcoming"),
-                        _statCard("${stats['ongoing']}", "Ongoing"),
-                        _statCard("${stats['completed']}", "Completed"),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // 🔍 SEARCH BAR
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: TextField(
-                      controller: _searchController,
-                      onChanged: (value) =>
-                          setState(() => _searchQuery = value.toLowerCase()),
-                      decoration: InputDecoration(
-                        hintText: "Search events...",
-                        prefixIcon: const Icon(Icons.search),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                    // 📊 STATS HEADER
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
+                        ),
+                        borderRadius: BorderRadius.vertical(
+                          bottom: Radius.circular(20),
                         ),
                       ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // 📑 FILTER TABS
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
                       child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          _filterTab("All", 0),
-                          const SizedBox(width: 8),
-                          _filterTab("Draft", 1),
-                          const SizedBox(width: 8),
-                          _filterTab("Upcoming", 2),
-                          const SizedBox(width: 8),
-                          _filterTab("Ongoing", 3),
-                          const SizedBox(width: 8),
-                          _filterTab("Completed", 4),
+                          _statCard("${stats['total']}", "Total"),
+                          _statCard("${stats['draft']}", "Draft"),
+                          _statCard("${stats['cancelled']}", "Cancelled"),
+                          _statCard("${stats['upcoming']}", "Upcoming"),
+                          _statCard("${stats['ongoing']}", "Ongoing"),
+                          _statCard("${stats['completed']}", "Completed"),
                         ],
                       ),
                     ),
-                  ),
 
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-                  // 📋 EVENT LIST
-                  if (filtered.isEmpty)
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 40),
-                        child: Text(
-                          "No events found",
-                          style: TextStyle(color: Colors.grey.shade600),
-                        ),
-                      ),
-                    )
-                  else
+                    // 🔍 SEARCH BAR
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Column(
-                        children: filtered.map((event) {
-                          final status = _getStatus(event);
-                          final statusColor = status == "upcoming"
-                              ? Colors.blue
-                              : status == "ongoing"
-                                  ? Colors.orange
-                                  : status == "draft"
-                                      ? Colors.grey
-                                      : Colors.green;
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: (value) =>
+                            setState(() => _searchQuery = value.toLowerCase()),
+                        decoration: InputDecoration(
+                          hintText: "Search events...",
+                          prefixIcon: const Icon(Icons.search),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
 
-                          return InkWell(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      EventDetailsScreen(event: event),
-                                ),
-                              ).then((_) => loadEvents());
-                            },
-                            child: Container(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                border: Border.all(
-                                  color: statusColor.withOpacity(0.3),
-                                  width: 2,
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Column(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color:
-                                              statusColor.withOpacity(0.2),
-                                          borderRadius:
-                                              BorderRadius.circular(6),
-                                        ),
-                                        child: Text(
-                                          status.toUpperCase(),
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                            color: statusColor,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        event["event_date"]
-                                            .toString()
-                                            .split("T")[0],
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: Colors.grey.shade600,
-                                        ),
-                                      ),
-                                    ],
+                    const SizedBox(height: 16),
+
+                    // 📑 FILTER TABS
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _filterTab("All", 0),
+                            const SizedBox(width: 8),
+                            _filterTab("Draft", 1),
+                            const SizedBox(width: 8),
+                            _filterTab("Cancelled", 2),
+                            const SizedBox(width: 8),
+                            _filterTab("Upcoming", 3),
+                            const SizedBox(width: 8),
+                            _filterTab("Ongoing", 4),
+                            const SizedBox(width: 8),
+                            _filterTab("Completed", 5),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // 📋 EVENT LIST
+                    if (filtered.isEmpty)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 40),
+                          child: Text(
+                            "No events found",
+                            style: TextStyle(color: Colors.grey.shade600),
+                          ),
+                        ),
+                      )
+                    else
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Column(
+                          children: filtered.map((event) {
+                            final status = _getStatus(event);
+                            final statusColor = status == "upcoming"
+                                ? Colors.blue
+                                : status == "ongoing"
+                                    ? Colors.orange
+                                    : status == "draft"
+                                        ? Colors.grey
+                                        : status == "cancelled"
+                                            ? Colors.red
+                                            : Colors.green;
+
+                            return InkWell(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        EventDetailsScreen(event: event),
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                ).then((_) => loadEvents());
+                              },
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: statusColor.withOpacity(0.3),
+                                    width: 2,
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Column(
                                       children: [
-                                        Text(
-                                          event["title"] ?? "Untitled",
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.bold,
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 4,
                                           ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
+                                          decoration: BoxDecoration(
+                                            color: statusColor.withOpacity(0.2),
+                                            borderRadius:
+                                                BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            status.toUpperCase(),
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                              color: statusColor,
+                                            ),
+                                          ),
                                         ),
-                                        const SizedBox(height: 4),
+                                        const SizedBox(height: 8),
                                         Text(
-                                          "📍 ${event["location"] ?? "N/A"}",
+                                          event["event_date"]
+                                              .toString()
+                                              .split("T")[0],
                                           style: TextStyle(
-                                            fontSize: 12,
+                                            fontSize: 11,
                                             color: Colors.grey.shade600,
                                           ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Row(
-                                          children: [
-                                            Text(
-                                              "👥 ${event["volunteers_required"] ?? 0}",
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                color: Colors.grey.shade600,
-                                              ),
-                                            ),
-                                            if (event["rating"] != null) ...[
-                                              const SizedBox(width: 12),
-                                              const Icon(Icons.star,
-                                                  size: 12,
-                                                  color: Colors.amber),
-                                              const SizedBox(width: 2),
-                                              Text(
-                                                "${event["rating"]}",
-                                                style: const TextStyle(
-                                                  fontSize: 11,
-                                                ),
-                                              ),
-                                            ],
-                                          ],
                                         ),
                                       ],
                                     ),
-                                  ),
-                                  const Icon(Icons.arrow_forward_ios,
-                                      size: 14, color: Colors.grey),
-                                ],
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            event["title"] ?? "Untitled",
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            "📍 ${event["location"] ?? "N/A"}",
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey.shade600,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              Text(
+                                                "👥 ${event["volunteers_required"] ?? 0}",
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: Colors.grey.shade600,
+                                                ),
+                                              ),
+                                              if (event["rating"] != null) ...[
+                                                const SizedBox(width: 12),
+                                                const Icon(Icons.star,
+                                                    size: 12,
+                                                    color: Colors.amber),
+                                                const SizedBox(width: 2),
+                                                Text(
+                                                  "${event["rating"]}",
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const Icon(Icons.arrow_forward_ios,
+                                        size: 14, color: Colors.grey),
+                                  ],
+                                ),
                               ),
-                            ),
-                          );
-                        }).toList(),
+                            );
+                          }).toList(),
+                        ),
                       ),
-                    ),
                     const SizedBox(height: 20),
                   ],
                 ),

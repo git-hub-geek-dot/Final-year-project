@@ -19,6 +19,8 @@ class EventDetailsScreen extends StatefulWidget {
 class _EventDetailsScreenState extends State<EventDetailsScreen> {
   bool loadingStats = true;
   bool publishingDraft = false;
+  bool cancellingEvent = false;
+  bool announcingEvent = false;
 
   int applied = 0;
   int approved = 0;
@@ -63,9 +65,17 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
   }
 
   bool _isDraft(Map event) {
-    final text =
-        (event["computed_status"] ?? event["status"] ?? "").toString().toLowerCase();
+    final text = (event["computed_status"] ?? event["status"] ?? "")
+        .toString()
+        .toLowerCase();
     return text == "draft";
+  }
+
+  bool _isCancelled(Map event) {
+    final text = (event["computed_status"] ?? event["status"] ?? "")
+        .toString()
+        .toLowerCase();
+    return text == "cancelled" || text == "closed";
   }
 
   Future<void> _publishDraft(Map event) async {
@@ -115,6 +125,255 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
       );
     } finally {
       if (mounted) setState(() => publishingDraft = false);
+    }
+  }
+
+  Future<String?> _showCancelReasonDialog() async {
+    final reasonOptions = [
+      "Low volunteer turnout",
+      "Bad weather conditions",
+      "Venue unavailable",
+      "Safety or security concerns",
+      "Permission or compliance issue",
+      "Budget or resource constraints",
+      "Organizer unavailable",
+      "Other",
+    ];
+
+    String selectedReason = reasonOptions.first;
+    final customReasonController = TextEditingController();
+    String? validationError;
+
+    final chosen = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final isOther = selectedReason == "Other";
+            return AlertDialog(
+              title: const Text("Cancel Event"),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Select a cancellation reason",
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 10),
+                    ...reasonOptions.map(
+                      (reason) => RadioListTile<String>(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        value: reason,
+                        groupValue: selectedReason,
+                        title: Text(reason),
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setDialogState(() {
+                            selectedReason = value;
+                            validationError = null;
+                          });
+                        },
+                      ),
+                    ),
+                    if (isOther) ...[
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: customReasonController,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          hintText: "Write cancellation reason",
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (_) {
+                          if (validationError != null) {
+                            setDialogState(() => validationError = null);
+                          }
+                        },
+                      ),
+                    ],
+                    if (validationError != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        validationError!,
+                        style: const TextStyle(
+                          color: Colors.red,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Back"),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    final reason = selectedReason == "Other"
+                        ? customReasonController.text.trim()
+                        : selectedReason.trim();
+
+                    if (reason.isEmpty) {
+                      setDialogState(() {
+                        validationError = "Please provide cancellation reason";
+                      });
+                      return;
+                    }
+
+                    Navigator.pop(context, reason);
+                  },
+                  child: const Text("Cancel Event"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    customReasonController.dispose();
+    return chosen;
+  }
+
+  Future<void> _cancelEvent(Map event) async {
+    final eventId = int.tryParse("${event["id"]}");
+    if (eventId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Invalid event id")),
+      );
+      return;
+    }
+
+    final reason = await _showCancelReasonDialog();
+    if (reason == null || reason.trim().isEmpty) return;
+
+    setState(() => cancellingEvent = true);
+    try {
+      await EventService.cancelEvent(id: eventId, reason: reason.trim());
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Event cancelled successfully")),
+      );
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      final message = e.toString().replaceFirst("Exception: ", "");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } finally {
+      if (mounted) setState(() => cancellingEvent = false);
+    }
+  }
+
+  Future<String?> _showAnnouncementDialog() async {
+    final controller = TextEditingController();
+    String? validationError;
+
+    final message = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text("Send Announcement"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Write a message for volunteers in this event.",
+                    style: TextStyle(fontSize: 13),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: controller,
+                    maxLength: 500,
+                    maxLines: 5,
+                    decoration: InputDecoration(
+                      hintText: "Type announcement...",
+                      border: const OutlineInputBorder(),
+                      errorText: validationError,
+                    ),
+                    onChanged: (_) {
+                      if (validationError != null) {
+                        setDialogState(() => validationError = null);
+                      }
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Cancel"),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    final value = controller.text.trim();
+                    if (value.isEmpty) {
+                      setDialogState(() {
+                        validationError = "Message is required";
+                      });
+                      return;
+                    }
+                    Navigator.pop(context, value);
+                  },
+                  icon: const Icon(Icons.send),
+                  label: const Text("Send"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    controller.dispose();
+    return message;
+  }
+
+  Future<void> _announceEvent(Map event) async {
+    final eventId = int.tryParse("${event["id"]}");
+    if (eventId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Invalid event id")),
+      );
+      return;
+    }
+
+    final message = await _showAnnouncementDialog();
+    if (message == null || message.trim().isEmpty) return;
+
+    setState(() => announcingEvent = true);
+    try {
+      final recipients = await EventService.announceEvent(
+        id: eventId,
+        message: message.trim(),
+      );
+      if (!mounted) return;
+
+      final recipientLabel = recipients == 1 ? "volunteer" : "volunteers";
+      final successText = recipients > 0
+          ? "Announcement sent to $recipients $recipientLabel"
+          : "Announcement sent. No volunteers to notify yet.";
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(successText)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final error = e.toString().replaceFirst("Exception: ", "");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error)),
+      );
+    } finally {
+      if (mounted) setState(() => announcingEvent = false);
     }
   }
 
@@ -303,8 +562,9 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
   Widget _actionButtons(Map event) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isNarrow = constraints.maxWidth < 420;
+        final isNarrow = constraints.maxWidth < 560;
         final isDraftEvent = _isDraft(event);
+        final isCancelledEvent = _isCancelled(event);
 
         final viewVolunteersButton = ElevatedButton(
           onPressed: () async {
@@ -338,41 +598,86 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
           label: const Text("Edit Event"),
         );
 
-        final closeButton = OutlinedButton(
-          onPressed: () {
-            Navigator.pop(context);
-          },
-          child: const Text("Close"),
+        final announceButton = OutlinedButton.icon(
+          onPressed: announcingEvent ? null : () => _announceEvent(event),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.blue.shade700,
+            side: BorderSide(color: Colors.blue.shade300),
+          ),
+          icon: announcingEvent
+              ? SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Colors.blue.shade400,
+                    ),
+                  ),
+                )
+              : const Icon(Icons.campaign),
+          label: Text(announcingEvent ? "Sending..." : "Announce"),
+        );
+
+        final cancelEventButton = OutlinedButton.icon(
+          onPressed: (cancellingEvent || isCancelledEvent)
+              ? null
+              : () => _cancelEvent(event),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.red.shade700,
+            side: BorderSide(color: Colors.red.shade400),
+          ),
+          icon: cancellingEvent
+              ? SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Colors.red.shade400,
+                    ),
+                  ),
+                )
+              : const Icon(Icons.event_busy),
+          label: Text(isCancelledEvent ? "Event Cancelled" : "Cancel Event"),
         );
 
         if (isNarrow) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (!isDraftEvent) ...[
+              if (!isDraftEvent && !isCancelledEvent) ...[
                 viewVolunteersButton,
                 const SizedBox(height: 10),
               ],
-              if (!isDraftEvent) ...[
+              if (!isDraftEvent && !isCancelledEvent) ...[
+                announceButton,
+                const SizedBox(height: 10),
+              ],
+              if (!isDraftEvent && !isCancelledEvent) ...[
                 editEventButton,
                 const SizedBox(height: 10),
               ],
-              closeButton,
+              if (!isDraftEvent) cancelEventButton,
             ],
           );
         }
 
         return Row(
           children: [
-            if (!isDraftEvent) ...[
+            if (!isDraftEvent && !isCancelledEvent) ...[
               Expanded(child: viewVolunteersButton),
               const SizedBox(width: 10),
             ],
-            if (!isDraftEvent) ...[
+            if (!isDraftEvent && !isCancelledEvent) ...[
+              announceButton,
+              const SizedBox(width: 10),
+            ],
+            if (!isDraftEvent && !isCancelledEvent) ...[
               editEventButton,
               const SizedBox(width: 10),
             ],
-            closeButton,
+            if (!isDraftEvent) cancelEventButton,
           ],
         );
       },
@@ -479,15 +784,35 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
   }
 
   static Widget _statusChip(String text) {
+    final normalized = text.toLowerCase();
+    final isCancelled = normalized.contains("cancel");
+    final isCompleted = normalized.contains("complete");
+    final isDraft = normalized.contains("draft");
+
+    final bgColor = isCancelled
+        ? const Color(0xFFFEE2E2)
+        : isCompleted
+            ? const Color(0xFFEDE9FE)
+            : isDraft
+                ? const Color(0xFFE5E7EB)
+                : Colors.green.shade100;
+    final dotColor = isCancelled
+        ? const Color(0xFFDC2626)
+        : isCompleted
+            ? const Color(0xFF7C3AED)
+            : isDraft
+                ? const Color(0xFF4B5563)
+                : Colors.green;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.green.shade100,
+        color: bgColor,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         children: [
-          const Icon(Icons.circle, size: 8, color: Colors.green),
+          Icon(Icons.circle, size: 8, color: dotColor),
           const SizedBox(width: 6),
           Text(text),
         ],
@@ -511,23 +836,23 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
   static String _formatEventDateRange(Map event) {
     final startDateRaw = event["event_date"]?.toString();
     final endDateRaw = event["end_date"]?.toString();
-    
+
     if (startDateRaw == null || startDateRaw.isEmpty) return "-";
-    
+
     final startDate = startDateRaw.split("T")[0];
-    
+
     // If no end date, show single date
     if (endDateRaw == null || endDateRaw.isEmpty) {
       return startDate;
     }
-    
+
     final endDate = endDateRaw.split("T")[0];
-    
+
     // If dates are the same, show single date
     if (startDate == endDate) {
       return startDate;
     }
-    
+
     // Show date range for multi-day events
     return "$startDate to $endDate";
   }

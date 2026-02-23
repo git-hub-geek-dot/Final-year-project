@@ -457,10 +457,13 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
       final matchesCategory =
           selectedCategory == "All Categories" || cats.contains(selectedCategory);
 
-      final date = DateTime.tryParse(event["event_date"]?.toString() ?? "");
-      if (date == null) return false;
+      final startDate = DateTime.tryParse(event["event_date"]?.toString() ?? "");
+      if (startDate == null) return false;
 
-      final dateOnly = DateTime(date.year, date.month, date.day);
+      final endDate = DateTime.tryParse(event["end_date"]?.toString() ?? event["event_date"]?.toString() ?? "");
+      final relevantDate = endDate ?? startDate;
+
+      final dateOnly = DateTime(relevantDate.year, relevantDate.month, relevantDate.day);
       final isCompleted = event["computed_status"]?.toString() == "completed";
       final isPast = dateOnly.isBefore(today) || isCompleted;
         final isOngoing = dateOnly.isAtSameMomentAs(today) && !isCompleted;

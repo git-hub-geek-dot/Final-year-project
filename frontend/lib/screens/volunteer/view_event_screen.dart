@@ -735,7 +735,10 @@ Join on VolunteerX
     final eventDateRaw = widget.event["event_date"]?.toString();
     if (eventDateRaw == null || eventDateRaw.isEmpty) return false;
 
-    final parsed = DateTime.tryParse(eventDateRaw);
+    final endDateRaw = widget.event["end_date"]?.toString();
+    final relevantDateRaw = endDateRaw ?? eventDateRaw;
+
+    final parsed = DateTime.tryParse(relevantDateRaw);
     if (parsed == null) return false;
 
     final now = DateTime.now();
@@ -875,6 +878,8 @@ Join on VolunteerX
         return Colors.green;
       case "rejected":
         return Colors.red;
+      case "waitlisted":
+        return Colors.amber;
       default:
         return Colors.grey;
     }
@@ -891,6 +896,8 @@ Join on VolunteerX
         return "✅ Application Approved";
       case "rejected":
         return "❌ Application Rejected";
+      case "waitlisted":
+        return "⏳ Waitlisted";
       default:
         return "";
     }

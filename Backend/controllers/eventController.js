@@ -814,7 +814,16 @@ exports.cancelEvent = async (req, res) => {
 
     const eventResult = await client.query(
       `
-      SELECT id, title, status
+      SELECT
+        id,
+        title,
+        status,
+        (
+          NOW() >= (
+            COALESCE(end_date, event_date)
+            + COALESCE(end_time, TIME '23:59:59')
+          )
+        ) AS has_ended
       FROM events
       WHERE id = $1 AND organiser_id = $2
       FOR UPDATE
@@ -828,10 +837,16 @@ exports.cancelEvent = async (req, res) => {
     }
 
     const event = eventResult.rows[0];
+    const hasEnded = event.has_ended === true;
 
     if (event.status === "deleted") {
       await client.query("ROLLBACK");
       return res.status(400).json({ error: "Event is deleted by admin" });
+    }
+
+    if (event.status === "closed") {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Event is already cancelled" });
     }
 
     if (event.status === "completed") {
@@ -839,9 +854,21 @@ exports.cancelEvent = async (req, res) => {
       return res.status(400).json({ error: "Completed events cannot be cancelled" });
     }
 
-    if (event.status === "closed") {
-      await client.query("ROLLBACK");
-      return res.status(400).json({ error: "Event is already cancelled" });
+    if (hasEnded) {
+      if (event.status === "open") {
+        await client.query(
+          `
+          UPDATE events
+          SET status = 'completed'
+          WHERE id = $1 AND organiser_id = $2 AND status = 'open'
+          `,
+          [eventId, organiserId]
+        );
+        await client.query("COMMIT");
+      } else {
+        await client.query("ROLLBACK");
+      }
+      return res.status(400).json({ error: "Completed events cannot be cancelled" });
     }
 
     await client.query(

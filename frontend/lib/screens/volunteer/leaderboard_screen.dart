@@ -334,35 +334,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     );
   }
 
-  /// ================= YOUR RANK =================
-  Widget _yourRankCard(Map<String, dynamic> user) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        gradient: AppColors.primaryGradient,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.person, color: Colors.white),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              "Your Rank: #${user["rank"]}",
-              style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.bold),
-            ),
-          ),
-          Text(
-            "${user["events"]} events",
-            style: const TextStyle(color: Colors.white70),
-          ),
-        ],
-      ),
-    );
-  }
-
   /// ================= RANK CARD =================
   Widget _rankCard({
     required int rank,

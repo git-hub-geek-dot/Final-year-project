@@ -8,6 +8,7 @@ const cors = require("cors");
 const path = require("path");
 const { Server } = require("socket.io");
 const { initChatSocket } = require("./sockets/chatSocket");
+const { markOverdueEventsCompleted } = require("./services/eventStatusService");
 
 const app = express();
 
@@ -58,6 +59,25 @@ const io = new Server(server, {
 });
 
 initChatSocket(io);
+
+const runEventStatusSync = async () => {
+  try {
+    const updatedCount = await markOverdueEventsCompleted();
+    if (updatedCount > 0) {
+      console.log(
+        `[EVENT STATUS] Auto-marked ${updatedCount} overdue event(s) as completed`
+      );
+    }
+  } catch (err) {
+    console.error("[EVENT STATUS] Sync failed:", err);
+  }
+};
+
+runEventStatusSync();
+const eventStatusInterval = setInterval(runEventStatusSync, 5 * 60 * 1000);
+if (typeof eventStatusInterval.unref === "function") {
+  eventStatusInterval.unref();
+}
 
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

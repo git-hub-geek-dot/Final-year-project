@@ -65,17 +65,49 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
   }
 
   bool _isDraft(Map event) {
-    final text = (event["computed_status"] ?? event["status"] ?? "")
-        .toString()
-        .toLowerCase();
+    final text = _normalizedStatus(event);
     return text == "draft";
   }
 
   bool _isCancelled(Map event) {
+    final text = _normalizedStatus(event);
+    return text == "cancelled" ||
+        text == "closed" ||
+        text == "deleted" ||
+        text == "deleted_by_admin";
+  }
+
+  String _normalizedStatus(Map event) {
     final text = (event["computed_status"] ?? event["status"] ?? "")
         .toString()
         .toLowerCase();
-    return text == "cancelled" || text == "closed";
+    if (text == "closed") return "cancelled";
+    if (text == "deleted" || text == "deleted_by_admin") {
+      return "deleted_by_admin";
+    }
+    return text;
+  }
+
+  String _statusText(Map event) {
+    switch (_normalizedStatus(event)) {
+      case "deleted_by_admin":
+        return "Removed by Admin";
+      case "cancelled":
+        return "Cancelled";
+      case "completed":
+        return "Completed";
+      case "draft":
+        return "Draft";
+      case "ongoing":
+        return "Ongoing";
+      case "upcoming":
+      case "open":
+        return "Upcoming";
+      default:
+        final raw = (event["computed_status"] ?? event["status"] ?? "upcoming")
+            .toString();
+        return raw.isEmpty ? "Upcoming" : raw;
+    }
   }
 
   Future<void> _publishDraft(Map event) async {
@@ -382,9 +414,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     final event = widget.event;
     final isDraftEvent = _isDraft(event);
     final bannerUrl = event["banner_url"];
-    final status = (event["computed_status"] ?? event["status"] ?? "upcoming")
-        .toString()
-        .toUpperCase();
+    final status = _statusText(event);
     final eventDateText = _fmtDate(event["event_date"]);
     final eventDateRangeText = _formatEventDateRange(event);
     final deadlineText = _fmtDate(event["application_deadline"]);
@@ -788,15 +818,20 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     final isCancelled = normalized.contains("cancel");
     final isCompleted = normalized.contains("complete");
     final isDraft = normalized.contains("draft");
+    final isDeleted = normalized.contains("removed");
 
-    final bgColor = isCancelled
+    final bgColor = isDeleted
+        ? const Color(0xFFF3F4F6)
+        : isCancelled
         ? const Color(0xFFFEE2E2)
         : isCompleted
             ? const Color(0xFFEDE9FE)
             : isDraft
                 ? const Color(0xFFE5E7EB)
                 : Colors.green.shade100;
-    final dotColor = isCancelled
+    final dotColor = isDeleted
+        ? const Color(0xFF6B7280)
+        : isCancelled
         ? const Color(0xFFDC2626)
         : isCompleted
             ? const Color(0xFF7C3AED)

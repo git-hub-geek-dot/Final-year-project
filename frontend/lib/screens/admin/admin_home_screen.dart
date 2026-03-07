@@ -104,7 +104,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       DashboardItem(
         icon: Icons.military_tech,
         title: 'Badges',
-        subtitle: 'Manage badges',
+        subtitle: 'View badge system',
         onTap: () => Navigator.push(context,
             MaterialPageRoute(builder: (_) => const AdminBadgesScreen())),
         color: Colors.amber,

@@ -77,8 +77,10 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   List<Map<String, dynamic>> _getFilteredUsers() {
     final filtered = users
         .where((u) {
-          final matchSearch = u["name"].toLowerCase().contains(search) ||
-              u["email"].toLowerCase().contains(search);
+          final name = (u["name"] ?? "").toString().toLowerCase();
+          final email = (u["email"] ?? "").toString().toLowerCase();
+          final matchSearch =
+              name.contains(search) || email.contains(search);
 
           final matchStatus =
               statusFilter == "all" || u["status"] == statusFilter;

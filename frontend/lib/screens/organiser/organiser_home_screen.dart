@@ -134,6 +134,9 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
         .toString()
         .toLowerCase();
     if (status == 'closed') return 'cancelled';
+    if (status == 'deleted' || status == 'deleted_by_admin') {
+      return 'deleted_by_admin';
+    }
     return status;
   }
 
@@ -512,6 +515,7 @@ Widget eventCard(
   final isEventCompleted = statusKey == 'completed';
   final isEventDraft = statusKey == 'draft';
   final isEventCancelled = statusKey == 'cancelled';
+  final isEventDeleted = statusKey == 'deleted_by_admin';
 
   return InkWell(
     onTap: () {
@@ -684,7 +688,11 @@ Widget eventCard(
               ],
             ),
           ),
-          if (isMine && !isEventCompleted && !isEventDraft && !isEventCancelled)
+          if (isMine &&
+              !isEventCompleted &&
+              !isEventDraft &&
+              !isEventCancelled &&
+              !isEventDeleted)
             InkWell(
               onTap: () {
                 Navigator.push(
@@ -725,6 +733,9 @@ String _eventStatus(Map event) {
       .toString()
       .toLowerCase();
   if (status == 'closed') return 'cancelled';
+  if (status == 'deleted' || status == 'deleted_by_admin') {
+    return 'deleted_by_admin';
+  }
   return status;
 }
 
@@ -740,6 +751,8 @@ String _statusLabel(String status) {
       return 'Draft';
     case 'cancelled':
       return 'Cancelled';
+    case 'deleted_by_admin':
+      return 'Removed by admin';
     default:
       return 'Upcoming';
   }
@@ -757,6 +770,8 @@ Color _statusColor(String status) {
       return Colors.grey.shade700;
     case 'cancelled':
       return const Color(0xFFDC2626);
+    case 'deleted_by_admin':
+      return const Color(0xFF6B7280);
     default:
       return Colors.black87;
   }
@@ -774,6 +789,8 @@ Color _statusBg(String status) {
       return Colors.grey.shade200;
     case 'cancelled':
       return const Color(0xFFFEE2E2);
+    case 'deleted_by_admin':
+      return const Color(0xFFF3F4F6);
     default:
       return Colors.grey.shade200;
   }
@@ -814,6 +831,14 @@ Map<String, dynamic>? _urgencyBadge(Map event, String status) {
       'text': 'Cancelled by organiser',
       'color': const Color(0xFFB91C1C),
       'bg': const Color(0xFFFEE2E2),
+    };
+  }
+
+  if (status == 'deleted_by_admin') {
+    return {
+      'text': 'Removed by admin',
+      'color': const Color(0xFF4B5563),
+      'bg': const Color(0xFFF3F4F6),
     };
   }
 

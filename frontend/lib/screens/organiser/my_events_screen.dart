@@ -43,7 +43,29 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
         .toString()
         .toLowerCase();
     if (status == "closed") return "cancelled";
+    if (status == "deleted" || status == "deleted_by_admin") {
+      return "deleted_by_admin";
+    }
     return status;
+  }
+
+  String _statusLabel(String status) {
+    switch (status) {
+      case "upcoming":
+        return "UPCOMING";
+      case "ongoing":
+        return "ONGOING";
+      case "draft":
+        return "DRAFT";
+      case "cancelled":
+        return "CANCELLED";
+      case "completed":
+        return "COMPLETED";
+      case "deleted_by_admin":
+        return "REMOVED";
+      default:
+        return status.toUpperCase();
+    }
   }
 
   List _getFilteredEvents() {
@@ -197,6 +219,8 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                                     ? Colors.orange
                                     : status == "draft"
                                         ? Colors.grey
+                                        : status == "deleted_by_admin"
+                                            ? Colors.blueGrey
                                         : status == "cancelled"
                                             ? Colors.red
                                             : Colors.green;
@@ -237,7 +261,7 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                                                 BorderRadius.circular(6),
                                           ),
                                           child: Text(
-                                            status.toUpperCase(),
+                                            _statusLabel(status),
                                             style: TextStyle(
                                               fontSize: 10,
                                               fontWeight: FontWeight.bold,

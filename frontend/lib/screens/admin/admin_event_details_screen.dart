@@ -428,6 +428,7 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
     final s = status?.toString().toLowerCase() ?? "active";
     switch (s) {
       case "active":
+      case "open":
         return Colors.green;
       case "completed":
         return Colors.blue;

@@ -14,6 +14,16 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
+  Color _badgeColor(String badgeName) {
+    final name = badgeName.toLowerCase();
+    if (name.contains("bronze")) return const Color(0xFFCD7F32);
+    if (name.contains("silver")) return const Color(0xFFC0C0C0);
+    if (name.contains("gold")) return const Color(0xFFFFD700);
+    if (name.contains("platinum")) return const Color(0xFFE5E4E2);
+    if (name.contains("diamond")) return const Color(0xFF4FC3F7);
+    return Colors.amber;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -61,7 +71,15 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen>
                       children: badges
                           .map((b) => Chip(
                                 label: Text(b),
-                                backgroundColor: Colors.amber.shade100,
+                                backgroundColor:
+                                    _badgeColor(b).withValues(alpha: 0.18),
+                                side: BorderSide(
+                                  color: _badgeColor(b).withValues(alpha: 0.5),
+                                ),
+                                labelStyle: TextStyle(
+                                  color: _badgeColor(b),
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ))
                           .toList(),
                     ),

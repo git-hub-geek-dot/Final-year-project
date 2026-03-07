@@ -24,97 +24,40 @@ class _AdminBadgesScreenState extends State<AdminBadgesScreen> {
     });
   }
 
-  Future<void> addBadgeDialog() async {
-    final name = TextEditingController();
-    final desc = TextEditingController();
-    final threshold = TextEditingController();
+  int _toInt(dynamic value) {
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
 
-    await showDialog(
-      context: context,
-      builder: (_) {
-        String role = "volunteer";
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: const Text("Create Badge"),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(controller: name, decoration: const InputDecoration(labelText: "Name")),
-                  TextField(controller: desc, decoration: const InputDecoration(labelText: "Description")),
-                  TextField(controller: threshold, decoration: const InputDecoration(labelText: "Threshold")),
-                  DropdownButton<String>(
-                    value: role,
-                    items: const [
-                      DropdownMenuItem(value: "volunteer", child: Text("Volunteer")),
-                      DropdownMenuItem(value: "organiser", child: Text("Organiser")),
-                    ],
-                    onChanged: (v) {
-                      if (v != null) {
-                        setState(() {
-                          role = v;
-                        });
-                      }
-                    },
-                  )
-                ],
-              ),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-                TextButton(
-                  onPressed: () async {
-                    final badgeName = name.text.trim();
-                    final badgeDescription = desc.text.trim();
-                    final thresholdValue = int.tryParse(threshold.text.trim());
+  Color _badgeBaseColor(Map<String, dynamic> badge) {
+    final name = (badge["name"] ?? "").toString().toLowerCase();
+    final threshold = _toInt(badge["threshold"]);
 
-                    if (badgeName.isEmpty ||
-                        badgeDescription.isEmpty ||
-                        thresholdValue == null ||
-                        thresholdValue < 1) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("Enter valid name, description and threshold"),
-                        ),
-                      );
-                      return;
-                    }
+    if (name.contains("bronze")) return const Color(0xFFCD7F32);
+    if (name.contains("silver")) return const Color(0xFFC0C0C0);
+    if (name.contains("gold")) return const Color(0xFFFFD700);
+    if (name.contains("platinum")) return const Color(0xFFE5E4E2);
+    if (name.contains("diamond")) return const Color(0xFF4FC3F7);
 
-                    try {
-                      await AdminService.createBadge({
-                        "name": badgeName,
-                        "description": badgeDescription,
-                        "role": role,
-                        "threshold": thresholdValue,
-                      });
-                      if (!context.mounted) return;
-                      Navigator.pop(context);
-                      refresh();
-                    } catch (e) {
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Failed to create badge: $e")),
-                      );
-                    }
-                  },
-                  child: const Text("Create"),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
+    if (threshold >= 50) return const Color(0xFFFFD700);
+    if (threshold >= 20) return const Color(0xFFC0C0C0);
+    return const Color(0xFFCD7F32);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Manage Badges'),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: addBadgeDialog,
-        child: const Icon(Icons.add),
+        title: const Text('Badge Overview'),
+        actions: [
+          IconButton(
+            onPressed: refresh,
+            icon: const Icon(Icons.refresh),
+            tooltip: "Refresh",
+          ),
+        ],
       ),
       body: AppBackground(
         child: FutureBuilder<List<dynamic>>(
@@ -129,7 +72,9 @@ class _AdminBadgesScreenState extends State<AdminBadgesScreen> {
             }
 
             if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return const Center(child: Text("No badges created yet."));
+              return const Center(
+                child: Text("No badges configured in system."),
+              );
             }
 
             final badges = snapshot.data!;
@@ -137,14 +82,31 @@ class _AdminBadgesScreenState extends State<AdminBadgesScreen> {
             return ListView.builder(
               itemCount: badges.length,
               itemBuilder: (_, i) {
-                final b = badges[i];
+                final badge = Map<String, dynamic>.from(badges[i] as Map);
+                final color = _badgeBaseColor(badge);
                 return ListTile(
-                  leading: const Icon(Icons.emoji_events, color: Colors.amber, size: 40),
-                  title: Text(b["name"], style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text("${b["role"]} • Requires ${b["threshold"]} events"),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.redAccent),
-                    onPressed: () => _deleteBadge(b['id']),
+                  leading: Icon(Icons.emoji_events, color: color, size: 36),
+                  title: Text(
+                    (badge["name"] ?? "Badge").toString(),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    "${badge["role"]} - Requires ${badge["threshold"]} events",
+                  ),
+                  trailing: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      "System",
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 );
               },
@@ -153,41 +115,5 @@ class _AdminBadgesScreenState extends State<AdminBadgesScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> _deleteBadge(int badgeId) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Badge'),
-        content: const Text('Are you sure you want to delete this badge? This action cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      try {
-        await AdminService.deleteBadge(badgeId);
-        refresh();
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to delete badge: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    }
   }
 }

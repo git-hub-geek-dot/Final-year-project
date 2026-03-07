@@ -93,6 +93,21 @@ class _MyBadgesScreenState extends State<MyBadgesScreen> {
     return "Completed events";
   }
 
+  Color _badgeBaseColor(Map<String, dynamic> badge) {
+    final name = (badge["name"] ?? "").toString().toLowerCase();
+    final threshold = _toInt(badge["threshold"]);
+
+    if (name.contains("bronze")) return const Color(0xFFCD7F32);
+    if (name.contains("silver")) return const Color(0xFFC0C0C0);
+    if (name.contains("gold")) return const Color(0xFFFFD700);
+    if (name.contains("platinum")) return const Color(0xFFE5E4E2);
+    if (name.contains("diamond")) return const Color(0xFF4FC3F7);
+
+    if (threshold >= 50) return const Color(0xFFFFD700);
+    if (threshold >= 20) return const Color(0xFFC0C0C0);
+    return const Color(0xFFCD7F32);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -168,7 +183,7 @@ class _MyBadgesScreenState extends State<MyBadgesScreen> {
               const Expanded(
                 child: Center(
                   child: Text(
-                    "No badges configured yet.\nAdmin can create badges from the admin panel.",
+                    "No badges configured in system yet.",
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -180,12 +195,15 @@ class _MyBadgesScreenState extends State<MyBadgesScreen> {
                   itemBuilder: (context, index) {
                     final badge = _badges[index];
                     final earned = badge["earned"] == true;
+                    final baseColor = _badgeBaseColor(badge);
 
                     return Card(
                       child: ListTile(
                         leading: Icon(
                           Icons.emoji_events,
-                          color: earned ? Colors.amber : Colors.grey,
+                          color: earned
+                              ? baseColor
+                              : baseColor.withValues(alpha: 0.35),
                         ),
                         title: Text((badge["name"] ?? "Badge").toString()),
                         subtitle: Text(_badgeSubtitle(badge)),

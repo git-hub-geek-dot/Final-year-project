@@ -60,7 +60,27 @@ class _OrganiserActivityScreenState extends State<OrganiserActivityScreen>
   }
 
   String _status(Map event) =>
-      (event["computed_status"] ?? event["status"] ?? "upcoming").toString();
+      _normalizedStatus(
+        (event["computed_status"] ?? event["status"] ?? "upcoming").toString(),
+      );
+
+  String _normalizedStatus(String raw) {
+    final status = raw.toLowerCase();
+    if (status == "closed") return "cancelled";
+    if (status == "deleted" || status == "deleted_by_admin") {
+      return "deleted_by_admin";
+    }
+    return status;
+  }
+
+  String _statusLabel(String status) {
+    switch (status) {
+      case "deleted_by_admin":
+        return "REMOVED";
+      default:
+        return status.toUpperCase();
+    }
+  }
 
   String _dateText(dynamic value) {
     if (value == null) return "Date not set";
@@ -153,6 +173,8 @@ class _OrganiserActivityScreenState extends State<OrganiserActivityScreen>
                                         ? Colors.green
                                         : status == "draft"
                                             ? Colors.grey
+                                            : status == "deleted_by_admin"
+                                                ? Colors.blueGrey
                                             : Colors.blue;
 
                                 return Container(
@@ -209,7 +231,7 @@ class _OrganiserActivityScreenState extends State<OrganiserActivityScreen>
                                           borderRadius: BorderRadius.circular(20),
                                         ),
                                         child: Text(
-                                          status.toUpperCase(),
+                                          _statusLabel(status),
                                           style: TextStyle(
                                             color: statusColor,
                                             fontWeight: FontWeight.bold,

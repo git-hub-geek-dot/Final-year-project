@@ -47,14 +47,8 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
   double? _upcomingCardHeight;
   double? _recommendedCardHeight;
 
-  String searchQuery = "";
   String selectedFeed = "all"; // all | confirmed | pending
   String selectedTimeline = "upcoming"; // upcoming | ongoing
-
-  // 🔹 FILTER UI STATE (UNCHANGED)
-  String selectedCategory = "All";
-  bool filterPaid = false;
-  bool filterUnpaid = false;
 
   final List<String> eventCategories = [
     "All",

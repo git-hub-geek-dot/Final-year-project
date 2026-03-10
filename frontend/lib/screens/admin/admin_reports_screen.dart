@@ -61,6 +61,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
         search: _search,
       );
       final items = (data["items"] as List?) ?? [];
+      if (!mounted) return;
       setState(() {
         _reports.addAll(items);
         _totalPages = data["totalPages"] ?? 1;
@@ -70,6 +71,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
         _errorMessage = null;
       });
     } catch (_) {
+      if (!mounted) return;
       setState(() {
         _loading = false;
         _loadingMore = false;
@@ -303,6 +305,15 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
     }
   }
 
+  Future<String?> _promptAdminNote(String title) {
+    return _promptText(
+      title: title,
+      hint: "Internal admin note (optional)",
+      maxLength: 500,
+      isRequired: false,
+    );
+  }
+
   Future<void> _showDetails(Map report) async {
     final status = report["status"]?.toString() ?? "pending";
     final canAct = status == "pending";
@@ -348,11 +359,14 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
           ),
           if (canAct)
             TextButton(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.pop(ctx);
+                final note = await _promptAdminNote("Resolve report");
+                if (note == null) return;
                 _resolveReport(
                   reportId: report["id"],
                   action: "none",
+                  note: note,
                 );
               },
               child: const Text("Resolve"),
@@ -375,9 +389,12 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                   maxLength: 500,
                 );
                 if (reason == null) return;
+                final note = await _promptAdminNote("Add admin note");
+                if (note == null) return;
                 _resolveReport(
                   reportId: report["id"],
                   action: "strike",
+                  note: note,
                   strikeReason: reason,
                 );
               },
@@ -389,9 +406,12 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                 Navigator.pop(ctx);
                 final data = await _promptSuspend();
                 if (data == null) return;
+                final note = await _promptAdminNote("Add admin note");
+                if (note == null) return;
                 _resolveReport(
                   reportId: report["id"],
                   action: "suspend",
+                  note: note,
                   suspendDays: data["days"] as int,
                   suspendReason: data["reason"] as String,
                 );
@@ -409,9 +429,12 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                   isRequired: false,
                 );
                 if (reason == null) return;
+                final note = await _promptAdminNote("Add admin note");
+                if (note == null) return;
                 _resolveReport(
                   reportId: report["id"],
                   action: "cancel_event",
+                  note: note,
                   cancelReason: reason,
                 );
               },

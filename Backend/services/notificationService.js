@@ -12,6 +12,35 @@ const getTokensByUserIds = async (userIds) => {
   return result.rows.map((row) => row.token);
 };
 
+const normalizeFcmData = (data) => {
+  if (!data || typeof data !== "object") {
+    return {};
+  }
+
+  return Object.entries(data).reduce((acc, [key, value]) => {
+    if (value === null || value === undefined) {
+      return acc;
+    }
+
+    if (typeof value === "string") {
+      acc[key] = value;
+      return acc;
+    }
+
+    if (
+      typeof value === "number" ||
+      typeof value === "boolean" ||
+      typeof value === "bigint"
+    ) {
+      acc[key] = String(value);
+      return acc;
+    }
+
+    acc[key] = JSON.stringify(value);
+    return acc;
+  }, {});
+};
+
 const sendToTokens = async (tokens, payload) => {
   if (!tokens || tokens.length === 0) return;
 
@@ -27,7 +56,7 @@ const sendToTokens = async (tokens, payload) => {
       title: payload.title,
       body: payload.body,
     },
-    data: payload.data || {},
+    data: normalizeFcmData(payload.data),
   });
 };
 

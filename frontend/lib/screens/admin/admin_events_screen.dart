@@ -126,6 +126,7 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
         currentPage += 1;
       } while (currentPage <= lastPage);
 
+      if (!mounted) return;
       setState(() {
         events
           ..clear()
@@ -134,6 +135,7 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
         errorMessage = null;
       });
     } catch (_) {
+      if (!mounted) return;
       setState(() {
         loading = false;
         if (reset) {
@@ -169,7 +171,7 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
 
                       return Column(
                         children: [
-                          // 🔍 Search
+
                           Padding(
                             padding: const EdgeInsets.all(8),
                             child: TextField(
@@ -256,7 +258,8 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
                                                     children: [
                                                       Expanded(
                                                         child: Text(
-                                                          event["title"],
+                                                          (event["title"] ?? "")
+                                                              .toString(),
                                                           style: TextStyle(
                                                             fontSize: 18,
                                                             fontWeight:

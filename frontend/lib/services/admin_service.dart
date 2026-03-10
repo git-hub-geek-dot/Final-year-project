@@ -434,7 +434,12 @@ class AdminService {
     );
 
     if (response.statusCode != 200) {
-      throw Exception("Failed to send broadcast notification");
+      String error = "Failed to send broadcast notification";
+      try {
+        final data = jsonDecode(response.body);
+        error = data["error"]?.toString() ?? error;
+      } catch (_) {}
+      throw Exception(error);
     }
   }
 

@@ -29,8 +29,19 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen> {
   }
 
   Future<void> _approve(int requestId) async {
-    await AdminService.approveVerification(requestId);
-    _loadRequests();
+    try {
+      await AdminService.approveVerification(requestId);
+      _loadRequests();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Verification approved")),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Approve failed: $e")),
+      );
+    }
   }
 
   Future<void> _reject(int requestId) async {
@@ -64,8 +75,19 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen> {
 
     if (remark == null || remark.isEmpty) return;
 
-    await AdminService.rejectVerification(requestId, remark);
-    _loadRequests();
+    try {
+      await AdminService.rejectVerification(requestId, remark);
+      _loadRequests();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Verification rejected")),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Reject failed: $e")),
+      );
+    }
   }
 
   // Show modal with full details and actions
@@ -273,6 +295,7 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen> {
                         final r = filtered[index];
                         final user = r["user"];
 
+
                         // choose a small thumbnail (selfie > id > event proof)
                         final thumb = (r["selfieUrl"] ?? r["selfie_url"]) ??
                             (r["idDocumentUrl"] ?? r["id_document_url"]) ??
@@ -297,7 +320,7 @@ class _AdminVerificationScreenState extends State<AdminVerificationScreen> {
                                 Text(user["email"] ?? ""),
                                 const SizedBox(height: 4),
                                 Text(
-                                    "Role: ${r["role"]} • Status: ${r["status"]}"),
+                                    "Role: ${r["role"]} - Status: ${r["status"]}"),
                               ],
                             ),
                             trailing: IconButton(

@@ -55,6 +55,7 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
         currentPage += 1;
       } while (currentPage <= lastPage);
 
+      if (!mounted) return;
       setState(() {
         apps
           ..clear()
@@ -63,6 +64,7 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
         errorMessage = null;
       });
     } catch (_) {
+      if (!mounted) return;
       setState(() {
         loading = false;
         if (reset) {
@@ -319,24 +321,26 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text("Application Details"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _detailRow("Event", eventTitle),
-            _detailRow("Organiser", organiserName),
-            _detailRow("Event Start", eventDate),
-            _detailRow("Event Created", eventCreatedAt),
-            const SizedBox(height: 8),
-            _detailRow("Volunteer", volunteerName),
-            _detailRow("Email", volunteerEmail),
-            _detailRow("City", volunteerCity),
-            const SizedBox(height: 8),
-            _detailRow("Status", statusText),
-            _detailRow("Applied", appliedAt),
-            if (status == "cancelled" && cancelReason.isNotEmpty)
-              _detailRow("Reason", cancelReason),
-          ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _detailRow("Event", eventTitle),
+              _detailRow("Organiser", organiserName),
+              _detailRow("Event Start", eventDate),
+              _detailRow("Event Created", eventCreatedAt),
+              const SizedBox(height: 8),
+              _detailRow("Volunteer", volunteerName),
+              _detailRow("Email", volunteerEmail),
+              _detailRow("City", volunteerCity),
+              const SizedBox(height: 8),
+              _detailRow("Status", statusText),
+              _detailRow("Applied", appliedAt),
+              if (status == "cancelled" && cancelReason.isNotEmpty)
+                _detailRow("Reason", cancelReason),
+            ],
+          ),
         ),
         actions: [
           TextButton(

@@ -13,6 +13,7 @@ class AdminLeaderboardScreen extends StatefulWidget {
 class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  late Future<List<dynamic>> _userBadgesFuture;
 
   Color _badgeColor(String badgeName) {
     final name = badgeName.toLowerCase();
@@ -28,6 +29,7 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _userBadgesFuture = AdminService.getUserBadges();
   }
 
   @override
@@ -122,11 +124,11 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen>
           children: [
             buildList(
               AdminService.getVolunteerLeaderboard(),
-              AdminService.getUserBadges(),
+              _userBadgesFuture,
             ),
             buildList(
               AdminService.getOrganiserLeaderboard(),
-              AdminService.getUserBadges(),
+              _userBadgesFuture,
             ),
           ],
         ),

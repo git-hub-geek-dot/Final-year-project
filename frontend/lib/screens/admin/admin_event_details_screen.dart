@@ -94,6 +94,7 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
   }
 
   Future<void> _showNotifyEventDialog() async {
+    final messenger = ScaffoldMessenger.of(context);
     final titleController = TextEditingController();
     final messageController = TextEditingController();
     bool isLoading = false;
@@ -133,11 +134,11 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
             ),
             ElevatedButton(
               onPressed: isLoading
-                  ? null
-                  : () async {
-                      if (titleController.text.trim().isEmpty ||
-                          messageController.text.trim().isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
+                   ? null
+                   : () async {
+                       if (titleController.text.trim().isEmpty ||
+                           messageController.text.trim().isEmpty) {
+                        messenger.showSnackBar(
                           const SnackBar(
                             content: Text("Please fill in all fields"),
                           ),
@@ -147,18 +148,18 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
 
                       setState(() => isLoading = true);
                       final rawId = widget.event["id"];
-                      final eventId = rawId is int
-                          ? rawId
-                          : int.tryParse(rawId?.toString() ?? "");
-                      if (eventId == null) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Invalid event id")),
-                          );
-                        }
-                        setState(() => isLoading = false);
-                        return;
-                      }
+                       final eventId = rawId is int
+                           ? rawId
+                           : int.tryParse(rawId?.toString() ?? "");
+                       if (eventId == null) {
+                         if (dialogContext.mounted) {
+                           setState(() => isLoading = false);
+                         }
+                         messenger.showSnackBar(
+                           const SnackBar(content: Text("Invalid event id")),
+                         );
+                         return;
+                       }
 
                       try {
                         await AdminService.sendEventNotification(
@@ -167,22 +168,20 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
                           message: messageController.text.trim(),
                         );
 
-                        if (context.mounted) {
-                          Navigator.pop(dialogContext);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text("Notification sent"),
-                            ),
-                          );
-                        }
+                        if (!dialogContext.mounted) return;
+                        Navigator.pop(dialogContext);
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content: Text("Notification sent"),
+                          ),
+                        );
                       } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text("Send failed: $e")),
-                          );
+                        if (dialogContext.mounted) {
+                          setState(() => isLoading = false);
                         }
-                      } finally {
-                        setState(() => isLoading = false);
+                        messenger.showSnackBar(
+                          SnackBar(content: Text("Send failed: $e")),
+                        );
                       }
                     },
               child: isLoading

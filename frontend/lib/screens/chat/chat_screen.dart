@@ -141,12 +141,15 @@ class _ChatScreenState extends State<ChatScreen> {
     final socket = io.io(
       ChatService.socketUrl(),
       io.OptionBuilder()
-          .setTransports(['websocket'])
+          .setTransports(['polling', 'websocket'])
           .setAuth({"token": token})
+          .enableReconnection()
+          .enableForceNew()
           .build(),
     );
 
     socket.onConnect((_) {
+      debugPrint("Chat socket connected");
       if (mounted) {
         setState(() {
           _isSocketConnected = true;
@@ -157,6 +160,7 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     socket.on("reconnect", (_) {
+      debugPrint("Chat socket reconnected");
       if (mounted) {
         setState(() {
           _isSocketConnected = true;
@@ -166,14 +170,16 @@ class _ChatScreenState extends State<ChatScreen> {
       _retryFailedMessages();
     });
 
-    socket.onDisconnect((_) {
+    socket.onDisconnect((reason) {
+      debugPrint("Chat socket disconnected: $reason");
       if (!mounted) return;
       setState(() {
         _isSocketConnected = false;
       });
     });
 
-    socket.onConnectError((_) {
+    socket.onConnectError((error) {
+      debugPrint("Chat socket connect error: $error");
       if (!mounted) return;
       setState(() {
         _isSocketConnected = false;

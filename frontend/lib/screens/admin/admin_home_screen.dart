@@ -37,80 +37,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final List<DashboardItem> items = [
-      DashboardItem(
-        icon: Icons.bar_chart,
-        title: 'Stats',
-        subtitle: 'View system statistics',
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const AdminStatsScreen())),
-        color: Colors.blue,
-      ),
-      DashboardItem(
-        icon: Icons.event,
-        title: 'Events',
-        subtitle: 'Manage events',
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const AdminEventsScreen())),
-        color: Colors.green,
-      ),
-      DashboardItem(
-        icon: Icons.people,
-        title: 'Users',
-        subtitle: 'Manage users',
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const AdminUsersScreen())),
-        color: Colors.orange,
-      ),
-      DashboardItem(
-        icon: Icons.assignment,
-        title: 'Applications',
-        subtitle: 'Review applications',
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const AdminApplicationsScreen())),
-        color: Colors.purple,
-      ),
-      DashboardItem(
-        icon: Icons.flag,
-        title: 'Reports',
-        subtitle: 'Moderation queue',
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const AdminReportsScreen())),
-        color: Colors.redAccent,
-      ),
-      DashboardItem(
-        icon: Icons.verified_user,
-        title: 'Verification',
-        subtitle: 'Verify users',
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const AdminVerificationScreen())),
-        color: Colors.cyan,
-      ),
-      DashboardItem(
-        icon: Icons.notifications_active,
-        title: 'Broadcast',
-        subtitle: 'Send notifications',
-        onTap: () => _showBroadcastDialog(context),
-        color: Colors.teal,
-      ),
-      DashboardItem(
-        icon: Icons.leaderboard,
-        title: 'Leaderboard',
-        subtitle: 'View leaderboard',
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const AdminLeaderboardScreen())),
-        color: Colors.red,
-      ),
-      DashboardItem(
-        icon: Icons.military_tech,
-        title: 'Badges',
-        subtitle: 'View badge system',
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const AdminBadgesScreen())),
-        color: Colors.amber,
-      ),
-    ];
-
     return Scaffold(
       appBar: AppBar(
         title: const Text("Admin Dashboard"),
@@ -141,8 +67,88 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             final loadingStats =
                 snapshot.connectionState == ConnectionState.waiting;
             final hasStatsError = snapshot.hasError;
+            final pendingVerifications =
+                (stats?['pendingVerifications'] as num?)?.toInt() ?? 0;
+            final pendingReports =
+                (stats?['pendingReports'] as num?)?.toInt() ?? 0;
             final screenWidth = MediaQuery.of(context).size.width;
             final isSmallScreen = screenWidth < 600;
+            final List<DashboardItem> items = [
+              DashboardItem(
+                icon: Icons.bar_chart,
+                title: 'Stats',
+                subtitle: 'View system statistics',
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const AdminStatsScreen())),
+                color: Colors.blue,
+              ),
+              DashboardItem(
+                icon: Icons.event,
+                title: 'Events',
+                subtitle: 'Manage events',
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const AdminEventsScreen())),
+                color: Colors.green,
+              ),
+              DashboardItem(
+                icon: Icons.people,
+                title: 'Users',
+                subtitle: 'Manage users',
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const AdminUsersScreen())),
+                color: Colors.orange,
+              ),
+              DashboardItem(
+                icon: Icons.assignment,
+                title: 'Applications',
+                subtitle: 'Review applications',
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const AdminApplicationsScreen())),
+                color: Colors.purple,
+              ),
+              DashboardItem(
+                icon: Icons.flag,
+                title: 'Reports',
+                subtitle: 'Moderation queue',
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const AdminReportsScreen())),
+                color: Colors.redAccent,
+                badgeCount: pendingReports > 0 ? pendingReports : null,
+              ),
+              DashboardItem(
+                icon: Icons.verified_user,
+                title: 'Verification',
+                subtitle: 'Verify users',
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const AdminVerificationScreen())),
+                color: Colors.cyan,
+                badgeCount:
+                    pendingVerifications > 0 ? pendingVerifications : null,
+              ),
+              DashboardItem(
+                icon: Icons.notifications_active,
+                title: 'Broadcast',
+                subtitle: 'Send notifications',
+                onTap: () => _showBroadcastDialog(context),
+                color: Colors.teal,
+              ),
+              DashboardItem(
+                icon: Icons.leaderboard,
+                title: 'Leaderboard',
+                subtitle: 'View leaderboard',
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const AdminLeaderboardScreen())),
+                color: Colors.red,
+              ),
+              DashboardItem(
+                icon: Icons.military_tech,
+                title: 'Badges',
+                subtitle: 'View badge system',
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const AdminBadgesScreen())),
+                color: Colors.amber,
+              ),
+            ];
 
             return Column(
               children: [
@@ -230,125 +236,166 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         ),
                         shrinkWrap: true,
                         itemCount: items.length,
-                        itemBuilder: (context, index) {
-                          final item = items[index];
-                          return Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(20.0),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: item.color.withValues(alpha: 0.2),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4),
-                                  spreadRadius: 0,
-                                ),
-                                BoxShadow(
-                                  color: item.color.withValues(alpha: 0.1),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
-                                  spreadRadius: -2,
-                                ),
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.05),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 8),
-                                  spreadRadius: 0,
-                                ),
-                              ],
-                            ),
-                            child: Card(
-                              elevation: 0,
-                              shadowColor: Colors.transparent,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20.0),
-                              ),
-                              child: InkWell(
-                                onTap: item.onTap,
-                                borderRadius: BorderRadius.circular(20.0),
-                                splashColor:
-                                    Colors.white.withValues(alpha: 0.2),
-                                highlightColor:
-                                    Colors.white.withValues(alpha: 0.1),
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(20.0),
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        item.color.withValues(alpha: 0.9),
-                                        item.color.withValues(alpha: 0.7),
-                                        item.color.withValues(alpha: 0.5),
-                                        item.color.withValues(alpha: 0.8),
-                                      ],
-                                      stops: const [0.0, 0.3, 0.7, 1.0],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
-                                  ),
-                                  child: Padding(
-                                    padding: EdgeInsets.all(
-                                        isSmallScreen ? 12.0 : 16.0),
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Container(
-                                          padding: EdgeInsets.all(
-                                              isSmallScreen ? 10 : 12),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white
-                                                .withValues(alpha: 0.2),
-                                            shape: BoxShape.circle,
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.white
-                                                    .withValues(alpha: 0.1),
-                                                blurRadius: 8,
-                                                spreadRadius: 0,
-                                              ),
-                                            ],
-                                          ),
-                                          child: Icon(
-                                            item.icon,
-                                            size: isSmallScreen ? 28.0 : 32.0,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                        SizedBox(
-                                            height: isSmallScreen ? 8.0 : 12.0),
-                                        Text(
-                                          item.title,
-                                          style: TextStyle(
-                                            fontSize:
-                                                isSmallScreen ? 14.0 : 16.0,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.white,
-                                          ),
-                                          textAlign: TextAlign.center,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        SizedBox(
-                                            height: isSmallScreen ? 2.0 : 4.0),
-                                        Text(
-                                          item.subtitle,
-                                          style: TextStyle(
-                                            fontSize:
-                                                isSmallScreen ? 10.0 : 12.0,
-                                            color: Colors.white70,
-                                          ),
-                                          textAlign: TextAlign.center,
-                                          maxLines: isSmallScreen ? 1 : 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      );
+                         itemBuilder: (context, index) {
+                           final item = items[index];
+                           return Stack(
+                             clipBehavior: Clip.none,
+                             children: [
+                               Container(
+                                 decoration: BoxDecoration(
+                                   borderRadius: BorderRadius.circular(20.0),
+                                   boxShadow: [
+                                     BoxShadow(
+                                       color: item.color.withValues(alpha: 0.2),
+                                       blurRadius: 12,
+                                       offset: const Offset(0, 4),
+                                       spreadRadius: 0,
+                                     ),
+                                     BoxShadow(
+                                       color: item.color.withValues(alpha: 0.1),
+                                       blurRadius: 6,
+                                       offset: const Offset(0, 2),
+                                       spreadRadius: -2,
+                                     ),
+                                     BoxShadow(
+                                       color: Colors.black.withValues(alpha: 0.05),
+                                       blurRadius: 20,
+                                       offset: const Offset(0, 8),
+                                       spreadRadius: 0,
+                                     ),
+                                   ],
+                                 ),
+                                 child: Card(
+                                   elevation: 0,
+                                   shadowColor: Colors.transparent,
+                                   shape: RoundedRectangleBorder(
+                                     borderRadius: BorderRadius.circular(20.0),
+                                   ),
+                                   child: InkWell(
+                                     onTap: item.onTap,
+                                     borderRadius: BorderRadius.circular(20.0),
+                                     splashColor:
+                                         Colors.white.withValues(alpha: 0.2),
+                                     highlightColor:
+                                         Colors.white.withValues(alpha: 0.1),
+                                     child: Container(
+                                       decoration: BoxDecoration(
+                                         borderRadius: BorderRadius.circular(20.0),
+                                         gradient: LinearGradient(
+                                           colors: [
+                                             item.color.withValues(alpha: 0.9),
+                                             item.color.withValues(alpha: 0.7),
+                                             item.color.withValues(alpha: 0.5),
+                                             item.color.withValues(alpha: 0.8),
+                                           ],
+                                           stops: const [0.0, 0.3, 0.7, 1.0],
+                                           begin: Alignment.topLeft,
+                                           end: Alignment.bottomRight,
+                                         ),
+                                       ),
+                                       child: Padding(
+                                         padding: EdgeInsets.all(
+                                             isSmallScreen ? 12.0 : 16.0),
+                                         child: Column(
+                                           mainAxisAlignment:
+                                               MainAxisAlignment.center,
+                                           children: [
+                                             Container(
+                                               padding: EdgeInsets.all(
+                                                   isSmallScreen ? 10 : 12),
+                                               decoration: BoxDecoration(
+                                                 color: Colors.white
+                                                     .withValues(alpha: 0.2),
+                                                 shape: BoxShape.circle,
+                                                 boxShadow: [
+                                                   BoxShadow(
+                                                     color: Colors.white
+                                                         .withValues(alpha: 0.1),
+                                                     blurRadius: 8,
+                                                     spreadRadius: 0,
+                                                   ),
+                                                 ],
+                                               ),
+                                               child: Icon(
+                                                 item.icon,
+                                                 size: isSmallScreen ? 28.0 : 32.0,
+                                                 color: Colors.white,
+                                               ),
+                                             ),
+                                             SizedBox(
+                                                 height:
+                                                     isSmallScreen ? 8.0 : 12.0),
+                                             Text(
+                                               item.title,
+                                               style: TextStyle(
+                                                 fontSize:
+                                                     isSmallScreen ? 14.0 : 16.0,
+                                                 fontWeight: FontWeight.bold,
+                                                 color: Colors.white,
+                                               ),
+                                               textAlign: TextAlign.center,
+                                               maxLines: 1,
+                                               overflow: TextOverflow.ellipsis,
+                                             ),
+                                             SizedBox(
+                                                 height:
+                                                     isSmallScreen ? 2.0 : 4.0),
+                                             Text(
+                                               item.subtitle,
+                                               style: TextStyle(
+                                                 fontSize:
+                                                     isSmallScreen ? 10.0 : 12.0,
+                                                 color: Colors.white70,
+                                               ),
+                                               textAlign: TextAlign.center,
+                                               maxLines: isSmallScreen ? 1 : 2,
+                                               overflow: TextOverflow.ellipsis,
+                                             ),
+                                           ],
+                                         ),
+                                       ),
+                                     ),
+                                   ),
+                                 ),
+                               ),
+                               if ((item.badgeCount ?? 0) > 0)
+                                 Positioned(
+                                   top: -6,
+                                   right: -6,
+                                   child: Container(
+                                     padding: const EdgeInsets.symmetric(
+                                         horizontal: 8, vertical: 4),
+                                     decoration: BoxDecoration(
+                                       color: Colors.white,
+                                       borderRadius: BorderRadius.circular(999),
+                                       border: Border.all(
+                                         color: item.color,
+                                         width: 1.5,
+                                       ),
+                                       boxShadow: [
+                                         BoxShadow(
+                                           color: Colors.black.withValues(alpha: 0.12),
+                                           blurRadius: 8,
+                                           offset: const Offset(0, 2),
+                                         ),
+                                       ],
+                                     ),
+                                     child: Text(
+                                       item.badgeCount! > 99
+                                           ? '99+'
+                                           : item.badgeCount!.toString(),
+                                       style: TextStyle(
+                                         color: item.color,
+                                         fontWeight: FontWeight.bold,
+                                         fontSize: isSmallScreen ? 11 : 12,
+                                       ),
+                                     ),
+                                   ),
+                                 ),
+                             ],
+                           );
+                         },
+                       );
                     },
                   ),
                 ),
@@ -510,6 +557,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   }
 
   void _showBroadcastDialog(BuildContext context) {
+    final messenger = ScaffoldMessenger.of(context);
     final titleController = TextEditingController();
     final messageController = TextEditingController();
     String selectedRole = 'all';
@@ -572,11 +620,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             ),
             ElevatedButton(
               onPressed: isLoading
-                  ? null
-                  : () async {
-                      if (titleController.text.trim().isEmpty ||
-                          messageController.text.trim().isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
+                   ? null
+                   : () async {
+                       if (titleController.text.trim().isEmpty ||
+                           messageController.text.trim().isEmpty) {
+                        messenger.showSnackBar(
                           const SnackBar(
                             content: Text('Please fill in all fields'),
                             backgroundColor: Colors.red,
@@ -592,30 +640,28 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           title: titleController.text.trim(),
                           message: messageController.text.trim(),
                           targetRole: selectedRole,
+                         );
+ 
+                        if (!dialogContext.mounted) return;
+                        Navigator.of(dialogContext).pop();
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Notification sent to ${selectedRole == 'all' ? 'all users' : '${selectedRole}s'}!',
+                            ),
+                            backgroundColor: Colors.green,
+                          ),
                         );
-
-                        if (context.mounted) {
-                          Navigator.of(dialogContext).pop();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Notification sent to ${selectedRole == 'all' ? 'all users' : '${selectedRole}s'}!',
-                              ),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                        }
                       } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Failed to send notification: $e'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
+                        if (dialogContext.mounted) {
+                          setState(() => isLoading = false);
                         }
-                      } finally {
-                        setState(() => isLoading = false);
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text('Failed to send notification: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
                       }
                     },
               child: isLoading
@@ -639,6 +685,7 @@ class DashboardItem {
   final String subtitle;
   final VoidCallback onTap;
   final Color color;
+  final int? badgeCount;
 
   DashboardItem({
     required this.icon,
@@ -646,5 +693,6 @@ class DashboardItem {
     required this.subtitle,
     required this.onTap,
     required this.color,
+    this.badgeCount,
   });
 }

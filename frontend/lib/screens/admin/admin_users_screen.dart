@@ -163,6 +163,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   Future<void> _showNotifySelectedDialog() async {
     if (selectedUserIds.isEmpty) return;
 
+    final messenger = ScaffoldMessenger.of(context);
     final titleController = TextEditingController();
     final messageController = TextEditingController();
     bool isLoading = false;
@@ -206,7 +207,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   : () async {
                       if (titleController.text.trim().isEmpty ||
                           messageController.text.trim().isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        messenger.showSnackBar(
                           const SnackBar(
                             content: Text("Please fill in all fields"),
                           ),
@@ -222,24 +223,22 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                           message: messageController.text.trim(),
                         );
 
-                        if (context.mounted) {
-                          Navigator.pop(dialogContext);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                "Notification sent to ${selectedUserIds.length} user(s)",
-                              ),
+                        if (!dialogContext.mounted) return;
+                        Navigator.pop(dialogContext);
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              "Notification sent to ${selectedUserIds.length} user(s)",
                             ),
-                          );
-                        }
+                          ),
+                        );
                       } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text("Send failed: $e")),
-                          );
+                        if (dialogContext.mounted) {
+                          setState(() => isLoading = false);
                         }
-                      } finally {
-                        setState(() => isLoading = false);
+                        messenger.showSnackBar(
+                          SnackBar(content: Text("Send failed: $e")),
+                        );
                       }
                     },
               child: isLoading
@@ -1264,10 +1263,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text("User Details"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             Center(
               child: CircleAvatar(
                 radius: 36,
@@ -1305,7 +1305,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       );
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 6),
-                  child: Text("• $createdAt: $reason"),
+                  child: Text("- $createdAt: $reason"),
                 );
               }),
             ],
@@ -1323,8 +1323,9 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
-            Text(adminNote.isEmpty ? "—" : adminNote),
+            Text(adminNote.isEmpty ? "-" : adminNote),
           ],
+          ),
         ),
         actions: [
           TextButton(
@@ -1435,51 +1436,72 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   Future<_SuspensionInput?> _promptSuspension() async {
     final daysController = TextEditingController(text: "3");
     final reasonController = TextEditingController();
+    String? daysError;
+    String? reasonError;
     final result = await showDialog<_SuspensionInput>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text("Suspend User"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: daysController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: "Days",
-                hintText: "Number of days to suspend",
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocalState) => AlertDialog(
+          title: const Text("Suspend User"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: daysController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: "Days",
+                  hintText: "Number of days to suspend",
+                  errorText: daysError,
+                ),
               ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: reasonController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  labelText: "Reason",
+                  hintText: "Reason for suspension",
+                  errorText: reasonError,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text("Cancel"),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: reasonController,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: "Reason",
-                hintText: "Reason for suspension",
-              ),
+            TextButton(
+              onPressed: () {
+                final days = int.tryParse(daysController.text.trim());
+                final reason = reasonController.text.trim();
+                final nextDaysError =
+                    days == null || days < 1 ? "Enter valid days" : null;
+                final nextReasonError =
+                    reason.isEmpty ? "Reason is required" : null;
+
+                if (nextDaysError != null || nextReasonError != null) {
+                  setLocalState(() {
+                    daysError = nextDaysError;
+                    reasonError = nextReasonError;
+                  });
+                  return;
+                }
+
+                Navigator.pop(
+                  ctx,
+                  _SuspensionInput(days: days!, reason: reason),
+                );
+              },
+              child: const Text("Suspend"),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("Cancel"),
-          ),
-          TextButton(
-            onPressed: () {
-              final days = int.tryParse(daysController.text.trim());
-              final reason = reasonController.text.trim();
-              if (days == null || days < 1 || reason.isEmpty) {
-                return;
-              }
-              Navigator.pop(ctx, _SuspensionInput(days: days, reason: reason));
-            },
-            child: const Text("Suspend"),
-          ),
-        ],
       ),
     );
+    daysController.dispose();
+    reasonController.dispose();
     return result;
   }
 

@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import '../../services/event_service.dart';
+import '../../theme/app_colors.dart';
 import '../../widgets/organiser_bottom_nav.dart';
 
 class LeaderboardScreen extends StatefulWidget {
@@ -82,7 +83,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
         title: const Text("Leaderboard"),
-        backgroundColor: const Color(0xFF2E6BE6),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        foregroundColor: Colors.white,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: AppColors.primaryGradient,
+          ),
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: _loadLeaderboard,
@@ -156,6 +164,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: [
@@ -181,6 +197,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: [
@@ -206,14 +230,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: active ? const Color(0xFF2E6BE6) : Colors.transparent,
+            gradient: active ? AppColors.primaryGradient : null,
             borderRadius: BorderRadius.circular(30),
           ),
           child: Text(
             text,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: active ? Colors.white : Colors.black54,
+              color: active ? Colors.white : Colors.grey.shade700,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -240,9 +264,16 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isFirst
+                      ? Colors.amber.withValues(alpha: 0.7)
+                      : const Color(0xFFE2E8F0),
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: isFirst ? Colors.amber.withOpacity(0.6) : Colors.black12,
+                    color: isFirst
+                        ? Colors.amber.withValues(alpha: 0.6)
+                        : Colors.black12,
                     blurRadius: isFirst ? 16 : 6,
                   ),
                 ],
@@ -310,18 +341,29 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     return Card(
       key: key,
       margin: const EdgeInsets.only(bottom: 10),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      elevation: 0,
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: const Color(0xFF2E6BE6),
+          backgroundColor: AppColors.primaryBlue,
           child: Text(
             "#$rank",
             style: const TextStyle(color: Colors.white),
           ),
         ),
-        title: Text(name),
-        subtitle: Text("$events events completed"),
-        trailing: const Icon(Icons.chevron_right),
+        title: Text(
+          name,
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        subtitle: Text(
+          "$events events completed",
+          style: TextStyle(color: Colors.grey.shade700),
+        ),
+        trailing: Icon(Icons.chevron_right, color: Colors.grey.shade500),
       ),
     );
   }

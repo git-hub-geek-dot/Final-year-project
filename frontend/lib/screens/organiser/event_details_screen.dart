@@ -77,6 +77,10 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
         text == "deleted_by_admin";
   }
 
+  bool _isCompleted(Map event) {
+    return _normalizedStatus(event) == "completed";
+  }
+
   String _normalizedStatus(Map event) {
     final text = (event["computed_status"] ?? event["status"] ?? "")
         .toString()
@@ -595,6 +599,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
         final isNarrow = constraints.maxWidth < 560;
         final isDraftEvent = _isDraft(event);
         final isCancelledEvent = _isCancelled(event);
+        final isCompletedEvent = _isCompleted(event);
 
         final viewVolunteersButton = ElevatedButton(
           onPressed: () async {
@@ -684,7 +689,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                 announceButton,
                 const SizedBox(height: 10),
               ],
-              if (!isDraftEvent && !isCancelledEvent) ...[
+              if (!isDraftEvent && !isCancelledEvent && !isCompletedEvent) ...[
                 editEventButton,
                 const SizedBox(height: 10),
               ],
@@ -703,7 +708,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
               announceButton,
               const SizedBox(width: 10),
             ],
-            if (!isDraftEvent && !isCancelledEvent) ...[
+            if (!isDraftEvent && !isCancelledEvent && !isCompletedEvent) ...[
               editEventButton,
               const SizedBox(width: 10),
             ],

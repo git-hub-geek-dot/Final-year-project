@@ -11,6 +11,7 @@ const {
   updateEvent,
   cancelEvent,
   announceEvent,
+  submitAttendanceFeedback,
   publishEvent,
 } = require("../controllers/eventController");
 
@@ -30,6 +31,11 @@ router.get("/events/leaderboard/volunteers", authMiddleware, getVolunteerLeaderb
 router.put("/events/:id", authMiddleware, updateEvent);
 router.put("/events/:id/cancel", authMiddleware, cancelEvent);
 router.post("/events/:id/announce", authMiddleware, announceEvent);
+router.post(
+  "/events/:id/attendance-feedback",
+  authMiddleware,
+  submitAttendanceFeedback
+);
 router.put("/events/:id/publish", authMiddleware, publishEvent);
 router.get(
   "/events/:id/applications",

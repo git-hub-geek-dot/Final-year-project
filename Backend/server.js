@@ -9,6 +9,9 @@ const path = require("path");
 const { Server } = require("socket.io");
 const { initChatSocket } = require("./sockets/chatSocket");
 const { markOverdueEventsCompleted } = require("./services/eventStatusService");
+const {
+  notifyOngoingAttendanceUpdates,
+} = require("./services/eventAttendanceNotificationService");
 
 const app = express();
 
@@ -62,10 +65,20 @@ initChatSocket(io);
 
 const runEventStatusSync = async () => {
   try {
-    const updatedCount = await markOverdueEventsCompleted();
+    const [updatedCount, attendanceNotifyCount] = await Promise.all([
+      markOverdueEventsCompleted(),
+      notifyOngoingAttendanceUpdates(),
+    ]);
+
     if (updatedCount > 0) {
       console.log(
         `[EVENT STATUS] Auto-marked ${updatedCount} overdue event(s) as completed`
+      );
+    }
+
+    if (attendanceNotifyCount > 0) {
+      console.log(
+        `[ATTENDANCE NOTIFY] Sent ${attendanceNotifyCount} organiser attendance update notification(s)`
       );
     }
   } catch (err) {

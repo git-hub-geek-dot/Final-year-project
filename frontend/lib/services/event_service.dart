@@ -182,6 +182,86 @@ class EventService {
     }
   }
 
+  /// ================= VOLUNTEER CANCEL APPLICATION =================
+  static Future<Map<String, dynamic>> cancelMyApplication({
+    required int applicationId,
+    String? reason,
+    String? supportingDocumentUrl,
+  }) async {
+    final token = await TokenService.getToken();
+    if (token == null) throw Exception("No token");
+
+    final response = await http.put(
+      Uri.parse("${ApiConfig.baseUrl}/applications/$applicationId/cancel"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
+      body: jsonEncode({
+        "reason": reason,
+        "supportingDocumentUrl": supportingDocumentUrl,
+      }),
+    );
+
+    final dynamic decoded = response.body.isNotEmpty
+        ? jsonDecode(response.body)
+        : <String, dynamic>{};
+
+    if (response.statusCode == 200) {
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) return Map<String, dynamic>.from(decoded);
+      return {"success": true};
+    }
+
+    String message = "Failed to cancel application";
+    if (decoded is Map) {
+      final parsed = decoded["error"] ?? decoded["message"];
+      if (parsed != null && parsed.toString().trim().isNotEmpty) {
+        message = parsed.toString();
+      }
+    }
+    throw Exception(message);
+  }
+
+  /// ================= VOLUNTEER STRIKE APPEAL =================
+  static Future<void> submitStrikeAppeal({
+    required int applicationId,
+    required String reason,
+    required String supportingDocumentUrl,
+  }) async {
+    final token = await TokenService.getToken();
+    if (token == null) throw Exception("No token");
+
+    final response = await http.put(
+      Uri.parse(
+          "${ApiConfig.baseUrl}/applications/$applicationId/strike-appeal"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
+      body: jsonEncode({
+        "reason": reason,
+        "supportingDocumentUrl": supportingDocumentUrl,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return;
+    }
+
+    String message = "Failed to submit appeal";
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map) {
+        final parsed = decoded["error"] ?? decoded["message"];
+        if (parsed != null && parsed.toString().trim().isNotEmpty) {
+          message = parsed.toString();
+        }
+      }
+    } catch (_) {}
+    throw Exception(message);
+  }
+
   /// ================= UPDATE EVENT =================
   static Future<bool> updateEvent({
     required int id,

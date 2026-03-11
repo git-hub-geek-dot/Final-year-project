@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:frontend/config/api_config.dart';
@@ -17,6 +16,14 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
+  static const int _maxProfileImageBytes = 5 * 1024 * 1024;
+  static const Set<String> _allowedProfileImageExtensions = {
+    "jpg",
+    "jpeg",
+    "png",
+    "webp",
+  };
+
   final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController cityController = TextEditingController();
@@ -73,6 +80,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 .toList() ??
             [];
 
+        if (!mounted) return;
         setState(() {
           _skills
             ..clear()
@@ -125,6 +133,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final token = prefs.getString("token");
 
       if (token == null || token.isEmpty) {
+        if (!mounted) return;
         setState(() => loadingProfile = false);
         return;
       }
@@ -138,6 +147,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           "Content-Type": "application/json",
         },
       );
+
+      if (!mounted) return;
 
       if (response.statusCode == 200) {
         final user = jsonDecode(response.body);
@@ -153,10 +164,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           loadingProfile = false;
         });
       } else {
-        loadingProfile = false;
+        setState(() => loadingProfile = false);
       }
-    } catch (e) {
-      loadingProfile = false;
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => loadingProfile = false);
     }
   }
 
@@ -219,6 +231,26 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return null;
   }
 
+  bool _isAllowedProfileImage(XFile file) {
+    final parts = file.name.toLowerCase().split(".");
+    if (parts.length < 2) return false;
+    return _allowedProfileImageExtensions.contains(parts.last);
+  }
+
+  void _restoreProfileImagePreview({
+    required XFile? previousImage,
+    required Uint8List? previousBytes,
+    required String? previousUrl,
+  }) {
+    if (!mounted) return;
+    setState(() {
+      _profileImage = previousImage;
+      _profileImageBytes = previousBytes;
+      _profileImageUrl = previousUrl;
+      isUploadingImage = false;
+    });
+  }
+
   // ================= PICK IMAGE FROM GALLERY =================
   Future<void> _pickImageFromGallery() async {
     try {
@@ -231,16 +263,46 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (pickedFile != null) {
         // Read bytes for preview
         final bytes = await pickedFile.readAsBytes();
-        
+
+        if (!_isAllowedProfileImage(pickedFile)) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Only JPG, JPEG, PNG, and WEBP images are allowed"),
+            ),
+          );
+          return;
+        }
+
+        if (bytes.length > _maxProfileImageBytes) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Image must be 5 MB or smaller"),
+            ),
+          );
+          return;
+        }
+
+        final previousImage = _profileImage;
+        final previousBytes = _profileImageBytes;
+        final previousUrl = _profileImageUrl;
+
+        if (!mounted) return;
         setState(() {
           _profileImage = pickedFile;
           _profileImageBytes = bytes; // Store bytes for web preview
         });
 
         // Upload the image
-        await _uploadProfileImage();
+        await _uploadProfileImage(
+          previousImage: previousImage,
+          previousBytes: previousBytes,
+          previousUrl: previousUrl,
+        );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error picking image: $e")),
       );
@@ -248,7 +310,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   // ================= UPLOAD PROFILE IMAGE =================
-  Future<void> _uploadProfileImage() async {
+  Future<void> _uploadProfileImage({
+    required XFile? previousImage,
+    required Uint8List? previousBytes,
+    required String? previousUrl,
+  }) async {
     if (_profileImage == null) return;
 
     setState(() => isUploadingImage = true);
@@ -257,8 +323,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString("token");
 
+      if (!mounted) return;
+
       if (token == null || token.isEmpty) {
-        setState(() => isUploadingImage = false);
+        _restoreProfileImagePreview(
+          previousImage: previousImage,
+          previousBytes: previousBytes,
+          previousUrl: previousUrl,
+        );
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Token not found. Please login again.")),
         );
@@ -268,6 +340,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       // Upload image and get URL
       final imageUrl = await UserService.uploadProfilePicture(token, _profileImage!);
 
+      if (!mounted) return;
+
       if (imageUrl != null) {
         setState(() {
           _profileImageUrl = imageUrl;
@@ -276,16 +350,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Profile picture updated ✅")),
+          const SnackBar(content: Text("Profile picture updated successfully")),
         );
       } else {
-        setState(() => isUploadingImage = false);
+        _restoreProfileImagePreview(
+          previousImage: previousImage,
+          previousBytes: previousBytes,
+          previousUrl: previousUrl,
+        );
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Failed to upload image")),
         );
       }
     } catch (e) {
-      setState(() => isUploadingImage = false);
+      if (!mounted) return;
+      _restoreProfileImagePreview(
+        previousImage: previousImage,
+        previousBytes: previousBytes,
+        previousUrl: previousUrl,
+      );
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error: $e")),
       );
@@ -320,6 +403,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString("token");
 
+      if (!mounted) return;
+
       if (token == null || token.isEmpty) {
         setState(() => isUploadingImage = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -331,6 +416,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       // Call delete endpoint
       final success = await UserService.deleteProfilePicture(token);
 
+      if (!mounted) return;
+
       if (success) {
         setState(() {
           _profileImage = null;
@@ -341,7 +428,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Profile picture removed ✅")),
+          const SnackBar(content: Text("Profile picture removed successfully")),
         );
       } else {
         setState(() => isUploadingImage = false);
@@ -350,6 +437,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         );
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() => isUploadingImage = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error: $e")),
@@ -419,6 +507,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString("token");
 
+      if (!mounted) return;
+
       if (token == null || token.isEmpty) {
         setState(() => isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -460,17 +550,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Profile updated ✅")),
+          const SnackBar(content: Text("Profile updated successfully")),
         );
 
-        Navigator.pop(context, true); // 🔁 trigger refresh
+        Navigator.pop(context, true);
       } else {
+        if (!mounted) return;
         setState(() => isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Update failed: ${response.body}")),
         );
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() => isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error: $e")),
@@ -491,13 +583,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
-        if (_hasProfileChanges) {
+    return PopScope(
+      canPop: !_hasProfileChanges,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _hasProfileChanges) {
           Navigator.pop(context, true);
-          return false;
         }
-        return true;
       },
       child: Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),

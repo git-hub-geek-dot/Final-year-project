@@ -39,6 +39,7 @@ app.use("/api", require("./routes/notificationRoutes"));
 app.use("/api", require("./routes/reportRoutes"));
 // Chat
 app.use("/api", require("./routes/chatRoutes"));
+app.use("/api", require("./routes/groupChatRoutes"));
 
 // 🔥 ADMIN ROUTES (already correct)
 app.use("/api/admin", require("./routes/adminRoutes"));

@@ -97,6 +97,15 @@ exports.getStatus = async (req, res) => {
   try {
     const userId = req.user.id;
 
+    const userResult = await pool.query(
+      'SELECT "isVerified" AS "isVerified" FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (userResult.rows[0]?.isVerified === true) {
+      return res.json({ status: "approved" });
+    }
+
     const result = await pool.query(
       `SELECT status
        FROM verification_requests

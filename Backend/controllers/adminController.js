@@ -1,85 +1,10 @@
 const pool = require("../config/db");
 const { notifyUser, notifyUsers } = require("../services/notificationService");
-
-const STRIKE_SUSPENSIONS = [
-  { threshold: 2, days: 3 },
-  { threshold: 3, days: 7 },
-];
-const BAN_STRIKE_THRESHOLD = 4;
-const MAX_STRIKE_REASON_LENGTH = 500;
-
-const applyStrike = async (client, { userId, adminId, reason }) => {
-  const userRes = await client.query(
-    "SELECT id, role, status, suspended_until FROM users WHERE id = $1",
-    [userId]
-  );
-
-  if (userRes.rowCount === 0) {
-    const error = new Error("User not found");
-    error.status = 404;
-    throw error;
-  }
-
-  if (userRes.rows[0].role === "admin") {
-    const error = new Error("Cannot strike admin users");
-    error.status = 400;
-    throw error;
-  }
-
-  await client.query(
-    `INSERT INTO user_strikes (user_id, admin_id, reason)
-     VALUES ($1, $2, $3)`,
-    [userId, adminId, reason]
-  );
-
-  const countRes = await client.query(
-    "SELECT COUNT(*)::int AS count FROM user_strikes WHERE user_id = $1",
-    [userId]
-  );
-
-  const strikeCount = countRes.rows[0]?.count || 0;
-  let action = "warning";
-  let suspendedUntil = null;
-  let status = userRes.rows[0].status;
-
-  if (strikeCount >= BAN_STRIKE_THRESHOLD) {
-    await client.query(
-      `UPDATE users
-       SET status = 'banned',
-           suspended_until = NULL,
-           suspension_reason = $2
-       WHERE id = $1`,
-      [userId, reason]
-    );
-    action = "banned";
-    status = "banned";
-  } else {
-    const match = STRIKE_SUSPENSIONS.find(
-      (entry) => entry.threshold === strikeCount
-    );
-
-    if (match) {
-      const until = new Date(Date.now() + match.days * 24 * 60 * 60 * 1000);
-      const updateRes = await client.query(
-        `UPDATE users
-         SET suspended_until = CASE
-             WHEN suspended_until IS NULL OR suspended_until < $2 THEN $2
-             ELSE suspended_until
-           END,
-           suspension_reason = $3
-         WHERE id = $1
-         RETURNING suspended_until, status`,
-        [userId, until, reason]
-      );
-
-      suspendedUntil = updateRes.rows[0]?.suspended_until || until;
-      status = updateRes.rows[0]?.status || status;
-      action = `suspended_${match.days}_days`;
-    }
-  }
-
-  return { strikeCount, action, suspendedUntil, status };
-};
+const {
+  MAX_STRIKE_REASON_LENGTH,
+  applyStrike,
+  recalculateUserStrikeState,
+} = require("../services/strikeService");
 
 // ================= GET ALL USERS =================
 const getUsers = async (req, res) => {
@@ -193,6 +118,17 @@ const getApplications = async (req, res) => {
            ELSE a.status
          END AS status,
          a.admin_cancel_reason,
+         a.volunteer_cancel_reason,
+         a.cancellation_supporting_document_url,
+         a.cancellation_window,
+         a.warning_issued,
+         a.strike_issued,
+         a.strike_appeal_reason,
+         a.strike_appeal_document_url,
+         a.strike_appeal_status,
+         a.strike_appeal_submitted_at,
+         a.strike_appeal_reviewed_at,
+         a.strike_appeal_review_note,
          a.applied_at,
          u.name AS volunteer_name,
          u.email AS volunteer_email,
@@ -222,6 +158,115 @@ const getApplications = async (req, res) => {
   }
 };
 
+const reviewStrikeAppeal = async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const applicationId = parseInt(req.params.id, 10);
+    const approved = Boolean(req.body?.approved);
+    const note = (req.body?.note || "").toString().trim();
+
+    if (!Number.isInteger(applicationId) || applicationId <= 0) {
+      return res.status(400).json({ error: "Invalid application ID" });
+    }
+
+    await client.query("BEGIN");
+
+    const appRes = await client.query(
+      `
+      SELECT id, volunteer_id, strike_appeal_status, strike_appeal_document_url
+      FROM applications
+      WHERE id = $1
+      FOR UPDATE
+      `,
+      [applicationId]
+    );
+
+    if (appRes.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Application not found" });
+    }
+
+    const app = appRes.rows[0];
+    if (app.strike_appeal_status !== "pending") {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "No pending appeal for this application" });
+    }
+
+    if (!app.strike_appeal_document_url) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Appeal is missing supporting document" });
+    }
+
+    let removedStrikeId = null;
+    if (approved) {
+      const strikeRes = await client.query(
+        `
+        SELECT id
+        FROM user_strikes
+        WHERE user_id = $1
+        ORDER BY created_at DESC
+        LIMIT 1
+        FOR UPDATE
+        `,
+        [app.volunteer_id]
+      );
+
+      if (strikeRes.rowCount > 0) {
+        removedStrikeId = strikeRes.rows[0].id;
+        await client.query("DELETE FROM user_strikes WHERE id = $1", [removedStrikeId]);
+      }
+
+      await recalculateUserStrikeState(client, {
+        userId: app.volunteer_id,
+        reasonForPenalty: "Strike appeal approved",
+      });
+    }
+
+    await client.query(
+      `
+      UPDATE applications
+      SET strike_appeal_status = $2,
+          strike_appeal_review_note = $3,
+          strike_appeal_reviewed_at = NOW()
+      WHERE id = $1
+      `,
+      [applicationId, approved ? "approved" : "rejected", note || null]
+    );
+
+    await client.query("COMMIT");
+
+    res.json({
+      success: true,
+      status: approved ? "approved" : "rejected",
+      removedStrikeId,
+    });
+
+    try {
+      await notifyUser(app.volunteer_id, {
+        title: "Strike appeal reviewed",
+        body: approved
+          ? "Your strike appeal was approved and your latest strike was removed."
+          : "Your strike appeal was rejected. The strike remains on your account.",
+        data: {
+          type: "strike_appeal_reviewed",
+          applicationId: String(applicationId),
+          status: approved ? "approved" : "rejected",
+        },
+      });
+    } catch (notifyErr) {
+      console.error("REVIEW STRIKE APPEAL NOTIFY ERROR:", notifyErr);
+    }
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (_) {}
+    console.error("REVIEW STRIKE APPEAL ERROR:", err);
+    res.status(500).json({ error: "Failed to review strike appeal" });
+  } finally {
+    client.release();
+  }
+};
+
 const getStats = async (req, res) => {
   try {
     const result = await pool.query(`
@@ -230,7 +275,8 @@ const getStats = async (req, res) => {
         (SELECT COUNT(*) FROM events) AS total_events,
         (SELECT COUNT(*) FROM events WHERE status = 'open') AS active_events,
         (SELECT COUNT(*) FROM applications) AS total_applications,
-        (SELECT COUNT(*) FROM verification_requests WHERE status = 'pending') AS pending_verifications
+        (SELECT COUNT(*) FROM verification_requests WHERE status = 'pending') AS pending_verifications,
+        (SELECT COUNT(*) FROM reports WHERE status = 'pending') AS pending_reports
     `);
 
     res.json({
@@ -239,6 +285,7 @@ const getStats = async (req, res) => {
       activeEvents: parseInt(result.rows[0].active_events),
       totalApplications: parseInt(result.rows[0].total_applications),
       pendingVerifications: parseInt(result.rows[0].pending_verifications),
+      pendingReports: parseInt(result.rows[0].pending_reports),
     });
   } catch (err) {
     res.status(500).json({ error: "Stats fetch failed" });
@@ -314,7 +361,12 @@ const updateUserStatus = async (req, res) => {
     }
 
     const result = await pool.query(
-      "UPDATE users SET status = $1 WHERE id = $2 RETURNING id, status",
+      `UPDATE users
+       SET status = $1,
+           suspended_until = NULL,
+           suspension_reason = NULL
+       WHERE id = $2
+       RETURNING id, status`,
       [status, userId]
     );
 
@@ -424,6 +476,7 @@ const addUserStrike = async (req, res) => {
 };
 
 const resetUserStrikes = async (req, res) => {
+  const client = await pool.connect();
   try {
     const userId = parseInt(req.params.id, 10);
 
@@ -431,16 +484,46 @@ const resetUserStrikes = async (req, res) => {
       return res.status(400).json({ error: "Invalid user ID" });
     }
 
-    await pool.query("DELETE FROM user_strikes WHERE user_id = $1", [userId]);
-    await pool.query(
-      "UPDATE users SET suspended_until = NULL, suspension_reason = NULL WHERE id = $1",
+    await client.query("BEGIN");
+
+    const userRes = await client.query(
+      "SELECT id, role, status FROM users WHERE id = $1 FOR UPDATE",
       [userId]
     );
 
+    if (userRes.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (userRes.rows[0].role === "admin") {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Cannot reset admin user strikes" });
+    }
+
+    await client.query("DELETE FROM user_strikes WHERE user_id = $1", [userId]);
+    await recalculateUserStrikeState(client, { userId });
+    await client.query("COMMIT");
+
     res.json({ message: "User strikes reset", strikeCount: 0 });
+
+    try {
+      await notifyUser(userId, {
+        title: "Account restored",
+        body: "Your strikes were reset and any active suspension was cleared.",
+        data: { type: "account_restored" },
+      });
+    } catch (notifyErr) {
+      console.error("RESET STRIKES NOTIFY ERROR:", notifyErr);
+    }
   } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (_) {}
     console.error("RESET STRIKES ERROR:", err);
     res.status(500).json({ error: "Failed to reset strikes" });
+  } finally {
+    client.release();
   }
 };
 
@@ -492,6 +575,20 @@ const suspendUser = async (req, res) => {
       message: "User suspended",
       suspendedUntil: result.rows[0]?.suspended_until || null,
     });
+
+    try {
+      await notifyUser(userId, {
+        title: "Account suspended",
+        body: `Your account has been suspended for ${days} days. Reason: ${reason}`,
+        data: {
+          type: "account_suspension",
+          days: String(days),
+          reason,
+        },
+      });
+    } catch (notifyErr) {
+      console.error("SUSPEND USER NOTIFY ERROR:", notifyErr);
+    }
   } catch (err) {
     console.error("SUSPEND USER ERROR:", err);
     res.status(500).json({ error: "Failed to suspend user" });
@@ -520,6 +617,18 @@ const unsuspendUser = async (req, res) => {
     }
 
     res.json({ message: "User unsuspended" });
+
+    try {
+      await notifyUser(userId, {
+        title: "Account restored",
+        body: "Your account suspension has been lifted.",
+        data: {
+          type: "account_unsuspended",
+        },
+      });
+    } catch (notifyErr) {
+      console.error("UNSUSPEND USER NOTIFY ERROR:", notifyErr);
+    }
   } catch (err) {
     console.error("UNSUSPEND USER ERROR:", err);
     res.status(500).json({ error: "Failed to unsuspend user" });
@@ -579,17 +688,57 @@ const deleteEvent = async (req, res) => {
   try {
     const eventId = req.params.id;
 
-    const result = await pool.query(
-  "UPDATE events SET status = 'deleted' WHERE id = $1",
-  [eventId]
-);
+    const eventRes = await pool.query(
+      "SELECT id, title, organiser_id FROM events WHERE id = $1",
+      [eventId]
+    );
 
-
-    if (result.rowCount === 0) {
+    if (eventRes.rowCount === 0) {
       return res.status(404).json({ error: "Event not found" });
     }
 
+    await pool.query("UPDATE events SET status = 'deleted' WHERE id = $1", [
+      eventId,
+    ]);
+
     res.json({ message: "Event deleted" });
+
+    try {
+      const organiserId = eventRes.rows[0].organiser_id;
+      const eventTitle = eventRes.rows[0].title || "An event";
+      const volunteerRes = await pool.query(
+        `SELECT DISTINCT volunteer_id
+         FROM applications
+         WHERE event_id = $1
+           AND status IN ('pending', 'approved', 'accepted', 'waitlisted', 'completed')`,
+        [eventId]
+      );
+      const recipientIds = [
+        ...new Set(
+          [organiserId, ...volunteerRes.rows.map((row) => row.volunteer_id)].filter(
+            Boolean
+          )
+        ),
+      ];
+
+      if (recipientIds.length > 0) {
+        const activeRes = await pool.query(
+          "SELECT id FROM users WHERE id = ANY($1) AND status = 'active'",
+          [recipientIds]
+        );
+        const activeIds = activeRes.rows.map((row) => row.id);
+
+        if (activeIds.length > 0) {
+          await notifyUsers(activeIds, {
+            title: "Event removed by admin",
+            body: `${eventTitle} was removed by admin.`,
+            data: { type: "event_deleted", eventId: String(eventId) },
+          });
+        }
+      }
+    } catch (notifyErr) {
+      console.error("DELETE EVENT NOTIFY ERROR:", notifyErr);
+    }
   } catch (err) {
     console.error("DELETE EVENT ERROR:", err);
     res.status(500).json({ error: "Failed to delete event" });
@@ -885,19 +1034,27 @@ const approveVerification = async (req, res) => {
 
   const client = await pool.connect();
   try {
-    // Check request exists
+    await client.query("BEGIN");
+
     const check = await client.query(
-      "SELECT user_id FROM verification_requests WHERE id = $1",
+      "SELECT user_id, status FROM verification_requests WHERE id = $1 FOR UPDATE",
       [requestId]
     );
 
     if (check.rows.length === 0) {
+      await client.query("ROLLBACK");
       return res.status(404).json({ error: "Request not found" });
+    }
+
+    if (check.rows[0].status !== "pending") {
+      await client.query("ROLLBACK");
+      return res
+        .status(400)
+        .json({ error: "Only pending requests can be approved" });
     }
 
     const userId = check.rows[0].user_id;
 
-    await client.query("BEGIN");
     await client.query(
       "UPDATE verification_requests SET status = 'approved', updated_at = NOW() WHERE id = $1",
       [requestId]
@@ -909,8 +1066,20 @@ const approveVerification = async (req, res) => {
     await client.query("COMMIT");
 
     res.json({ message: "User verified successfully" });
+
+    try {
+      await notifyUser(userId, {
+        title: "Verification approved",
+        body: "Your verification request has been approved.",
+        data: { type: "verification", status: "approved" },
+      });
+    } catch (notifyErr) {
+      console.error("APPROVE VERIFICATION NOTIFY ERROR:", notifyErr);
+    }
   } catch (err) {
-    await client.query("ROLLBACK");
+    try {
+      await client.query("ROLLBACK");
+    } catch (_) {}
     console.error("APPROVE VERIFICATION ERROR:", err);
     res.status(500).json({ error: "Failed to approve verification" });
   } finally {
@@ -919,6 +1088,7 @@ const approveVerification = async (req, res) => {
 };
 
 const rejectVerification = async (req, res) => {
+  const client = await pool.connect();
   try {
     const { requestId, remark } = req.body;
 
@@ -926,19 +1096,54 @@ const rejectVerification = async (req, res) => {
       return res.status(400).json({ error: "requestId is required" });
     }
 
-    const result = await pool.query(
-      "UPDATE verification_requests SET status = 'rejected', admin_remark = $1, updated_at = NOW() WHERE id = $2 RETURNING id",
-      [remark || null, requestId]
+    await client.query("BEGIN");
+
+    const check = await client.query(
+      "SELECT user_id, status FROM verification_requests WHERE id = $1 FOR UPDATE",
+      [requestId]
     );
 
-    if (result.rowCount === 0) {
+    if (check.rowCount === 0) {
+      await client.query("ROLLBACK");
       return res.status(404).json({ error: "Request not found" });
     }
 
+    if (check.rows[0].status !== "pending") {
+      await client.query("ROLLBACK");
+      return res
+        .status(400)
+        .json({ error: "Only pending requests can be rejected" });
+    }
+
+    const userId = check.rows[0].user_id;
+
+    await client.query(
+      "UPDATE verification_requests SET status = 'rejected', admin_remark = $1, updated_at = NOW() WHERE id = $2 RETURNING id",
+      [remark || null, requestId]
+    );
+    await client.query("COMMIT");
+
     res.json({ message: "Verification rejected" });
+
+    try {
+      await notifyUser(userId, {
+        title: "Verification rejected",
+        body: remark
+          ? `Your verification request was rejected. Remark: ${remark}`
+          : "Your verification request was rejected. Please review your documents and submit again.",
+        data: { type: "verification", status: "rejected", remark: remark || "" },
+      });
+    } catch (notifyErr) {
+      console.error("REJECT VERIFICATION NOTIFY ERROR:", notifyErr);
+    }
   } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (_) {}
     console.error("REJECT VERIFICATION ERROR:", err);
     res.status(500).json({ error: "Failed to reject verification" });
+  } finally {
+    client.release();
   }
 };
 
@@ -1251,6 +1456,7 @@ const resolveReport = async (req, res) => {
     }
 
     let actionTaken = action;
+    let postCommitNotification = null;
 
     if (action === "strike") {
       const strikeReason = (req.body?.strikeReason || note || "").toString().trim();
@@ -1278,9 +1484,10 @@ const resolveReport = async (req, res) => {
         throw applyErr;
       }
       actionTaken = `strike_${strikeResult.action}`;
-
-      try {
-        await notifyUser(actionUserId, {
+      postCommitNotification = {
+        userId: actionUserId,
+        errorLabel: "REPORT STRIKE NOTIFY ERROR:",
+        payload: {
           title: "Account notice",
           body:
             strikeResult.action === "warning"
@@ -1294,10 +1501,8 @@ const resolveReport = async (req, res) => {
             strikeCount: strikeResult.strikeCount,
             reason: strikeReason,
           },
-        });
-      } catch (notifyErr) {
-        console.error("REPORT STRIKE NOTIFY ERROR:", notifyErr);
-      }
+        },
+      };
     }
 
     if (action === "suspend") {
@@ -1343,8 +1548,10 @@ const resolveReport = async (req, res) => {
       );
 
       actionTaken = `suspend_${suspendDays}_days`;
-      try {
-        await notifyUser(actionUserId, {
+      postCommitNotification = {
+        userId: actionUserId,
+        errorLabel: "REPORT SUSPEND NOTIFY ERROR:",
+        payload: {
           title: "Account suspended",
           body: `Your account has been suspended for ${suspendDays} days. Reason: ${suspendReason}`,
           data: {
@@ -1352,10 +1559,8 @@ const resolveReport = async (req, res) => {
             days: String(suspendDays),
             reason: suspendReason,
           },
-        });
-      } catch (notifyErr) {
-        console.error("REPORT SUSPEND NOTIFY ERROR:", notifyErr);
-      }
+        },
+      };
     }
 
     if (action === "cancel_event") {
@@ -1380,17 +1585,17 @@ const resolveReport = async (req, res) => {
       actionTaken = "cancel_event";
 
       if (actionUserId) {
-        try {
-          await notifyUser(actionUserId, {
+        postCommitNotification = {
+          userId: actionUserId,
+          errorLabel: "REPORT EVENT NOTIFY ERROR:",
+          payload: {
             title: "Event removed",
             body: cancelReason
               ? `Your event was removed. Reason: ${cancelReason}`
               : "Your event was removed by admin.",
             data: { type: "event_removed", eventId: String(actionEventId) },
-          });
-        } catch (notifyErr) {
-          console.error("REPORT EVENT NOTIFY ERROR:", notifyErr);
-        }
+          },
+        };
       }
     }
 
@@ -1410,6 +1615,17 @@ const resolveReport = async (req, res) => {
 
     await client.query("COMMIT");
     res.json({ message: "Report resolved", actionTaken });
+
+    if (postCommitNotification) {
+      try {
+        await notifyUser(
+          postCommitNotification.userId,
+          postCommitNotification.payload
+        );
+      } catch (notifyErr) {
+        console.error(postCommitNotification.errorLabel, notifyErr);
+      }
+    }
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("RESOLVE REPORT ERROR:", err);
@@ -1503,14 +1719,17 @@ const sendEventNotification = async (req, res) => {
     const organiserId = eventRes.rows[0].organiser_id;
 
     const volunteerRes = await pool.query(
-      "SELECT DISTINCT volunteer_id FROM applications WHERE event_id = $1",
+      `SELECT DISTINCT volunteer_id
+       FROM applications
+       WHERE event_id = $1
+         AND status IN ('approved', 'accepted', 'completed')`,
       [eventIdInt]
     );
     const volunteerIds = volunteerRes.rows
       .map((r) => r.volunteer_id)
       .filter(Boolean);
 
-    const rawIds = [organiserId, ...volunteerIds].filter(Boolean);
+    const rawIds = [...new Set([organiserId, ...volunteerIds].filter(Boolean))];
 
     if (rawIds.length === 0) {
       return res.status(400).json({ error: "No users to notify" });
@@ -1559,6 +1778,7 @@ module.exports = {
   suspendUser,
   unsuspendUser,
   cancelApplication,
+  reviewStrikeAppeal,
   deleteEvent,
   hardDeleteEvent,
   getVolunteerLeaderboard,

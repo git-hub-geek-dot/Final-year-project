@@ -1,13 +1,17 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 import '../../config/api_config.dart';
 import '../../services/token_service.dart';
 import '../../services/rating_service.dart';
 import '../../services/saved_events_service.dart';
 import '../../services/verification_service.dart';
+import '../../services/event_service.dart';
 import 'view_organiser_profile_screen.dart';
 import 'get_verified_screen.dart';
+import '../chat/event_group_chat_screen.dart';
+import 'event_announcements_screen.dart';
 import 'package:share_plus/share_plus.dart';
 import '../rating/rating_screen.dart';
 import '../../widgets/robust_image.dart';
@@ -31,6 +35,9 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
   int? ratingScore;
   String? ratingComment;
   String? verificationStatus;
+  int? applicationId;
+  bool isCancelling = false;
+  final ImagePicker _picker = ImagePicker();
 
   /// null | pending | approved | rejected
   String? applicationStatus;
@@ -165,10 +172,18 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        final resolvedApplicationId = data["applied"] == true
+            ? (data["applicationId"] ?? data["application_id"]) as int?
+            : null;
         setState(() {
           applicationStatus = data["applied"] == true ? data["status"] : null;
+          applicationId = resolvedApplicationId;
           isLoadingStatus = false;
         });
+
+        if (data["applied"] == true && resolvedApplicationId == null) {
+          await _resolveApplicationIdFromMyApplications();
+        }
       } else {
         setState(() {
           isLoadingStatus = false;
@@ -179,6 +194,49 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
       setState(() {
         isLoadingStatus = false;
       });
+    }
+  }
+
+  Future<void> _resolveApplicationIdFromMyApplications() async {
+    try {
+      final token = await TokenService.getToken();
+      if (token == null || token.isEmpty) return;
+
+      final response = await http.get(
+        Uri.parse("${ApiConfig.baseUrl}/applications/my"),
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
+      );
+
+      if (response.statusCode != 200 || !mounted) return;
+
+      final decoded = jsonDecode(response.body);
+      final apps = decoded is List
+          ? decoded
+          : decoded is Map && decoded["applications"] is List
+              ? decoded["applications"] as List
+              : const [];
+
+      final currentEventId = widget.event["id"];
+      final match = apps.cast<dynamic>().firstWhere(
+            (app) => app is Map && app["event_id"] == currentEventId,
+            orElse: () => null,
+          );
+
+      if (match is Map && match["id"] != null) {
+        final resolvedId = match["id"] is int
+            ? match["id"] as int
+            : int.tryParse(match["id"].toString());
+        if (resolvedId != null && mounted) {
+          setState(() {
+            applicationId = resolvedId;
+          });
+        }
+      }
+    } catch (_) {
+      // Leave applicationId null if fallback lookup fails.
     }
   }
 
@@ -206,6 +264,7 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
             (data["status"]?.toString().toLowerCase() ?? "pending");
         setState(() {
           applicationStatus = nextStatus;
+          applicationId = data["application_id"] as int?;
           isApplying = false;
         });
       } else if (response.statusCode == 403) {
@@ -577,7 +636,8 @@ Join on VolunteerX
     final isClosed = status != null && status != "open";
 
     if (isCompleted || isClosed) {
-      final closedLabel = isCompleted ? "Event completed" : "Applications closed";
+      final closedLabel =
+          isCompleted ? "Event completed" : "Applications closed";
       return SizedBox(
         height: 54,
         width: double.infinity,
@@ -633,18 +693,384 @@ Join on VolunteerX
       );
     }
 
-    return _statusPill(
-      _statusText(applicationStatus!),
-      _statusColor(applicationStatus!),
+    final canCancel = _isCancelableStatus(applicationStatus!);
+    final isApprovedState = _isApprovedStatus(applicationStatus!);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (isApprovedState)
+          Row(
+            children: [
+              Expanded(
+                child: _quickActionPill(
+                  label: "Announcements",
+                  icon: Icons.campaign_outlined,
+                  color: const Color(0xFF2E6BE6),
+                  onTap: () {
+                    final eventId = widget.event["id"] as int?;
+                    if (eventId == null) {
+                      _snack("Event not found");
+                      return;
+                    }
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => EventAnnouncementsScreen(
+                          eventId: eventId,
+                          eventTitle: (widget.event["title"] ?? "Event")
+                              .toString(),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _quickActionPill(
+                  label: "Group Chat",
+                  icon: Icons.groups_2_outlined,
+                  color: const Color(0xFF2ECC71),
+                  onTap: () {
+                    final eventId = widget.event["id"] as int?;
+                    if (eventId == null) {
+                      _snack("Event not found");
+                      return;
+                    }
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => EventGroupChatScreen(
+                          eventId: eventId,
+                          eventTitle: (widget.event["title"] ?? "Event")
+                              .toString(),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          )
+        else
+          _statusPill(
+            _statusText(applicationStatus!),
+            _statusColor(applicationStatus!),
+          ),
+        if (canCancel) ...[
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton(
+              onPressed: isCancelling ? null : _showCancelDialog,
+              child: isCancelling
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(
+                      _isWithinLockWindow()
+                          ? "Cancel Participation (Locked)"
+                          : "Cancel Participation",
+                    ),
+            ),
+          ),
+        ],
+      ],
     );
+  }
+
+  bool _isCancelableStatus(String status) {
+    final normalized = status.toLowerCase();
+    return normalized == "approved" || normalized == "accepted";
+  }
+
+  bool _isApprovedStatus(String status) {
+    final normalized = status.toLowerCase();
+    return normalized == "approved" || normalized == "accepted";
+  }
+
+  DateTime? _eventStartDateTime() {
+    final eventDateRaw = widget.event["event_date"]?.toString();
+    if (eventDateRaw == null || eventDateRaw.isEmpty) return null;
+
+    final eventDate = DateTime.tryParse(eventDateRaw);
+    if (eventDate == null) return null;
+
+    final startTimeRaw = widget.event["start_time"]?.toString();
+    if (startTimeRaw == null || startTimeRaw.isEmpty) {
+      return DateTime(eventDate.year, eventDate.month, eventDate.day);
+    }
+
+    final parsedTime = DateTime.tryParse(startTimeRaw);
+    int hour = parsedTime?.hour ?? 0;
+    int minute = parsedTime?.minute ?? 0;
+    int second = parsedTime?.second ?? 0;
+    if (parsedTime == null) {
+      final parts = startTimeRaw.split(":");
+      if (parts.length >= 2) {
+        hour = int.tryParse(parts[0]) ?? 0;
+        minute = int.tryParse(parts[1]) ?? 0;
+        second = int.tryParse(parts.length >= 3 ? parts[2] : "0") ?? 0;
+      }
+    }
+
+    return DateTime(
+      eventDate.year,
+      eventDate.month,
+      eventDate.day,
+      hour,
+      minute,
+      second,
+    );
+  }
+
+  double? _hoursBeforeEvent() {
+    final start = _eventStartDateTime();
+    if (start == null) return null;
+    return start.difference(DateTime.now()).inMinutes / 60.0;
+  }
+
+  bool _isWithinLockWindow() {
+    final hours = _hoursBeforeEvent();
+    return hours != null && hours <= 48;
+  }
+
+  Future<void> _showCancelDialog() async {
+    if (applicationId == null) {
+      _snack("Application not found for cancellation");
+      return;
+    }
+
+    final hoursBefore = _hoursBeforeEvent();
+    final isWithinLockWindow = hoursBefore != null && hoursBefore <= 48;
+    final title = (widget.event["title"] ?? "this event").toString();
+    final reasonController = TextEditingController();
+    String? documentUrl;
+    bool uploadingDoc = false;
+    String? reasonError;
+    String? documentError;
+
+    final bool? proceed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setLocalState) {
+            String policyText;
+            if (isWithinLockWindow) {
+              policyText =
+                  "This event starts in less than 48 hours. Cancelling now applies an immediate strike. Supporting document upload is mandatory to continue.";
+            } else if (hoursBefore != null && hoursBefore <= 72) {
+              policyText =
+                  "This cancellation is within 48-72 hours before the event. You will receive a warning. Repeated cancellations without a reason may lead to a strike.";
+            } else {
+              policyText =
+                  "This cancellation is outside the strike window. No strike will be applied.";
+            }
+
+            return AlertDialog(
+              title: const Text("Cancel Participation"),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("Event: $title"),
+                    const SizedBox(height: 10),
+                    Text(
+                      policyText,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: reasonController,
+                      onChanged: (_) {
+                        if (reasonError != null) {
+                          setLocalState(() => reasonError = null);
+                        }
+                      },
+                      minLines: 2,
+                      maxLines: 4,
+                      decoration: InputDecoration(
+                        labelText: isWithinLockWindow
+                            ? "Reason *"
+                            : "Reason (optional but recommended)",
+                        helperText: isWithinLockWindow
+                            ? "Mandatory for cancellations within 48 hours"
+                            : null,
+                        errorText: reasonError,
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isWithinLockWindow
+                              ? "Supporting document *"
+                              : "Supporting document",
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                documentUrl == null
+                                    ? (isWithinLockWindow
+                                        ? "Mandatory for cancellations within 48 hours"
+                                        : "No supporting document uploaded")
+                                    : "Supporting document attached",
+                                style: TextStyle(
+                                  color: documentUrl == null
+                                      ? Colors.black54
+                                      : Colors.green,
+                                ),
+                              ),
+                            ),
+                            TextButton.icon(
+                              onPressed: uploadingDoc
+                                  ? null
+                                  : () async {
+                                      final picked = await _picker.pickImage(
+                                        source: ImageSource.gallery,
+                                        imageQuality: 80,
+                                      );
+                                      if (picked == null) return;
+
+                                      setLocalState(() => uploadingDoc = true);
+                                      try {
+                                        final uploaded =
+                                            await EventService.uploadImage(
+                                                picked);
+                                        setLocalState(() {
+                                          documentUrl = uploaded;
+                                          documentError = null;
+                                        });
+                                      } catch (e) {
+                                        if (!mounted) return;
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              "Failed to upload document: $e",
+                                            ),
+                                          ),
+                                        );
+                                      } finally {
+                                        setLocalState(
+                                            () => uploadingDoc = false);
+                                      }
+                                    },
+                              icon: uploadingDoc
+                                  ? const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.upload_file),
+                              label: const Text("Upload"),
+                            ),
+                          ],
+                        ),
+                        if (documentError != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            documentError!,
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text("Keep"),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (isWithinLockWindow) {
+                      final trimmedReason = reasonController.text.trim();
+                      setLocalState(() {
+                        reasonError = trimmedReason.isEmpty
+                            ? "Reason is mandatory within 48 hours"
+                            : null;
+                        documentError = documentUrl == null
+                            ? "Supporting document is mandatory within 48 hours"
+                            : null;
+                      });
+
+                      if (trimmedReason.isEmpty || documentUrl == null) {
+                        return;
+                      }
+                    }
+                    Navigator.pop(context, true);
+                  },
+                  child: const Text("Confirm Cancel"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (proceed != true) return;
+
+    setState(() => isCancelling = true);
+    try {
+      final response = await EventService.cancelMyApplication(
+        applicationId: applicationId!,
+        reason: reasonController.text.trim().isEmpty
+            ? null
+            : reasonController.text.trim(),
+        supportingDocumentUrl: documentUrl,
+      );
+
+      if (!mounted) return;
+      final strikeIssued = response["strikeIssued"] == true;
+      final warningIssued = response["warningIssued"] == true;
+
+      setState(() {
+        applicationStatus = "cancelled";
+      });
+
+      final message = strikeIssued
+          ? "Participation cancelled. A strike was applied."
+          : warningIssued
+              ? "Participation cancelled. Warning issued for 48-72 hour window."
+              : "Participation cancelled.";
+      _snack(message);
+    } catch (e) {
+      if (!mounted) return;
+      _snack("Failed to cancel: $e");
+    } finally {
+      if (mounted) {
+        setState(() => isCancelling = false);
+      }
+    }
   }
 
   // ================= HELPERS =================
   List<Widget> _buildScheduleRows() {
     final dailySchedules = widget.event["daily_schedules"];
-    
+
     // If there are daily schedules, display them
-    if (dailySchedules != null && dailySchedules is List && dailySchedules.isNotEmpty) {
+    if (dailySchedules != null &&
+        dailySchedules is List &&
+        dailySchedules.isNotEmpty) {
       // Check if it's a multi-day event
       if (dailySchedules.length > 1) {
         // Multi-day: show day, date, and time on one line
@@ -674,7 +1100,7 @@ Join on VolunteerX
         ];
       }
     }
-    
+
     // Fall back to single time display
     return [
       _iconRow(
@@ -700,23 +1126,23 @@ Join on VolunteerX
   String _formatDateRange() {
     final startDateRaw = widget.event["event_date"]?.toString();
     final endDateRaw = widget.event["end_date"]?.toString();
-    
+
     if (startDateRaw == null || startDateRaw.isEmpty) return "N/A";
-    
+
     final startDate = startDateRaw.split("T")[0];
-    
+
     // If no end date or same as start date, show single date
     if (endDateRaw == null || endDateRaw.isEmpty) {
       return startDate;
     }
-    
+
     final endDate = endDateRaw.split("T")[0];
-    
+
     // If dates are the same, show single date
     if (startDate == endDate) {
       return startDate;
     }
-    
+
     // Show date range for multi-day events
     return "$startDate to $endDate";
   }
@@ -752,12 +1178,12 @@ Join on VolunteerX
     if (url == null || url.trim().isEmpty) return null;
 
     String trimmed = url.trim();
-    
+
     // Replace localhost with 10.0.2.2 for Android emulator
     if (trimmed.contains("localhost")) {
       trimmed = trimmed.replaceAll("localhost", "10.0.2.2");
     }
-    
+
     if (trimmed.startsWith("http")) return trimmed;
 
     final baseUri = Uri.parse(ApiConfig.baseUrl);
@@ -869,6 +1295,44 @@ Join on VolunteerX
     );
   }
 
+  Widget _quickActionPill({
+    required String label,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(30),
+      child: Container(
+        height: 52,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              color.withOpacity(0.12),
+              color.withOpacity(0.22),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(30),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Color _statusColor(String status) {
     switch (status) {
       case "pending":
@@ -877,6 +1341,8 @@ Join on VolunteerX
       case "accepted":
         return Colors.green;
       case "rejected":
+        return Colors.red;
+      case "cancelled":
         return Colors.red;
       case "waitlisted":
         return Colors.amber;
@@ -896,6 +1362,8 @@ Join on VolunteerX
         return "✅ Application Approved";
       case "rejected":
         return "❌ Application Rejected";
+      case "cancelled":
+        return "Application Cancelled";
       case "waitlisted":
         return "⏳ Waitlisted";
       default:
@@ -997,12 +1465,14 @@ Join on VolunteerX
 
     switch (verificationStatus) {
       case "pending":
-        message = "Your verification is under review. You can apply for events after approval.";
+        message =
+            "Your verification is under review. You can apply for events after approval.";
         actionText = "OK";
         action = () => Navigator.pop(context);
         break;
       case "rejected":
-        message = "Your verification was rejected. Please submit verification again to apply for events.";
+        message =
+            "Your verification was rejected. Please submit verification again to apply for events.";
         actionText = "Get Verified";
         action = () {
           Navigator.pop(context);

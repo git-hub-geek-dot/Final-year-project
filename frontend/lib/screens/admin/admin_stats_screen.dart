@@ -6,6 +6,8 @@ import 'package:frontend/widgets/error_state.dart';
 import 'admin_users_screen.dart';
 import 'admin_events_screen.dart';
 import 'admin_applications_screen.dart';
+import 'admin_verification_screen.dart';
+import 'admin_reports_screen.dart';
 import '../../services/admin_service.dart';
 
 class AdminStatsScreen extends StatefulWidget {
@@ -168,9 +170,19 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
                           child: statCard("Events", s["totalEvents"]),
                         ),
                         statCard("Active Events", s["activeEvents"]),
-                        statCard(
-                          "Pending Verifications",
-                          s["pendingVerifications"],
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const AdminVerificationScreen(),
+                              ),
+                            );
+                          },
+                          child: statCard(
+                            "Pending Verifications",
+                            s["pendingVerifications"],
+                          ),
                         ),
                         GestureDetector(
                           onTap: () {
@@ -183,6 +195,20 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
                           },
                           child:
                               statCard("Applications", s["totalApplications"]),
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const AdminReportsScreen(),
+                              ),
+                            );
+                          },
+                          child: statCard(
+                            "Pending Reports",
+                            s["pendingReports"],
+                          ),
                         ),
                       ],
                     ),

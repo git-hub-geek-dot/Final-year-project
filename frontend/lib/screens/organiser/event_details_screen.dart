@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../services/event_service.dart';
 import '../../widgets/organiser_bottom_nav.dart';
+import '../chat/event_group_chat_screen.dart';
 import 'edit_event_screen.dart';
 import 'review_application_screen.dart';
 import '../../widgets/robust_image.dart';
@@ -614,6 +615,12 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
               loadStats();
             }
           },
+          style: ElevatedButton.styleFrom(
+            minimumSize: const Size(0, 40),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            elevation: 2,
+            textStyle: const TextStyle(fontWeight: FontWeight.w700),
+          ),
           child: const Text("View Volunteers"),
         );
 
@@ -654,6 +661,33 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
           label: Text(announcingEvent ? "Sending..." : "Announce"),
         );
 
+        final eventChatButton = OutlinedButton.icon(
+          onPressed: () {
+            final eventId = int.tryParse("${event["id"]}");
+            if (eventId == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Invalid event id")),
+              );
+              return;
+            }
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => EventGroupChatScreen(
+                  eventId: eventId,
+                  eventTitle: (event["title"] ?? "Event").toString(),
+                ),
+              ),
+            );
+          },
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.green.shade700,
+            side: BorderSide(color: Colors.green.shade300),
+          ),
+          icon: const Icon(Icons.forum_outlined),
+          label: const Text("Event Chat"),
+        );
+
         final cancelEventButton = OutlinedButton.icon(
           onPressed: (cancellingEvent || isCancelledEvent)
               ? null
@@ -690,6 +724,11 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                 const SizedBox(height: 10),
               ],
               if (!isDraftEvent && !isCancelledEvent && !isCompletedEvent) ...[
+              if (!isDraftEvent && !isCancelledEvent) ...[
+                eventChatButton,
+                const SizedBox(height: 10),
+              ],
+              if (!isDraftEvent && !isCancelledEvent && !isCompletedEvent) ...[
                 editEventButton,
                 const SizedBox(height: 10),
               ],
@@ -706,6 +745,11 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
             ],
             if (!isDraftEvent && !isCancelledEvent) ...[
               announceButton,
+              const SizedBox(width: 10),
+            ],
+            if (!isDraftEvent && !isCancelledEvent && !isCompletedEvent) ...[
+            if (!isDraftEvent && !isCancelledEvent) ...[
+              eventChatButton,
               const SizedBox(width: 10),
             ],
             if (!isDraftEvent && !isCancelledEvent && !isCompletedEvent) ...[

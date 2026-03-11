@@ -28,6 +28,54 @@ class VolunteerProfileScreen extends StatefulWidget {
 class HelpSupportScreen extends StatelessWidget {
   const HelpSupportScreen({super.key});
 
+  static const List<Map<String, String>> _faqItems = [
+    {
+      "question": "What is the strike/suspension policy?",
+      "answer":
+          "Repeated violations may lead to strikes. 2 strikes: 3-day suspension, 3 strikes: 7-day suspension, 4 strikes: account ban.",
+    },
+    {
+      "question": "How do I apply for an event?",
+      "answer":
+          "Open an event card and tap Apply. Fill required details and submit your application.",
+    },
+    {
+      "question": "Can I cancel my application?",
+      "answer":
+          "Yes. If cancellation is available for that event, you can cancel from your application details.",
+    },
+    {
+      "question": "How are badges earned?",
+      "answer":
+          "Badges are awarded based on completed events and consistent participation.",
+    },
+    {
+      "question": "How do paid event payments work?",
+      "answer":
+          "Payment status depends on organiser confirmation and event completion.",
+    },
+    {
+      "question": "Why are events not loading?",
+      "answer":
+          "Check your internet connection, then refresh the page. If it persists, contact support.",
+    },
+    {
+      "question": "What if I face login issues?",
+      "answer":
+          "Verify your credentials and try Forgot Password if needed.",
+    },
+    {
+      "question": "How can I improve my profile completion?",
+      "answer":
+          "Update your name, email, city, profile photo, and verification status in profile settings.",
+    },
+    {
+      "question": "How do I contact support?",
+      "answer":
+          "Email volunteerxteam@gmail.com with screenshots and issue details for faster support.",
+    },
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -50,24 +98,7 @@ class HelpSupportScreen extends StatelessWidget {
               icon: Icons.quiz,
               title: "FAQs",
               subtitle: "Common questions answered",
-              onTap: () => _showBottomSheet(
-                context,
-                title: "Frequently Asked Questions",
-                content: const [
-                  "- What is the strike/suspension policy?\n"
-                      "Repeated violations may lead to strikes. 2 strikes: "
-                      "3-day suspension, 3 strikes: 7-day suspension, "
-                      "4 strikes: ban.",
-                  "- How do I apply for an event?\n"
-                      "Tap on the Apply button on any event card.",
-                  "- Can I cancel my application?\n"
-                      "Yes, cancellation will be available once applications are approved.",
-                  "- Are paid events guaranteed payments?\n"
-                      "Payments depend on organiser confirmation and event completion.",
-                  "- How are badges earned?\n"
-                      "Badges are awarded based on completed events and participation level.",
-                ],
-              ),
+              onTap: () => _showFaqBottomSheet(context),
             ),
             _supportTile(
               context,
@@ -115,7 +146,7 @@ class HelpSupportScreen extends StatelessWidget {
                 title: "Contact VolunteerX",
                 content: const [
                   "Email Support",
-                  "volunteerx@gmail.com",
+                  "volunteerxteam@gmail.com",
                   "",
                   "Our team usually responds within 24-48 hours.",
                   "Please include screenshots or details for faster support.",
@@ -196,6 +227,83 @@ class HelpSupportScreen extends StatelessWidget {
                     child: Text(
                       text,
                       style: const TextStyle(fontSize: 14, height: 1.4),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showFaqBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade400,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                const Text(
+                  "Frequently Asked Questions",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ..._faqItems.map(
+                  (faq) => Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    elevation: 0,
+                    color: const Color(0xFFF5F6FA),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Theme(
+                      data: Theme.of(sheetContext).copyWith(
+                        dividerColor: Colors.transparent,
+                      ),
+                      child: ExpansionTile(
+                        tilePadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 2,
+                        ),
+                        childrenPadding:
+                            const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                        title: Text(
+                          faq["question"] ?? "",
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        children: [
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              faq["answer"] ?? "",
+                              style: const TextStyle(height: 1.35),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

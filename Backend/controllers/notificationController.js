@@ -55,10 +55,16 @@ exports.getNotifications = async (req, res) => {
     const page = Math.max(parseInt(req.query.page || "1", 10), 1);
     const limit = Math.max(parseInt(req.query.limit || "20", 10), 1);
     const offset = (page - 1) * limit;
+    const hiddenType = "ongoing_attendance_update";
 
     const countRes = await pool.query(
-      "SELECT COUNT(*) FROM notifications WHERE user_id = $1",
-      [userId]
+      `
+      SELECT COUNT(*)
+      FROM notifications
+      WHERE user_id = $1
+        AND COALESCE(data ->> 'type', '') <> $2
+      `,
+      [userId, hiddenType]
     );
     const total = parseInt(countRes.rows[0].count, 10);
     const totalPages = Math.max(Math.ceil(total / limit), 1);
@@ -68,10 +74,11 @@ exports.getNotifications = async (req, res) => {
       SELECT id, title, body, data, created_at, read_at
       FROM notifications
       WHERE user_id = $1
+        AND COALESCE(data ->> 'type', '') <> $4
       ORDER BY created_at DESC
       LIMIT $2 OFFSET $3
       `,
-      [userId, limit, offset]
+      [userId, limit, offset, hiddenType]
     );
 
     res.json({
@@ -89,9 +96,16 @@ exports.getNotifications = async (req, res) => {
 exports.getUnreadCount = async (req, res) => {
   try {
     const userId = req.user.id;
+    const hiddenType = "ongoing_attendance_update";
     const result = await pool.query(
-      "SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND read_at IS NULL",
-      [userId]
+      `
+      SELECT COUNT(*)
+      FROM notifications
+      WHERE user_id = $1
+        AND read_at IS NULL
+        AND COALESCE(data ->> 'type', '') <> $2
+      `,
+      [userId, hiddenType]
     );
     const count = parseInt(result.rows[0].count, 10);
     res.json({ unreadCount: count });

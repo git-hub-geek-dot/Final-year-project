@@ -3,6 +3,9 @@ const { notifyUsers } = require("../services/notificationService");
 const {
   notifyCompletedEventsForOrganiser,
 } = require("../services/eventCompletionNotificationService");
+const {
+  notifyOngoingAttendanceUpdatesForOrganiser,
+} = require("../services/eventAttendanceNotificationService");
 
 /*
 EVENTS TABLE (SOURCE OF TRUTH)
@@ -269,6 +272,12 @@ exports.createEvent = async (req, res) => {
 // =======================================================
 exports.getMyEvents = async (req, res) => {
   try {
+    try {
+      await notifyOngoingAttendanceUpdatesForOrganiser(req.user.id);
+    } catch (attendanceNotifyErr) {
+      console.error("ORGANISER ATTENDANCE NOTIFY ERROR:", attendanceNotifyErr);
+    }
+
     try {
       await notifyCompletedEventsForOrganiser(req.user.id);
     } catch (notifyErr) {
@@ -565,6 +574,39 @@ exports.updateEvent = async (req, res) => {
     }
 
     await client.query("BEGIN");
+
+    const eventStateResult = await client.query(
+      `
+      SELECT
+        id,
+        status,
+        (
+          status = 'completed'
+          OR (
+            status NOT IN ('draft', 'deleted')
+            AND NOW() >= (
+              COALESCE(end_date, event_date) + COALESCE(end_time, TIME '23:59:59')
+            )
+          )
+        ) AS is_completed
+      FROM events
+      WHERE id = $1 AND organiser_id = $2
+      FOR UPDATE
+      `,
+      [eventId, organiserId]
+    );
+
+    if (eventStateResult.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    if (eventStateResult.rows[0]?.is_completed === true) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        error: "Completed events cannot be edited",
+      });
+    }
 
     const result = await client.query(
       `
@@ -1000,6 +1042,223 @@ exports.announceEvent = async (req, res) => {
   } catch (err) {
     console.error("ANNOUNCE EVENT ERROR:", err);
     res.status(500).json({ error: "Failed to send announcement" });
+  }
+};
+
+// =======================================================
+// SUBMIT ATTENDANCE FEEDBACK (ORGANISER -> ADMIN REVIEW)
+// =======================================================
+exports.submitAttendanceFeedback = async (req, res) => {
+  try {
+    if (req.user?.role !== "organiser") {
+      return res.status(403).json({
+        error: "Only organisers can submit attendance feedback",
+      });
+    }
+
+    const organiserId = req.user.id;
+    const eventId = Number.parseInt(req.params.id, 10);
+    const absentVolunteerIdsRaw = req.body?.absentVolunteerIds;
+    const summary = (req.body?.summary || "").toString().trim();
+
+    if (!Number.isInteger(eventId) || eventId <= 0) {
+      return res.status(400).json({ error: "Invalid event id" });
+    }
+
+    if (!Array.isArray(absentVolunteerIdsRaw)) {
+      return res.status(400).json({
+        error: "absentVolunteerIds must be an array",
+      });
+    }
+
+    if (summary.length > 1000) {
+      return res.status(400).json({ error: "Summary is too long" });
+    }
+
+    const eventResult = await pool.query(
+      `
+      SELECT
+        id,
+        title,
+        status,
+        (
+          NOW() >= (
+            event_date + COALESCE(start_time, TIME '00:00:00')
+          )
+        ) AS has_started
+      FROM events
+      WHERE id = $1 AND organiser_id = $2
+      `,
+      [eventId, organiserId]
+    );
+
+    if (eventResult.rowCount === 0) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    const event = eventResult.rows[0];
+    if (event.status === "draft") {
+      return res.status(400).json({
+        error: "Attendance feedback is not available for draft events",
+      });
+    }
+    if (event.status === "deleted") {
+      return res.status(400).json({
+        error: "Attendance feedback is not available for deleted events",
+      });
+    }
+    if (event.status === "closed") {
+      return res.status(400).json({
+        error: "Attendance feedback is not available for cancelled events",
+      });
+    }
+    if (event.has_started !== true) {
+      return res.status(400).json({
+        error: "Attendance feedback is available after event starts",
+      });
+    }
+
+    const uniqueAbsentIds = [
+      ...new Set(
+        absentVolunteerIdsRaw
+          .map((id) => Number.parseInt(id, 10))
+          .filter((id) => Number.isInteger(id) && id > 0)
+      ),
+    ];
+
+    const approvedVolunteersResult = await pool.query(
+      `
+      SELECT
+        a.volunteer_id,
+        u.name
+      FROM applications a
+      JOIN users u ON u.id = a.volunteer_id
+      WHERE a.event_id = $1
+        AND a.status IN ('approved', 'accepted', 'completed')
+      `,
+      [eventId]
+    );
+
+    const approvedIdSet = new Set(
+      approvedVolunteersResult.rows.map((row) => row.volunteer_id)
+    );
+
+    const invalidAbsentIds = uniqueAbsentIds.filter(
+      (id) => !approvedIdSet.has(id)
+    );
+    if (invalidAbsentIds.length > 0) {
+      return res.status(400).json({
+        error:
+          "All absent volunteers must be part of the approved volunteer list",
+      });
+    }
+
+    if (uniqueAbsentIds.length === 0) {
+      return res.json({
+        message: "Attendance feedback submitted. All volunteers marked present.",
+        reports_created: 0,
+        absent_count: 0,
+      });
+    }
+
+    const approvedNameMap = new Map(
+      approvedVolunteersResult.rows.map((row) => [row.volunteer_id, row.name])
+    );
+    const detailsPrefix = `Event #${eventId}:`;
+
+    let reportsCreated = 0;
+    const flaggedVolunteers = [];
+
+    for (const volunteerId of uniqueAbsentIds) {
+      const existingReport = await pool.query(
+        `
+        SELECT id
+        FROM reports
+        WHERE reporter_id = $1
+          AND target_type = 'user'
+          AND target_id = $2
+          AND status = 'pending'
+          AND details LIKE $3
+        LIMIT 1
+        `,
+        [organiserId, volunteerId, `${detailsPrefix}%`]
+      );
+
+      if (existingReport.rowCount > 0) {
+        continue;
+      }
+
+      const details = [
+        `${detailsPrefix} ${event.title}`,
+        "Volunteer was marked absent by organiser attendance feedback.",
+        summary ? `Organiser note: ${summary}` : null,
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      await pool.query(
+        `
+        INSERT INTO reports (
+          reporter_id,
+          target_type,
+          target_id,
+          reason,
+          details,
+          status,
+          created_at,
+          updated_at
+        )
+        VALUES ($1, 'user', $2, $3, $4, 'pending', NOW(), NOW())
+        `,
+        [
+          organiserId,
+          volunteerId,
+          "Attendance no-show report",
+          details,
+        ]
+      );
+
+      reportsCreated += 1;
+      const volunteerName = approvedNameMap.get(volunteerId);
+      if (volunteerName) flaggedVolunteers.push(volunteerName);
+    }
+
+    if (reportsCreated > 0) {
+      const adminResult = await pool.query(
+        `
+        SELECT id
+        FROM users
+        WHERE role = 'admin' AND status = 'active'
+        `
+      );
+      const adminIds = adminResult.rows.map((row) => row.id);
+
+      if (adminIds.length > 0) {
+        await notifyUsers(adminIds, {
+          title: "Attendance issue reported",
+          body: `${reportsCreated} absent volunteer report(s) submitted for ${event.title}.`,
+          data: {
+            type: "attendance_issue_reported",
+            eventId: String(eventId),
+            reportsCreated: String(reportsCreated),
+            absentCount: String(uniqueAbsentIds.length),
+          },
+        });
+      }
+    }
+
+    res.json({
+      message:
+        reportsCreated > 0
+          ? "Attendance feedback submitted and sent to admin."
+          : "Attendance feedback already submitted for selected volunteers.",
+      reports_created: reportsCreated,
+      absent_count: uniqueAbsentIds.length,
+      flagged_volunteers: flaggedVolunteers,
+    });
+  } catch (err) {
+    console.error("SUBMIT ATTENDANCE FEEDBACK ERROR:", err);
+    res.status(500).json({ error: "Failed to submit attendance feedback" });
   }
 };
 

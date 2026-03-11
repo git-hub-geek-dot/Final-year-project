@@ -397,6 +397,47 @@ class EventService {
     throw Exception(errorMessage);
   }
 
+  /// ================= ATTENDANCE FEEDBACK =================
+  static Future<Map<String, dynamic>> submitAttendanceFeedback({
+    required int eventId,
+    required List<int> absentVolunteerIds,
+    String? summary,
+  }) async {
+    final token = await TokenService.getToken();
+    if (token == null) throw Exception("No token");
+
+    final response = await http.post(
+      Uri.parse("${ApiConfig.baseUrl}/events/$eventId/attendance-feedback"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
+      body: jsonEncode({
+        "absentVolunteerIds": absentVolunteerIds,
+        "summary": (summary ?? "").trim(),
+      }),
+    );
+
+    final decoded = _tryDecodeMap(response.body);
+    if (response.statusCode == 200) {
+      return decoded ?? <String, dynamic>{};
+    }
+
+    final errorMessage =
+        (decoded?["error"] ?? decoded?["message"] ?? "Failed to submit attendance feedback")
+            .toString();
+    throw Exception(errorMessage);
+  }
+
+  static Map<String, dynamic>? _tryDecodeMap(String raw) {
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) return Map<String, dynamic>.from(decoded);
+    } catch (_) {}
+    return null;
+  }
+
   /// ================= PUBLISH DRAFT =================
   static Future<void> publishDraftEvent(int id) async {
     final token = await TokenService.getToken();

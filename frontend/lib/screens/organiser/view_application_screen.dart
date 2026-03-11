@@ -373,8 +373,10 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
     final status = app?["status"]?.toString() ?? "pending";
     final normalizedStatus = status.toLowerCase();
     final isAlreadyApproved = _isApprovedStatus(normalizedStatus);
+    final isAlreadyRejected = normalizedStatus == "rejected";
+    final hasFinalDecision = isAlreadyApproved || isAlreadyRejected;
     final approveBlockedByCapacity =
-        !isAlreadyApproved && _isApproveBlockedByCapacity();
+        !hasFinalDecision && _isApproveBlockedByCapacity();
     final showRatingAction =
         normalizedStatus == "accepted" || normalizedStatus == "approved";
     final canRateVolunteer = showRatingAction && _isEventCompleted(app);
@@ -614,69 +616,98 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                                   ),
                                 ),
                               ],
-                              SizedBox(height: compact ? 8 : 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: SizedBox(
-                                      height: actionButtonHeight,
-                                      child: ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor:
-                                              const Color(0xFFEF4444),
-                                          foregroundColor: Colors.white,
-                                          elevation: 0,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(16),
+                              if (!hasFinalDecision) ...[
+                                SizedBox(height: compact ? 8 : 12),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: SizedBox(
+                                        height: actionButtonHeight,
+                                        child: ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor:
+                                                const Color(0xFFEF4444),
+                                            foregroundColor: Colors.white,
+                                            elevation: 0,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                            ),
                                           ),
-                                        ),
-                                        onPressed: actionLoading
-                                            ? null
-                                            : () => updateStatus("rejected"),
-                                        child: Text(
-                                          actionLoading
-                                              ? "Please wait..."
-                                              : "Reject",
-                                          style: TextStyle(
-                                              fontSize: compact ? 16 : 18),
+                                          onPressed: actionLoading
+                                              ? null
+                                              : () => updateStatus("rejected"),
+                                          child: Text(
+                                            actionLoading
+                                                ? "Please wait..."
+                                                : "Reject",
+                                            style: TextStyle(
+                                                fontSize: compact ? 16 : 18),
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                  SizedBox(width: compact ? 8 : 12),
-                                  Expanded(
-                                    child: SizedBox(
-                                      height: actionButtonHeight,
-                                      child: ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor:
-                                              const Color(0xFF16A34A),
-                                          foregroundColor: Colors.white,
-                                          elevation: 0,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(16),
+                                    SizedBox(width: compact ? 8 : 12),
+                                    Expanded(
+                                      child: SizedBox(
+                                        height: actionButtonHeight,
+                                        child: ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor:
+                                                const Color(0xFF16A34A),
+                                            foregroundColor: Colors.white,
+                                            elevation: 0,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                            ),
                                           ),
-                                        ),
-                                        onPressed: actionLoading ||
-                                                approveBlockedByCapacity
-                                            ? null
-                                            : () => updateStatus("approved"),
-                                        child: Text(
-                                          actionLoading
-                                              ? "Please wait..."
-                                              : approveBlockedByCapacity
-                                                  ? "Slots Full"
-                                                  : "Approve",
-                                          style: TextStyle(
-                                              fontSize: compact ? 16 : 18),
+                                          onPressed: actionLoading ||
+                                                  approveBlockedByCapacity
+                                              ? null
+                                              : () => updateStatus("approved"),
+                                          child: Text(
+                                            actionLoading
+                                                ? "Please wait..."
+                                                : approveBlockedByCapacity
+                                                    ? "Slots Full"
+                                                    : "Approve",
+                                            style: TextStyle(
+                                                fontSize: compact ? 16 : 18),
+                                          ),
                                         ),
                                       ),
                                     ),
+                                  ],
+                                ),
+                              ] else ...[
+                                SizedBox(height: compact ? 8 : 12),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 10,
                                   ),
-                                ],
-                              ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: const Color(0xFFE2E8F0),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    isAlreadyApproved
+                                        ? "This application is already approved."
+                                        : "This application is already rejected.",
+                                    style: TextStyle(
+                                      color: Colors.grey.shade700,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),

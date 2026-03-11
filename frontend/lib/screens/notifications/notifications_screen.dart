@@ -9,6 +9,7 @@ import '../../services/notification_api_service.dart';
 import '../../services/token_service.dart';
 import '../../widgets/app_background.dart';
 import '../chat/chat_screen.dart';
+import '../organiser/attendance_feedback_screen.dart';
 import '../chat/event_group_chat_screen.dart';
 import '../organiser/event_details_screen.dart';
 import '../organiser/organiser_profile_screen.dart';
@@ -302,6 +303,27 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       return;
     }
 
+    if (type == "attendance_feedback_required") {
+      final raw = data["eventId"] ?? data["event_id"];
+      final eventId = int.tryParse(raw?.toString() ?? "");
+      if (eventId != null) {
+        final role = (await TokenService.getRole())?.toLowerCase();
+        if (!mounted) return;
+
+        if (role == "organiser") {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => AttendanceFeedbackScreen(eventId: eventId),
+            ),
+          );
+        } else {
+          await _openEventDetails(eventId);
+        }
+      }
+      return;
+    }
+
     if (type == "event_group_chat") {
       final raw = data["eventId"] ?? data["event_id"];
       final eventId = int.tryParse(raw?.toString() ?? "");
@@ -340,7 +362,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     if (type == "event_update" ||
         type == "event_broadcast" ||
-        type == "event_removed") {
+        type == "event_removed" ||
+        type == "event_cancelled" ||
+        type == "event_announcement") {
       final raw = data["eventId"] ?? data["event_id"];
       final eventId = int.tryParse(raw?.toString() ?? "");
       if (eventId != null) {

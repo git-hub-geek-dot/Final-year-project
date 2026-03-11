@@ -80,6 +80,13 @@ router.delete(
   adminController.cancelApplication
 );
 
+router.put(
+  "/applications/:id/strike-appeal/review",
+  authenticateToken,
+  adminOnly,
+  adminController.reviewStrikeAppeal
+);
+
 // ================= STATS =================
 router.get(
   "/stats",

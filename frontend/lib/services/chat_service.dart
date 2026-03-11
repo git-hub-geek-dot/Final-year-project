@@ -84,4 +84,62 @@ class ChatService {
   }
 
   // REST sendMessage removed: chat uses sockets only.
+
+  static Future<Map<String, dynamic>> fetchEventGroupMessages(int eventId) async {
+    final token = await TokenService.getToken();
+
+    final response = await http.get(
+      Uri.parse("${ApiConfig.baseUrl}/chat/group/$eventId/messages"),
+      headers: {
+        "Authorization": "Bearer $token",
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data is Map<String, dynamic>) return data;
+      if (data is Map) return Map<String, dynamic>.from(data);
+      throw Exception("Invalid group chat response");
+    }
+
+    throw Exception("Failed to fetch event group chat");
+  }
+
+  static Future<Map<String, dynamic>> sendEventGroupMessage({
+    required int eventId,
+    required String message,
+  }) async {
+    final token = await TokenService.getToken();
+
+    final response = await http.post(
+      Uri.parse("${ApiConfig.baseUrl}/chat/group/$eventId/messages"),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({
+        "message": message,
+      }),
+    );
+
+    if (response.statusCode == 201 || response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data is Map<String, dynamic>) return data;
+      if (data is Map) return Map<String, dynamic>.from(data);
+      throw Exception("Invalid group chat response");
+    }
+
+    String messageText = "Failed to send message";
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map) {
+        final parsed = decoded["error"] ?? decoded["message"];
+        if (parsed != null && parsed.toString().trim().isNotEmpty) {
+          messageText = parsed.toString();
+        }
+      }
+    } catch (_) {}
+
+    throw Exception(messageText);
+  }
 }

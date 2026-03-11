@@ -1,8 +1,65 @@
 const pool = require("../config/db");
 const { notifyUser } = require("../services/notificationService");
+const { applyStrike, MAX_STRIKE_REASON_LENGTH } = require("../services/strikeService");
 const {
   notifyCompletedEventsForVolunteer,
 } = require("../services/eventCompletionNotificationService");
+
+const SAFE_WINDOW_HOURS = 72;
+const LOCK_WINDOW_HOURS = 48;
+
+const buildEventStartDate = (event) => {
+  if (!event?.event_date) return null;
+
+  const datePart = new Date(event.event_date).toISOString().slice(0, 10);
+  let timePart = "00:00:00";
+  if (event.start_time) {
+    const raw = event.start_time.toString();
+    const direct = raw.match(/(\d{2}:\d{2}:\d{2})/);
+    if (direct) {
+      timePart = direct[1];
+    } else {
+      const parsed = new Date(raw);
+      if (!Number.isNaN(parsed.getTime())) {
+        timePart = parsed.toISOString().slice(11, 19);
+      }
+    }
+  }
+
+  return new Date(`${datePart}T${timePart}Z`);
+};
+
+const promoteWaitlistedVolunteer = async ({ client, eventId }) => {
+  const waitlisted = await client.query(
+    `
+    SELECT id, volunteer_id
+    FROM applications
+    WHERE event_id = $1
+      AND status = 'waitlisted'
+    ORDER BY applied_at ASC
+    LIMIT 1
+    FOR UPDATE
+    `,
+    [eventId]
+  );
+
+  if (waitlisted.rowCount === 0) {
+    return null;
+  }
+
+  const promotedApp = waitlisted.rows[0];
+
+  await client.query(
+    `
+    UPDATE applications
+    SET status = 'approved'
+    WHERE id = $1
+    `,
+    [promotedApp.id]
+  );
+
+  return promotedApp;
+};
 
 // ================= APPLY TO EVENT =================
 exports.applyToEvent = async (req, res) => {
@@ -116,7 +173,7 @@ exports.getApplicationStatus = async (req, res) => {
 
     const result = await pool.query(
       `
-      SELECT status
+      SELECT id, status
       FROM applications
       WHERE event_id = $1 AND volunteer_id = $2
       `,
@@ -136,7 +193,8 @@ exports.getApplicationStatus = async (req, res) => {
 
     res.json({
       applied: true,
-      status
+      status,
+      applicationId: result.rows[0].id,
     });
   } catch (err) {
     console.error("STATUS ERROR:", err);
@@ -215,6 +273,14 @@ exports.getMyApplications = async (req, res) => {
           ELSE a.status
         END AS status,
         a.admin_cancel_reason,
+        a.volunteer_cancel_reason,
+        a.cancellation_supporting_document_url,
+        a.cancellation_window,
+        a.strike_issued,
+        a.warning_issued,
+        a.volunteer_cancelled_at,
+        a.strike_appeal_status,
+        a.strike_appeal_submitted_at,
         a.applied_at,
         COALESCE(
           CASE WHEN e.event_type = 'unpaid' THEN 'not_applicable' END,
@@ -226,6 +292,7 @@ exports.getMyApplications = async (req, res) => {
         e.title,
         e.location,
         e.event_date,
+        e.start_time,
         e.end_date,
         e.end_time,
         e.status AS event_status,
@@ -256,7 +323,11 @@ exports.getMyApplications = async (req, res) => {
       LEFT JOIN event_categories ec ON ec.event_id = e.id
       LEFT JOIN categories c ON c.id = ec.category_id
       WHERE a.volunteer_id = $1
-      GROUP BY a.id, a.status, a.applied_at, a.compensation_status, e.id, e.organiser_id, e.title, e.location, e.event_date, e.end_date, e.end_time, e.status, e.event_type, e.payment_per_day
+      GROUP BY a.id, a.status, a.admin_cancel_reason, a.volunteer_cancel_reason, a.cancellation_supporting_document_url,
+           a.cancellation_window, a.strike_issued, a.warning_issued, a.volunteer_cancelled_at,
+           a.strike_appeal_status, a.strike_appeal_submitted_at,
+           a.applied_at, a.compensation_status, e.id, e.organiser_id, e.title, e.location,
+               e.event_date, e.start_time, e.end_date, e.end_time, e.status, e.event_type, e.payment_per_day
       ORDER BY a.applied_at DESC
       `,
       [volunteerId]
@@ -266,6 +337,384 @@ exports.getMyApplications = async (req, res) => {
   } catch (err) {
     console.error("MY APPLICATIONS ERROR:", err);
     res.status(500).json({ error: "Failed to fetch my applications" });
+  }
+};
+
+// ================= VOLUNTEER CANCEL APPLICATION =================
+exports.cancelMyApplication = async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const applicationId = parseInt(req.params.id, 10);
+    const volunteerId = req.user?.id;
+
+    if (!Number.isInteger(applicationId) || applicationId <= 0) {
+      return res.status(400).json({ error: "Invalid application ID" });
+    }
+
+    if (!volunteerId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const reason = (req.body?.reason || "").toString().trim();
+    const supportingDocumentUrl = (req.body?.supportingDocumentUrl || "")
+      .toString()
+      .trim();
+
+    if (reason.length > MAX_STRIKE_REASON_LENGTH) {
+      return res.status(400).json({ error: "Cancellation reason is too long" });
+    }
+
+    await client.query("BEGIN");
+
+    const appRes = await client.query(
+      `
+      SELECT
+        a.id,
+        a.status,
+        a.event_id,
+        a.volunteer_id,
+        e.title,
+        e.organiser_id,
+        e.event_date,
+        e.start_time,
+        e.volunteers_required
+      FROM applications a
+      JOIN events e ON e.id = a.event_id
+      WHERE a.id = $1
+        AND a.volunteer_id = $2
+      FOR UPDATE
+      `,
+      [applicationId, volunteerId]
+    );
+
+    if (appRes.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Application not found" });
+    }
+
+    const app = appRes.rows[0];
+    const currentStatus = (app.status || "").toString().toLowerCase();
+    if (["cancelled", "rejected", "completed", "no_show"].includes(currentStatus)) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Application can no longer be cancelled" });
+    }
+
+    const eventStart = buildEventStartDate(app);
+    if (!eventStart) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Event date is missing" });
+    }
+
+    const hoursBeforeStart = (eventStart.getTime() - Date.now()) / (1000 * 60 * 60);
+
+    let cancellationWindow = "outside_72";
+    let warningIssued = false;
+    let strikeIssued = false;
+    let strikeAction = null;
+    let strikeCount = null;
+
+    if (hoursBeforeStart <= LOCK_WINDOW_HOURS) {
+      cancellationWindow = "inside_48";
+
+      if (!reason) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          error:
+            "Cancellation reason is required for cancellations within 48 hours",
+        });
+      }
+
+      if (!supportingDocumentUrl) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          error:
+            "Supporting document is required for cancellations within 48 hours",
+        });
+      }
+
+      strikeIssued = true;
+
+      const strikeReason = `Late cancellation (within 48 hours) for event: ${app.title}`;
+      const strikeResult = await applyStrike(client, {
+        userId: volunteerId,
+        adminId: app.organiser_id,
+        reason: strikeReason,
+      });
+      strikeAction = strikeResult.action;
+      strikeCount = strikeResult.strikeCount;
+    } else if (hoursBeforeStart <= SAFE_WINDOW_HOURS) {
+      cancellationWindow = "48_to_72";
+      warningIssued = true;
+
+      const repeatedWindowCancellationsRes = await client.query(
+        `
+        SELECT COUNT(*)::int AS count
+        FROM applications
+        WHERE volunteer_id = $1
+          AND cancellation_window = '48_to_72'
+          AND warning_issued = TRUE
+        `,
+        [volunteerId]
+      );
+
+      const repeatedCount = repeatedWindowCancellationsRes.rows[0]?.count || 0;
+      const hasReasonContext = reason.length > 0 || supportingDocumentUrl.length > 0;
+
+      if (repeatedCount >= 1 && !hasReasonContext) {
+        strikeIssued = true;
+        const strikeReason = `Repeated 48-72h cancellation without reason for event: ${app.title}`;
+        const strikeResult = await applyStrike(client, {
+          userId: volunteerId,
+          adminId: app.organiser_id,
+          reason: strikeReason,
+        });
+        strikeAction = strikeResult.action;
+        strikeCount = strikeResult.strikeCount;
+      }
+    }
+
+    await client.query(
+      `
+      UPDATE applications
+      SET status = 'cancelled',
+          volunteer_cancel_reason = $2,
+          cancellation_supporting_document_url = $3,
+          volunteer_cancelled_at = NOW(),
+          cancellation_window = $4,
+          warning_issued = $5,
+          strike_issued = $6,
+          strike_appeal_status = CASE WHEN $6 THEN 'eligible' ELSE strike_appeal_status END
+      WHERE id = $1
+      `,
+      [
+        applicationId,
+        reason || null,
+        supportingDocumentUrl || null,
+        cancellationWindow,
+        warningIssued,
+        strikeIssued,
+      ]
+    );
+
+    const promoted = await promoteWaitlistedVolunteer({
+      client,
+      eventId: app.event_id,
+    });
+
+    await client.query("COMMIT");
+
+    res.json({
+      success: true,
+      message: "Application cancelled",
+      cancellationWindow,
+      warningIssued,
+      strikeIssued,
+      strikeAction,
+      strikeCount,
+      waitlistPromoted: Boolean(promoted),
+    });
+
+    try {
+      if (promoted?.volunteer_id) {
+        await notifyUser(promoted.volunteer_id, {
+          title: "Spot available",
+          body: `You were moved from waiting list to approved for ${app.title}.`,
+          data: {
+            type: "waitlist_promoted",
+            eventId: String(app.event_id),
+          },
+        });
+      }
+
+      if (app.organiser_id) {
+        await notifyUser(app.organiser_id, {
+          title: "Volunteer cancelled",
+          body: reason
+            ? `A volunteer cancelled for ${app.title}. Reason: ${reason}`
+            : `A volunteer cancelled for ${app.title}.`,
+          data: {
+            type: "volunteer_cancelled",
+            eventId: String(app.event_id),
+            applicationId: String(applicationId),
+            strikeIssued,
+            warningIssued,
+            cancellationWindow,
+          },
+        });
+      }
+    } catch (notifyErr) {
+      console.error("VOLUNTEER CANCEL NOTIFY ERROR:", notifyErr);
+    }
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (_) {}
+    console.error("VOLUNTEER CANCEL APPLICATION ERROR:", err);
+    res.status(500).json({ error: "Failed to cancel application" });
+  } finally {
+    client.release();
+  }
+};
+
+// ================= ORGANISER MARK NO-SHOW =================
+exports.markVolunteerNoShow = async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const applicationId = parseInt(req.params.id, 10);
+    const organiserId = req.user?.id;
+
+    if (req.user?.role !== "organiser") {
+      return res.status(403).json({ error: "Only organisers can mark no-show" });
+    }
+
+    if (!Number.isInteger(applicationId) || applicationId <= 0) {
+      return res.status(400).json({ error: "Invalid application ID" });
+    }
+
+    await client.query("BEGIN");
+
+    const appRes = await client.query(
+      `
+      SELECT a.id, a.status, a.event_id, a.volunteer_id, e.organiser_id, e.title
+      FROM applications a
+      JOIN events e ON e.id = a.event_id
+      WHERE a.id = $1
+        AND e.organiser_id = $2
+      FOR UPDATE
+      `,
+      [applicationId, organiserId]
+    );
+
+    if (appRes.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Application not found" });
+    }
+
+    const app = appRes.rows[0];
+    const status = (app.status || "").toString().toLowerCase();
+    if (!["approved", "accepted"].includes(status)) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Only approved volunteers can be marked no-show" });
+    }
+
+    await client.query(
+      `
+      UPDATE applications
+      SET status = 'no_show',
+          strike_issued = TRUE,
+          strike_appeal_status = 'eligible',
+          volunteer_cancel_reason = COALESCE(volunteer_cancel_reason, 'No show'),
+          volunteer_cancelled_at = COALESCE(volunteer_cancelled_at, NOW())
+      WHERE id = $1
+      `,
+      [applicationId]
+    );
+
+    const strikeResult = await applyStrike(client, {
+      userId: app.volunteer_id,
+      adminId: organiserId,
+      reason: `No-show after approval for event: ${app.title}`,
+    });
+
+    const promoted = await promoteWaitlistedVolunteer({
+      client,
+      eventId: app.event_id,
+    });
+
+    await client.query("COMMIT");
+
+    res.json({
+      success: true,
+      strikeIssued: true,
+      strikeCount: strikeResult.strikeCount,
+      strikeAction: strikeResult.action,
+      waitlistPromoted: Boolean(promoted),
+    });
+
+    try {
+      await notifyUser(app.volunteer_id, {
+        title: "No-show recorded",
+        body: `You were marked as no-show for ${app.title}. A strike was applied. You can submit an appeal with supporting documents.`,
+        data: {
+          type: "no_show_strike",
+          applicationId: String(applicationId),
+          strikeCount: strikeResult.strikeCount,
+        },
+      });
+
+      if (promoted?.volunteer_id) {
+        await notifyUser(promoted.volunteer_id, {
+          title: "Spot available",
+          body: `You were moved from waiting list to approved for ${app.title}.`,
+          data: {
+            type: "waitlist_promoted",
+            eventId: String(app.event_id),
+          },
+        });
+      }
+    } catch (notifyErr) {
+      console.error("NO SHOW NOTIFY ERROR:", notifyErr);
+    }
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (_) {}
+    console.error("MARK NO SHOW ERROR:", err);
+    res.status(500).json({ error: "Failed to mark no-show" });
+  } finally {
+    client.release();
+  }
+};
+
+// ================= VOLUNTEER STRIKE APPEAL =================
+exports.submitStrikeAppeal = async (req, res) => {
+  try {
+    const applicationId = parseInt(req.params.id, 10);
+    const volunteerId = req.user?.id;
+    const reason = (req.body?.reason || "").toString().trim();
+    const supportingDocumentUrl = (req.body?.supportingDocumentUrl || "")
+      .toString()
+      .trim();
+
+    if (!Number.isInteger(applicationId) || applicationId <= 0) {
+      return res.status(400).json({ error: "Invalid application ID" });
+    }
+
+    if (!reason) {
+      return res.status(400).json({ error: "Appeal reason is required" });
+    }
+
+    if (!supportingDocumentUrl) {
+      return res.status(400).json({ error: "Supporting document is required" });
+    }
+
+    if (reason.length > MAX_STRIKE_REASON_LENGTH) {
+      return res.status(400).json({ error: "Appeal reason is too long" });
+    }
+
+    const result = await pool.query(
+      `
+      UPDATE applications
+      SET strike_appeal_reason = $3,
+          strike_appeal_document_url = $4,
+          strike_appeal_status = 'pending',
+          strike_appeal_submitted_at = NOW()
+      WHERE id = $1
+        AND volunteer_id = $2
+        AND strike_issued = TRUE
+      RETURNING id, event_id
+      `,
+      [applicationId, volunteerId, reason, supportingDocumentUrl]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(400).json({ error: "No strike found for this application" });
+    }
+
+    res.json({ success: true, message: "Strike appeal submitted" });
+  } catch (err) {
+    console.error("SUBMIT STRIKE APPEAL ERROR:", err);
+    res.status(500).json({ error: "Failed to submit strike appeal" });
   }
 };
 

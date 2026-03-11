@@ -451,40 +451,45 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
     final list = widget.events.whereType<Map<String, dynamic>>().where((event) {
       final title = (event["title"] ?? "").toString().toLowerCase();
       final location = (event["location"] ?? "").toString().toLowerCase();
-      final matchesSearch = title.contains(searchQuery) || location.contains(searchQuery);
+      final matchesSearch =
+          title.contains(searchQuery) || location.contains(searchQuery);
 
       final List cats = (event["categories"] ?? []);
-      final matchesCategory =
-          selectedCategory == "All Categories" || cats.contains(selectedCategory);
+      final matchesCategory = selectedCategory == "All Categories" ||
+          cats.contains(selectedCategory);
 
-      final startDate = DateTime.tryParse(event["event_date"]?.toString() ?? "");
+      final startDate =
+          DateTime.tryParse(event["event_date"]?.toString() ?? "");
       if (startDate == null) return false;
 
-      final endDate = DateTime.tryParse(event["end_date"]?.toString() ?? event["event_date"]?.toString() ?? "");
+      final endDate = DateTime.tryParse(event["end_date"]?.toString() ??
+          event["event_date"]?.toString() ??
+          "");
       final relevantDate = endDate ?? startDate;
 
-      final dateOnly = DateTime(relevantDate.year, relevantDate.month, relevantDate.day);
+      final dateOnly =
+          DateTime(relevantDate.year, relevantDate.month, relevantDate.day);
       final isCompleted = event["computed_status"]?.toString() == "completed";
       final isPast = dateOnly.isBefore(today) || isCompleted;
-        final isOngoing = dateOnly.isAtSameMomentAs(today) && !isCompleted;
+      final isOngoing = dateOnly.isAtSameMomentAs(today) && !isCompleted;
       final isUpcoming = dateOnly.isAfter(today) && !isCompleted;
 
-        final appStatus = _applicationStatusForEvent(event) ??
+      final appStatus = _applicationStatusForEvent(event) ??
           (event["application_status"] ??
-              event["applicationStatus"] ??
-              event["my_application_status"] ??
-              "")
-            .toString()
-            .toLowerCase();
-        final isApproved = appStatus == "approved" ||
-            appStatus == "accepted" ||
-            appStatus == "completed";
+                  event["applicationStatus"] ??
+                  event["my_application_status"] ??
+                  "")
+              .toString()
+              .toLowerCase();
+      final isApproved = appStatus == "approved" ||
+          appStatus == "accepted" ||
+          appStatus == "completed";
 
-            final matchesTab = selectedTab == "all"
-              ? !isCompleted && appStatus != "rejected"
-              : selectedTab == "past"
-                ? isPast && isApproved
-                : selectedTab == "ongoing"
+      final matchesTab = selectedTab == "all"
+          ? !isCompleted && appStatus != "rejected"
+          : selectedTab == "past"
+              ? isPast && isApproved
+              : selectedTab == "ongoing"
                   ? isOngoing && appStatus != "rejected"
                   : isUpcoming && appStatus != "rejected";
 
@@ -510,15 +515,15 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
                     "")
                 .toString()
                 .toLowerCase();
-        
+
         final aIsUnapplied = aStatus.isEmpty;
         final bIsUnapplied = bStatus.isEmpty;
-        
+
         // Unapplied events come first
         if (aIsUnapplied && !bIsUnapplied) return -1;
         if (!aIsUnapplied && bIsUnapplied) return 1;
       }
-      
+
       // Then sort by date
       final aDate = DateTime.tryParse(a["event_date"]?.toString() ?? "");
       final bDate = DateTime.tryParse(b["event_date"]?.toString() ?? "");
@@ -626,19 +631,20 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
 
   Widget _eventCard(Map<String, dynamic> event) {
     final date = _formatDateRange(event);
-    final time = "${_formatTime(event["start_time"])} - ${_formatTime(event["end_time"])}";
+    final time =
+        "${_formatTime(event["start_time"])} - ${_formatTime(event["end_time"])}";
     final progressLabel = _progressLabel(event);
     final statusText = event["computed_status"]?.toString() == "completed"
-      ? "Completed"
-      : "Open";
+        ? "Completed"
+        : "Open";
     final statusColor = statusText == "Open" ? Colors.green : Colors.grey;
     final rawApplicationStatus = _applicationStatusForEvent(event) ??
-      (event["application_status"] ??
-          event["applicationStatus"] ??
-          event["my_application_status"] ??
-          "")
-        .toString()
-        .toLowerCase();
+        (event["application_status"] ??
+                event["applicationStatus"] ??
+                event["my_application_status"] ??
+                "")
+            .toString()
+            .toLowerCase();
 
     final isPastTab = selectedTab == "past";
     final isClosed = statusText == "Completed";
@@ -674,7 +680,8 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
             CircleAvatar(
               radius: 22,
               backgroundColor: const Color(0xFFEAF0FF),
-              child: const Icon(Icons.volunteer_activism, color: Color(0xFF2E6BE6)),
+              child: const Icon(Icons.volunteer_activism,
+                  color: Color(0xFF2E6BE6)),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -690,7 +697,8 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
                           color: statusColor.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(10),
@@ -808,6 +816,9 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
     if (status == "rejected") {
       return _ActionState("Rejected", false, Colors.red);
     }
+    if (status == "cancelled") {
+      return _ActionState("Cancelled", false, Colors.red);
+    }
 
     return _ActionState("Apply", true, const Color(0xFF2ECC71));
   }
@@ -853,7 +864,7 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
     if (normalizedUrl != null && normalizedUrl.contains("localhost")) {
       normalizedUrl = normalizedUrl.replaceAll("localhost", "10.0.2.2");
     }
-    
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
       child: Container(
@@ -910,32 +921,36 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
   String _formatDateRange(Map<String, dynamic> event) {
     final startDateRaw = event["event_date"]?.toString();
     final endDateRaw = event["end_date"]?.toString();
-    
+
     if (startDateRaw == null || startDateRaw.isEmpty) return "";
-    
+
     final startParsed = DateTime.tryParse(startDateRaw);
     if (startParsed == null) return "";
-    
-    final startFormatted = "${startParsed.day.toString().padLeft(2, "0")} ${_monthName(startParsed.month)} ${startParsed.year}";
-    
+
+    final startFormatted =
+        "${startParsed.day.toString().padLeft(2, "0")} ${_monthName(startParsed.month)} ${startParsed.year}";
+
     // If no end date, show single date
     if (endDateRaw == null || endDateRaw.isEmpty) {
       return startFormatted;
     }
-    
+
     final endParsed = DateTime.tryParse(endDateRaw);
     if (endParsed == null) return startFormatted;
-    
+
     // If dates are the same, show single date
-    final startDateOnly = DateTime(startParsed.year, startParsed.month, startParsed.day);
-    final endDateOnly = DateTime(endParsed.year, endParsed.month, endParsed.day);
-    
+    final startDateOnly =
+        DateTime(startParsed.year, startParsed.month, startParsed.day);
+    final endDateOnly =
+        DateTime(endParsed.year, endParsed.month, endParsed.day);
+
     if (startDateOnly == endDateOnly) {
       return startFormatted;
     }
-    
+
     // Show date range for multi-day events
-    final endFormatted = "${endParsed.day.toString().padLeft(2, "0")} ${_monthName(endParsed.month)} ${endParsed.year}";
+    final endFormatted =
+        "${endParsed.day.toString().padLeft(2, "0")} ${_monthName(endParsed.month)} ${endParsed.year}";
     return "$startFormatted - $endFormatted";
   }
 

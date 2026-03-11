@@ -66,6 +66,18 @@ model Application {
   volunteerId  Int?      @map("volunteer_id")
   status       String?   @default("pending") @db.VarChar(20)
   adminCancelReason String? @map("admin_cancel_reason")
+  volunteerCancelReason String? @map("volunteer_cancel_reason")
+  cancellationSupportingDocumentUrl String? @map("cancellation_supporting_document_url")
+  cancellationWindow String? @map("cancellation_window") @db.VarChar(30)
+  warningIssued Boolean @default(false) @map("warning_issued")
+  strikeIssued Boolean @default(false) @map("strike_issued")
+  volunteerCancelledAt DateTime? @map("volunteer_cancelled_at") @db.Timestamp(6)
+  strikeAppealReason String? @map("strike_appeal_reason")
+  strikeAppealDocumentUrl String? @map("strike_appeal_document_url")
+  strikeAppealStatus String? @default("none") @map("strike_appeal_status") @db.VarChar(20)
+  strikeAppealSubmittedAt DateTime? @map("strike_appeal_submitted_at") @db.Timestamp(6)
+  strikeAppealReviewedAt DateTime? @map("strike_appeal_reviewed_at") @db.Timestamp(6)
+  strikeAppealReviewNote String? @map("strike_appeal_review_note")
   compensationStatus String? @map("compensation_status") @db.VarChar(20)
   appliedAt    DateTime? @default(now()) @map("applied_at") @db.Timestamp(6)
 
@@ -130,9 +142,25 @@ model Event {
   responsibilities      EventResponsibility[]
   ratings               Rating[]
   dailySchedules        DailySchedule[]
+  groupMessages         EventGroupMessage[]
 
   @@index([status], map: "idx_events_status")
   @@map("events")
+}
+
+model EventGroupMessage {
+  id        Int      @id @default(autoincrement())
+  eventId   Int      @map("event_id")
+  senderId  Int      @map("sender_id")
+  message   String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([eventId], map: "idx_event_group_messages_event_id")
+  @@index([createdAt], map: "idx_event_group_messages_created_at")
+  @@map("event_group_messages")
 }
 
 model DailySchedule {
@@ -359,6 +387,7 @@ model User {
   deviceTokens DeviceToken[]
   notifications Notification[]
   chatReads     ChatThreadRead[]
+  eventGroupMessages EventGroupMessage[]
   strikes       UserStrike[] @relation("UserStrikes")
   strikesGiven  UserStrike[] @relation("AdminStrikes")
   reportsFiled  Report[]     @relation("ReportReporter")

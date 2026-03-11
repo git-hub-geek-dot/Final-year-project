@@ -1,85 +1,10 @@
 const pool = require("../config/db");
 const { notifyUser, notifyUsers } = require("../services/notificationService");
-
-const STRIKE_SUSPENSIONS = [
-  { threshold: 2, days: 3 },
-  { threshold: 3, days: 7 },
-];
-const BAN_STRIKE_THRESHOLD = 4;
-const MAX_STRIKE_REASON_LENGTH = 500;
-
-const applyStrike = async (client, { userId, adminId, reason }) => {
-  const userRes = await client.query(
-    "SELECT id, role, status, suspended_until FROM users WHERE id = $1",
-    [userId]
-  );
-
-  if (userRes.rowCount === 0) {
-    const error = new Error("User not found");
-    error.status = 404;
-    throw error;
-  }
-
-  if (userRes.rows[0].role === "admin") {
-    const error = new Error("Cannot strike admin users");
-    error.status = 400;
-    throw error;
-  }
-
-  await client.query(
-    `INSERT INTO user_strikes (user_id, admin_id, reason)
-     VALUES ($1, $2, $3)`,
-    [userId, adminId, reason]
-  );
-
-  const countRes = await client.query(
-    "SELECT COUNT(*)::int AS count FROM user_strikes WHERE user_id = $1",
-    [userId]
-  );
-
-  const strikeCount = countRes.rows[0]?.count || 0;
-  let action = "warning";
-  let suspendedUntil = null;
-  let status = userRes.rows[0].status;
-
-  if (strikeCount >= BAN_STRIKE_THRESHOLD) {
-    await client.query(
-      `UPDATE users
-       SET status = 'banned',
-           suspended_until = NULL,
-           suspension_reason = $2
-       WHERE id = $1`,
-      [userId, reason]
-    );
-    action = "banned";
-    status = "banned";
-  } else {
-    const match = STRIKE_SUSPENSIONS.find(
-      (entry) => entry.threshold === strikeCount
-    );
-
-    if (match) {
-      const until = new Date(Date.now() + match.days * 24 * 60 * 60 * 1000);
-      const updateRes = await client.query(
-        `UPDATE users
-         SET suspended_until = CASE
-             WHEN suspended_until IS NULL OR suspended_until < $2 THEN $2
-             ELSE suspended_until
-           END,
-           suspension_reason = $3
-         WHERE id = $1
-         RETURNING suspended_until, status`,
-        [userId, until, reason]
-      );
-
-      suspendedUntil = updateRes.rows[0]?.suspended_until || until;
-      status = updateRes.rows[0]?.status || status;
-      action = `suspended_${match.days}_days`;
-    }
-  }
-
-  return { strikeCount, action, suspendedUntil, status };
-};
+const {
+  MAX_STRIKE_REASON_LENGTH,
+  applyStrike,
+  recalculateUserStrikeState,
+} = require("../services/strikeService");
 
 // ================= GET ALL USERS =================
 const getUsers = async (req, res) => {
@@ -193,6 +118,17 @@ const getApplications = async (req, res) => {
            ELSE a.status
          END AS status,
          a.admin_cancel_reason,
+         a.volunteer_cancel_reason,
+         a.cancellation_supporting_document_url,
+         a.cancellation_window,
+         a.warning_issued,
+         a.strike_issued,
+         a.strike_appeal_reason,
+         a.strike_appeal_document_url,
+         a.strike_appeal_status,
+         a.strike_appeal_submitted_at,
+         a.strike_appeal_reviewed_at,
+         a.strike_appeal_review_note,
          a.applied_at,
          u.name AS volunteer_name,
          u.email AS volunteer_email,
@@ -219,6 +155,115 @@ const getApplications = async (req, res) => {
   } catch (err) {
     console.error("GET APPLICATIONS ERROR:", err);
     res.status(500).json({ error: "Failed to fetch applications" });
+  }
+};
+
+const reviewStrikeAppeal = async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const applicationId = parseInt(req.params.id, 10);
+    const approved = Boolean(req.body?.approved);
+    const note = (req.body?.note || "").toString().trim();
+
+    if (!Number.isInteger(applicationId) || applicationId <= 0) {
+      return res.status(400).json({ error: "Invalid application ID" });
+    }
+
+    await client.query("BEGIN");
+
+    const appRes = await client.query(
+      `
+      SELECT id, volunteer_id, strike_appeal_status, strike_appeal_document_url
+      FROM applications
+      WHERE id = $1
+      FOR UPDATE
+      `,
+      [applicationId]
+    );
+
+    if (appRes.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Application not found" });
+    }
+
+    const app = appRes.rows[0];
+    if (app.strike_appeal_status !== "pending") {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "No pending appeal for this application" });
+    }
+
+    if (!app.strike_appeal_document_url) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Appeal is missing supporting document" });
+    }
+
+    let removedStrikeId = null;
+    if (approved) {
+      const strikeRes = await client.query(
+        `
+        SELECT id
+        FROM user_strikes
+        WHERE user_id = $1
+        ORDER BY created_at DESC
+        LIMIT 1
+        FOR UPDATE
+        `,
+        [app.volunteer_id]
+      );
+
+      if (strikeRes.rowCount > 0) {
+        removedStrikeId = strikeRes.rows[0].id;
+        await client.query("DELETE FROM user_strikes WHERE id = $1", [removedStrikeId]);
+      }
+
+      await recalculateUserStrikeState(client, {
+        userId: app.volunteer_id,
+        reasonForPenalty: "Strike appeal approved",
+      });
+    }
+
+    await client.query(
+      `
+      UPDATE applications
+      SET strike_appeal_status = $2,
+          strike_appeal_review_note = $3,
+          strike_appeal_reviewed_at = NOW()
+      WHERE id = $1
+      `,
+      [applicationId, approved ? "approved" : "rejected", note || null]
+    );
+
+    await client.query("COMMIT");
+
+    res.json({
+      success: true,
+      status: approved ? "approved" : "rejected",
+      removedStrikeId,
+    });
+
+    try {
+      await notifyUser(app.volunteer_id, {
+        title: "Strike appeal reviewed",
+        body: approved
+          ? "Your strike appeal was approved and your latest strike was removed."
+          : "Your strike appeal was rejected. The strike remains on your account.",
+        data: {
+          type: "strike_appeal_reviewed",
+          applicationId: String(applicationId),
+          status: approved ? "approved" : "rejected",
+        },
+      });
+    } catch (notifyErr) {
+      console.error("REVIEW STRIKE APPEAL NOTIFY ERROR:", notifyErr);
+    }
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (_) {}
+    console.error("REVIEW STRIKE APPEAL ERROR:", err);
+    res.status(500).json({ error: "Failed to review strike appeal" });
+  } finally {
+    client.release();
   }
 };
 
@@ -457,14 +502,7 @@ const resetUserStrikes = async (req, res) => {
     }
 
     await client.query("DELETE FROM user_strikes WHERE user_id = $1", [userId]);
-    await client.query(
-      `UPDATE users
-       SET status = CASE WHEN status = 'banned' THEN 'active' ELSE status END,
-           suspended_until = NULL,
-           suspension_reason = NULL
-       WHERE id = $1`,
-      [userId]
-    );
+    await recalculateUserStrikeState(client, { userId });
     await client.query("COMMIT");
 
     res.json({ message: "User strikes reset", strikeCount: 0 });
@@ -1740,6 +1778,7 @@ module.exports = {
   suspendUser,
   unsuspendUser,
   cancelApplication,
+  reviewStrikeAppeal,
   deleteEvent,
   hardDeleteEvent,
   getVolunteerLeaderboard,

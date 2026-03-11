@@ -1154,6 +1154,9 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     if (normalized == "rejected") {
       return _ActionState("Rejected", false, Colors.red);
     }
+    if (normalized == "cancelled") {
+      return _ActionState("Cancelled", false, Colors.red);
+    }
 
     return _ActionState("Apply", true, const Color(0xFF2ECC71));
   }
@@ -1239,32 +1242,36 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
   String _formatDateRange(Map<String, dynamic> event) {
     final startDateRaw = event["event_date"]?.toString();
     final endDateRaw = event["end_date"]?.toString();
-    
+
     if (startDateRaw == null || startDateRaw.isEmpty) return "";
-    
+
     final startParsed = DateTime.tryParse(startDateRaw);
     if (startParsed == null) return "";
-    
-    final startFormatted = "${startParsed.day.toString().padLeft(2, "0")} ${_monthName(startParsed.month)} ${startParsed.year}";
-    
+
+    final startFormatted =
+        "${startParsed.day.toString().padLeft(2, "0")} ${_monthName(startParsed.month)} ${startParsed.year}";
+
     // If no end date, show single date
     if (endDateRaw == null || endDateRaw.isEmpty) {
       return startFormatted;
     }
-    
+
     final endParsed = DateTime.tryParse(endDateRaw);
     if (endParsed == null) return startFormatted;
-    
+
     // If dates are the same, show single date
-    final startDateOnly = DateTime(startParsed.year, startParsed.month, startParsed.day);
-    final endDateOnly = DateTime(endParsed.year, endParsed.month, endParsed.day);
-    
+    final startDateOnly =
+        DateTime(startParsed.year, startParsed.month, startParsed.day);
+    final endDateOnly =
+        DateTime(endParsed.year, endParsed.month, endParsed.day);
+
     if (startDateOnly == endDateOnly) {
       return startFormatted;
     }
-    
+
     // Show date range for multi-day events
-    final endFormatted = "${endParsed.day.toString().padLeft(2, "0")} ${_monthName(endParsed.month)} ${endParsed.year}";
+    final endFormatted =
+        "${endParsed.day.toString().padLeft(2, "0")} ${_monthName(endParsed.month)} ${endParsed.year}";
     return "$startFormatted - $endFormatted";
   }
 
@@ -1370,6 +1377,9 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
+        actionsIconTheme: const IconThemeData(color: Colors.white),
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
@@ -1438,17 +1448,36 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
         ],
       ),
       body: getBody(),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        currentIndex: selectedIndex,
-        onTap: (i) => setState(() => selectedIndex = i),
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-          BottomNavigationBarItem(icon: Icon(Icons.event), label: "Events"),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.leaderboard), label: "Leaderboard"),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
-        ],
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF3B82F6), Color(0xFF22C55E)],
+          ),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Theme(
+            data: Theme.of(context).copyWith(canvasColor: Colors.transparent),
+            child: BottomNavigationBar(
+              type: BottomNavigationBarType.fixed,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              currentIndex: selectedIndex,
+              selectedItemColor: Colors.white,
+              unselectedItemColor: Colors.white70,
+              selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700),
+              onTap: (i) => setState(() => selectedIndex = i),
+              items: const [
+                BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
+                BottomNavigationBarItem(icon: Icon(Icons.event), label: "Events"),
+                BottomNavigationBarItem(
+                    icon: Icon(Icons.leaderboard), label: "Leaderboard"),
+                BottomNavigationBarItem(
+                    icon: Icon(Icons.person), label: "Profile"),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -66,4 +66,25 @@ router.put(
   applicationController.updateCompensationStatus
 );
 
+// ✅ NEW: Volunteer cancellation with strike-window policy
+router.put(
+  "/applications/:id/cancel",
+  authenticateToken,
+  applicationController.cancelMyApplication
+);
+
+// ✅ NEW: Organiser no-show marker (direct strike)
+router.put(
+  "/applications/:id/no-show",
+  authenticateToken,
+  applicationController.markVolunteerNoShow
+);
+
+// ✅ NEW: Volunteer appeal for cancellation/no-show strike
+router.put(
+  "/applications/:id/strike-appeal",
+  authenticateToken,
+  applicationController.submitStrikeAppeal
+);
+
 module.exports = router;

@@ -915,18 +915,40 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
                                   : verificationStatus == "approved"
                                       ? "Verified"
                                       : "Get Verified",
-                              verificationStatus == "pending" ||
-                                      verificationStatus == "approved"
-                                  ? () {}
-                                  : () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) =>
-                                              const VolunteerGetVerifiedScreen(),
-                                        ),
-                                      );
-                                    },
+                              () {
+                                final status =
+                                    (verificationStatus ?? '').toLowerCase();
+
+                                if (status == 'approved') {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        "Your account is already verified.",
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                if (status == 'pending') {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        "Your verification request is under review.",
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const VolunteerGetVerifiedScreen(),
+                                  ),
+                                );
+                              },
                             ),
 
                             _tile(

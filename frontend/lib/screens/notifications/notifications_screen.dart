@@ -9,9 +9,11 @@ import '../../services/notification_api_service.dart';
 import '../../services/token_service.dart';
 import '../../widgets/app_background.dart';
 import '../chat/chat_screen.dart';
+import '../chat/event_group_chat_screen.dart';
 import '../organiser/event_details_screen.dart';
 import '../organiser/organiser_profile_screen.dart';
 import '../volunteer/my_applications_screen.dart';
+import '../volunteer/event_announcements_screen.dart';
 import '../volunteer/view_event_screen.dart';
 import '../volunteer/volunteer_profile_screen.dart';
 
@@ -293,6 +295,42 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             builder: (_) => ChatScreen(
               threadId: threadId,
               title: "Chat",
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    if (type == "event_group_chat") {
+      final raw = data["eventId"] ?? data["event_id"];
+      final eventId = int.tryParse(raw?.toString() ?? "");
+      if (eventId != null) {
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => EventGroupChatScreen(
+              eventId: eventId,
+              eventTitle: "Event",
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    if (type == "event_announcement") {
+      final raw = data["eventId"] ?? data["event_id"];
+      final eventId = int.tryParse(raw?.toString() ?? "");
+      if (eventId != null) {
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => EventAnnouncementsScreen(
+              eventId: eventId,
+              eventTitle: "Event",
             ),
           ),
         );

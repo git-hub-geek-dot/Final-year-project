@@ -723,7 +723,6 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                 announceButton,
                 const SizedBox(height: 10),
               ],
-              if (!isDraftEvent && !isCancelledEvent && !isCompletedEvent) ...[
               if (!isDraftEvent && !isCancelledEvent) ...[
                 eventChatButton,
                 const SizedBox(height: 10),
@@ -747,7 +746,6 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
               announceButton,
               const SizedBox(width: 10),
             ],
-            if (!isDraftEvent && !isCancelledEvent && !isCompletedEvent) ...[
             if (!isDraftEvent && !isCancelledEvent) ...[
               eventChatButton,
               const SizedBox(width: 10),

@@ -48,6 +48,7 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
         final data = await AdminService.getAllApplications(
           page: currentPage,
           limit: 20,
+          eventId: widget.eventId,
         );
         final items = (data["items"] as List?) ?? [];
         lastPage = data["totalPages"] ?? currentPage;
@@ -132,6 +133,8 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
       case "approved":
       case "accepted":
         return Colors.green;
+      case "no_show":
+        return Colors.deepOrange;
       case "rejected":
       case "cancelled":
         return Colors.red;
@@ -150,6 +153,8 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
         return "Rejected";
       case "cancelled":
         return "Cancelled";
+      case "no_show":
+        return "No-show";
       case "pending":
         return "Pending";
       default:
@@ -239,6 +244,10 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
                                     DropdownMenuItem(
                                       value: "cancelled",
                                       child: Text("Cancelled"),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: "no_show",
+                                      child: Text("No-show"),
                                     ),
                                   ],
                                   onChanged: (v) =>
@@ -381,6 +390,8 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
         return "No rejected applications found";
       case "cancelled":
         return "No cancelled applications found";
+      case "no_show":
+        return "No no-show applications found";
       case "all":
       default:
         return "No applications found";
@@ -396,6 +407,8 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
         return Icons.block;
       case "cancelled":
         return Icons.cancel;
+      case "no_show":
+        return Icons.person_off;
       case "pending":
       default:
         return Icons.hourglass_top;

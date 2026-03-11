@@ -81,7 +81,7 @@ class HelpSupportScreen extends StatelessWidget {
           const SizedBox(height: 10),
           _infoTile("App Version", "1.0.0"),
           _infoTile("Developed By", "Volunteerx Team"),
-          _infoTile("Support Email", "support@volunteerx.com"),
+          _infoTile("Support Email", "volunteerxteam@gmail.com"),
           const SizedBox(height: 20),
         ],
       ),
@@ -130,19 +130,99 @@ Widget _infoTile(String title, String value) {
   );
 }
 
+const List<Map<String, String>> _supportFaqs = [
+  {
+    "question": "How do I manage my events?",
+    "answer":
+        "Open My Events to edit event details, update capacity, or change event status.",
+  },
+  {
+    "question": "How does verification work?",
+    "answer":
+        "Go to Get Verified, submit the required documents, and wait for admin review.",
+  },
+  {
+    "question": "What is the strike/suspension policy?",
+    "answer":
+        "Repeated violations may lead to strikes. 2 strikes: 3-day suspension, 3 strikes: 7-day suspension, 4 strikes: account ban.",
+  },
+  {
+    "question": "Can I edit an event after publishing it?",
+    "answer":
+        "Yes. Use My Events to update event information. Volunteers will see the latest saved details.",
+  },
+  {
+    "question": "Why is my event not getting applications?",
+    "answer":
+        "Check event date, location, category, and description clarity. Better details usually improve applications.",
+  },
+  {
+    "question": "Can I report a volunteer issue?",
+    "answer":
+        "Yes. Use reporting options in the app and include clear details for faster review.",
+  },
+  {
+    "question": "How do I update my profile information?",
+    "answer":
+        "Open your profile and tap Edit Profile to update your details.",
+  },
+  {
+    "question": "How can I contact support quickly?",
+    "answer":
+        "Email volunteerxteam@gmail.com and attach screenshots if possible.",
+  },
+];
+
 void _showFaqDialog(BuildContext context) {
   showDialog(
     context: context,
-    builder: (_) => AlertDialog(
+    builder: (dialogContext) => AlertDialog(
       title: const Text("Frequently Asked Questions"),
-      content: const Text(
-        "• How do I manage my events?\n"
-        "Go to My Events and update details or status.\n\n"
-        "• How does verification work?\n"
-        "Submit documents under Get Verified and wait for admin review.\n\n"
-        "• What is the strike/suspension policy?\n"
-        "Repeated violations may lead to strikes. 2 strikes: 3-day suspension, "
-        "3 strikes: 7-day suspension, 4 strikes: ban.",
+      content: SizedBox(
+        width: MediaQuery.of(dialogContext).size.width * 0.85,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: _supportFaqs
+                .map(
+                  (faq) => Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    elevation: 0,
+                    color: const Color(0xFFF5F6FA),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Theme(
+                      data: Theme.of(dialogContext).copyWith(
+                        dividerColor: Colors.transparent,
+                      ),
+                      child: ExpansionTile(
+                        tilePadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 2,
+                        ),
+                        childrenPadding:
+                            const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                        title: Text(
+                          faq["question"] ?? "",
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        children: [
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              faq["answer"] ?? "",
+                              style: const TextStyle(height: 1.35),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+        ),
       ),
       actions: [
         TextButton(
@@ -160,7 +240,7 @@ void _showContactDialog(BuildContext context) {
     builder: (_) => AlertDialog(
       title: const Text("Contact Support"),
       content: const Text(
-        "You can reach us at:\n\nsupport@volunteerx.com\n\n"
+        "You can reach us at:\n\nvolunteerxteam@gmail.com\n\n"
         "We'll get back to you as soon as possible.",
       ),
       actions: [
@@ -179,7 +259,7 @@ void _showReportDialog(BuildContext context) {
     builder: (_) => AlertDialog(
       title: const Text("Report a Problem"),
       content: const Text(
-        "Please describe the issue and email it to:\n\nsupport@volunteerx.com",
+        "Please describe the issue and email it to:\n\nvolunteerxteam@gmail.com",
       ),
       actions: [
         TextButton(
@@ -795,3 +875,4 @@ Widget _profileOption({
     ),
   );
 }
+

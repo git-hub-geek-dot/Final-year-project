@@ -133,7 +133,7 @@ class _EventGroupChatScreenState extends State<EventGroupChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("${widget.eventTitle} - Group Chat"),
+        title: Text("${widget.eventTitle} - Event Chat"),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),

@@ -729,7 +729,7 @@ Join on VolunteerX
               const SizedBox(width: 10),
               Expanded(
                 child: _quickActionPill(
-                  label: "Group Chat",
+                  label: "Event Chat",
                   icon: Icons.groups_2_outlined,
                   color: const Color(0xFF2ECC71),
                   onTap: () {

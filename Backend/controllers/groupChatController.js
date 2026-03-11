@@ -44,7 +44,7 @@ exports.getEventGroupMessages = async (req, res) => {
 
     const event = await canAccessEventGroupChat({ eventId, userId, role });
     if (!event) {
-      return res.status(403).json({ error: "Not allowed to access this event group chat" });
+      return res.status(403).json({ error: "Not allowed to access this event chat" });
     }
 
     const messagesRes = await pool.query(
@@ -92,7 +92,7 @@ exports.sendEventGroupMessage = async (req, res) => {
 
     const event = await canAccessEventGroupChat({ eventId, userId, role });
     if (!event) {
-      return res.status(403).json({ error: "Not allowed to send message in this event group chat" });
+      return res.status(403).json({ error: "Not allowed to send message in this event chat" });
     }
 
     const inserted = await pool.query(
@@ -135,7 +135,7 @@ exports.sendEventGroupMessage = async (req, res) => {
     if (recipientIds.length > 0) {
       try {
         await notifyUsers(recipientIds, {
-          title: `Group chat: ${event.title}`,
+          title: `Event chat: ${event.title}`,
           body: `${senderName}: ${message}`,
           data: {
             type: "event_group_chat",

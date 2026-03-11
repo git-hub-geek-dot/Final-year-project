@@ -99,10 +99,10 @@ class ChatService {
       final data = jsonDecode(response.body);
       if (data is Map<String, dynamic>) return data;
       if (data is Map) return Map<String, dynamic>.from(data);
-      throw Exception("Invalid group chat response");
+      throw Exception("Invalid event chat response");
     }
 
-    throw Exception("Failed to fetch event group chat");
+    throw Exception("Failed to fetch event chat");
   }
 
   static Future<Map<String, dynamic>> sendEventGroupMessage({
@@ -126,7 +126,7 @@ class ChatService {
       final data = jsonDecode(response.body);
       if (data is Map<String, dynamic>) return data;
       if (data is Map) return Map<String, dynamic>.from(data);
-      throw Exception("Invalid group chat response");
+      throw Exception("Invalid event chat response");
     }
 
     String messageText = "Failed to send message";

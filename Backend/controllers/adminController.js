@@ -501,8 +501,19 @@ const resetUserStrikes = async (req, res) => {
       return res.status(400).json({ error: "Cannot reset admin user strikes" });
     }
 
+    const previousStatus = userRes.rows[0].status;
     await client.query("DELETE FROM user_strikes WHERE user_id = $1", [userId]);
     await recalculateUserStrikeState(client, { userId });
+    if (previousStatus === "inactive") {
+      await client.query(
+        `UPDATE users
+         SET status = 'inactive',
+             suspended_until = NULL,
+             suspension_reason = NULL
+         WHERE id = $1`,
+        [userId]
+      );
+    }
     await client.query("COMMIT");
 
     res.json({ message: "User strikes reset", strikeCount: 0 });

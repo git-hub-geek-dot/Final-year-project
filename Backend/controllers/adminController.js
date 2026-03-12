@@ -73,7 +73,11 @@ const getEvents = async (req, res) => {
     const limit = Math.max(parseInt(req.query.limit || "20", 10), 1);
     const offset = (page - 1) * limit;
 
-    const countResult = await pool.query("SELECT COUNT(*) FROM events");
+    const countResult = await pool.query(`
+      SELECT COUNT(*)
+      FROM events e
+      JOIN users u ON e.organiser_id = u.id
+    `);
     const total = parseInt(countResult.rows[0].count, 10);
     const totalPages = Math.max(Math.ceil(total / limit), 1);
 
@@ -104,19 +108,85 @@ const getApplications = async (req, res) => {
     const page = Math.max(parseInt(req.query.page || "1", 10), 1);
     const limit = Math.max(parseInt(req.query.limit || "20", 10), 1);
     const offset = (page - 1) * limit;
+    const rawEventId = req.query.eventId;
+    const hasEventIdFilter =
+      rawEventId !== undefined &&
+      rawEventId !== null &&
+      String(rawEventId).trim() !== "";
 
-    const countResult = await pool.query("SELECT COUNT(*) FROM applications");
+    let eventId = null;
+    if (hasEventIdFilter) {
+      eventId = parseInt(String(rawEventId), 10);
+      if (!Number.isInteger(eventId) || eventId <= 0) {
+        return res.status(400).json({ error: "Invalid event ID" });
+      }
+    }
+
+    const filterValues = hasEventIdFilter ? [eventId] : [];
+    const whereClause = hasEventIdFilter ? "WHERE a.event_id = $1" : "";
+    const normalizedStatusExpr = `
+      CASE
+        WHEN a.status IN ('accepted', 'completed') THEN 'approved'
+        WHEN a.status = 'waitlisted' THEN 'pending'
+        ELSE a.status
+      END
+    `;
+    const joinedFromClause = `
+      FROM applications a
+      JOIN users u ON a.volunteer_id = u.id
+      JOIN events e ON a.event_id = e.id
+      JOIN users o ON e.organiser_id = o.id
+      ${whereClause}
+    `;
+
+    const countResult = await pool.query(
+      `SELECT COUNT(*) ${joinedFromClause}`,
+      filterValues
+    );
     const total = parseInt(countResult.rows[0].count, 10);
     const totalPages = Math.max(Math.ceil(total / limit), 1);
+    const summaryResult = await pool.query(
+      `
+      SELECT
+        ${normalizedStatusExpr} AS status,
+        COUNT(*)::int AS count
+      ${joinedFromClause}
+      GROUP BY 1
+      `,
+      filterValues
+    );
+
+    const summary = {
+      applied: total,
+      approved: 0,
+      pending: 0,
+      rejected: 0,
+      cancelled: 0,
+      no_show: 0,
+    };
+
+    for (const row of summaryResult.rows) {
+      const status = String(row.status || "").toLowerCase();
+      const count = parseInt(row.count, 10) || 0;
+
+      if (status === "approved") {
+        summary.approved += count;
+      } else if (status === "rejected") {
+        summary.rejected += count;
+      } else if (status === "cancelled") {
+        summary.cancelled += count;
+      } else if (status === "no_show") {
+        summary.no_show += count;
+      } else {
+        summary.pending += count;
+      }
+    }
 
     const apps = await pool.query(
       `SELECT 
          a.id,
          a.event_id,
-         CASE
-           WHEN a.status = 'accepted' THEN 'approved'
-           ELSE a.status
-         END AS status,
+          ${normalizedStatusExpr} AS status,
          a.admin_cancel_reason,
          a.volunteer_cancel_reason,
          a.cancellation_supporting_document_url,
@@ -137,13 +207,10 @@ const getApplications = async (req, res) => {
          e.event_date,
          e.created_at AS event_created_at,
          o.name AS organiser_name
-       FROM applications a
-       JOIN users u ON a.volunteer_id = u.id
-       JOIN events e ON a.event_id = e.id
-       JOIN users o ON e.organiser_id = o.id
-       ORDER BY a.applied_at DESC
-       LIMIT $1 OFFSET $2`,
-      [limit, offset]
+        ${joinedFromClause}
+        ORDER BY a.applied_at DESC
+        LIMIT $${filterValues.length + 1} OFFSET $${filterValues.length + 2}`,
+      [...filterValues, limit, offset]
     );
 
     res.json({
@@ -151,6 +218,7 @@ const getApplications = async (req, res) => {
       page,
       totalPages,
       total,
+      summary,
     });
   } catch (err) {
     console.error("GET APPLICATIONS ERROR:", err);
@@ -272,9 +340,24 @@ const getStats = async (req, res) => {
     const result = await pool.query(`
       SELECT
         (SELECT COUNT(*) FROM users) AS total_users,
-        (SELECT COUNT(*) FROM events) AS total_events,
-        (SELECT COUNT(*) FROM events WHERE status = 'open') AS active_events,
-        (SELECT COUNT(*) FROM applications) AS total_applications,
+        (
+          SELECT COUNT(*)
+          FROM events e
+          JOIN users u ON e.organiser_id = u.id
+        ) AS total_events,
+        (
+          SELECT COUNT(*)
+          FROM events e
+          JOIN users u ON e.organiser_id = u.id
+          WHERE e.status = 'open'
+        ) AS active_events,
+        (
+          SELECT COUNT(*)
+          FROM applications a
+          JOIN users v ON a.volunteer_id = v.id
+          JOIN events e ON a.event_id = e.id
+          JOIN users o ON e.organiser_id = o.id
+        ) AS total_applications,
         (SELECT COUNT(*) FROM verification_requests WHERE status = 'pending') AS pending_verifications,
         (SELECT COUNT(*) FROM reports WHERE status = 'pending') AS pending_reports
     `);
@@ -306,16 +389,20 @@ const getStatsTimeseries = async (req, res) => {
         )::date AS day
       ),
       event_counts AS (
-        SELECT created_at::date AS day, COUNT(*)::int AS count
-        FROM events
-        WHERE created_at::date >= CURRENT_DATE - ($1::int - 1)
-        GROUP BY created_at::date
+        SELECT e.created_at::date AS day, COUNT(*)::int AS count
+        FROM events e
+        JOIN users u ON e.organiser_id = u.id
+        WHERE e.created_at::date >= CURRENT_DATE - ($1::int - 1)
+        GROUP BY e.created_at::date
       ),
       application_counts AS (
-        SELECT applied_at::date AS day, COUNT(*)::int AS count
-        FROM applications
-        WHERE applied_at::date >= CURRENT_DATE - ($1::int - 1)
-        GROUP BY applied_at::date
+        SELECT a.applied_at::date AS day, COUNT(*)::int AS count
+        FROM applications a
+        JOIN users v ON a.volunteer_id = v.id
+        JOIN events e ON a.event_id = e.id
+        JOIN users o ON e.organiser_id = o.id
+        WHERE a.applied_at::date >= CURRENT_DATE - ($1::int - 1)
+        GROUP BY a.applied_at::date
       )
       SELECT d.day,
              COALESCE(e.count, 0) AS events,

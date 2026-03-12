@@ -177,13 +177,22 @@ class AdminService {
   }
 
   // ================= APPLICATIONS =================
-  static Future<Map<String, dynamic>> getAllApplications(
-      {int page = 1, int limit = 20}) async {
+  static Future<Map<String, dynamic>> getAllApplications({
+    int page = 1,
+    int limit = 20,
+    int? eventId,
+  }) async {
     final token = await TokenService.getToken();
+    final uri = Uri.parse("${ApiConfig.baseUrl}/admin/applications").replace(
+      queryParameters: {
+        "page": "$page",
+        "limit": "$limit",
+        if (eventId != null) "eventId": "$eventId",
+      },
+    );
 
     final res = await http.get(
-      Uri.parse(
-          "${ApiConfig.baseUrl}/admin/applications?page=$page&limit=$limit"),
+      uri,
       headers: {
         "Content-Type": "application/json",
         "Authorization": "Bearer $token",

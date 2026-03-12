@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../config/api_config.dart';
 import '../../services/event_service.dart';
 import '../../services/token_service.dart';
+import '../../utils/ist_date_time.dart';
 import 'view_event_screen.dart';
 
 class MyApplicationsScreen extends StatefulWidget {
@@ -161,12 +162,11 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
   bool _isPastEventDate(String? rawDate) {
     if (rawDate == null || rawDate.isEmpty) return false;
 
-    final parsed = DateTime.tryParse(rawDate);
+    final parsed = IstDateTime.tryParse(rawDate);
     if (parsed == null) return false;
 
-    final now = DateTime.now();
-    final eventDateOnly = DateTime(parsed.year, parsed.month, parsed.day);
-    final today = DateTime(now.year, now.month, now.day);
+    final eventDateOnly = IstDateTime.startOfDay(parsed);
+    final today = IstDateTime.startOfDay(IstDateTime.now());
 
     return eventDateOnly.isBefore(today);
   }
@@ -180,7 +180,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
     final eventDateRaw = app["event_date"]?.toString();
     if (eventDateRaw == null || eventDateRaw.isEmpty) return null;
 
-    final eventDate = DateTime.tryParse(eventDateRaw);
+    final eventDate = IstDateTime.tryParse(eventDateRaw);
     if (eventDate == null) return null;
 
     final startTimeRaw = app["start_time"]?.toString();
@@ -214,7 +214,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
   double? _hoursBeforeEvent(Map app) {
     final start = _parseEventStartDateTime(app);
     if (start == null) return null;
-    return start.difference(DateTime.now()).inMinutes / 60.0;
+    return start.difference(IstDateTime.now()).inMinutes / 60.0;
   }
 
   Future<void> _cancelApplication(Map app) async {

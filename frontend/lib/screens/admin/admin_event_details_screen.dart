@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/widgets/app_background.dart';
 import '../../services/admin_service.dart';
+import '../../utils/ist_date_time.dart';
 import 'admin_applications_screen.dart';
 import '../../widgets/robust_image.dart';
 
@@ -20,6 +21,9 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
   int approved = 0;
   int pending = 0;
   int rejected = 0;
+  int cancelled = 0;
+  int noShow = 0;
+  String? statsError;
 
   @override
   void initState() {
@@ -27,67 +31,52 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
     loadStats();
   }
 
-  Future<List<dynamic>> _fetchAllApplications() async {
-    final allItems = <dynamic>[];
-    int currentPage = 1;
-    int lastPage = 1;
-
-    do {
-      final data = await AdminService.getAllApplications(
-        page: currentPage,
-        limit: 20,
-      );
-      final items = (data["items"] as List?) ?? [];
-      lastPage = data["totalPages"] ?? currentPage;
-      allItems.addAll(items);
-      currentPage += 1;
-    } while (currentPage <= lastPage);
-
-    return allItems;
-  }
-
   Future<void> loadStats() async {
+    final eventId = _toInt(widget.event["id"]);
+    if (eventId == null) {
+      if (mounted) {
+        setState(() {
+          loadingStats = false;
+          statsError = "Invalid event ID";
+        });
+      }
+      return;
+    }
+
     try {
       if (mounted) {
         setState(() {
           loadingStats = true;
+          statsError = null;
         });
       }
 
-      final list = await _fetchAllApplications();
-      final eventId = _toInt(widget.event["id"]);
-      final eventApplications = eventId == null
-          ? <dynamic>[]
-          : list.where((app) => _toInt(app["event_id"]) == eventId).toList();
-
-      int a = eventApplications.length;
-      int ap = 0, p = 0, r = 0;
-
-      for (final x in eventApplications) {
-        final s = (x["status"] ?? "pending").toString().toLowerCase();
-
-        if (s == "accepted" || s == "approved") {
-          ap++;
-        } else if (s == "rejected") {
-          r++;
-        } else {
-          p++;
-        }
-      }
+      final data = await AdminService.getAllApplications(
+        page: 1,
+        limit: 1,
+        eventId: eventId,
+      );
+      final summary = data["summary"] is Map
+          ? Map<String, dynamic>.from(data["summary"] as Map)
+          : <String, dynamic>{};
 
       if (mounted) {
         setState(() {
-          applied = a;
-          approved = ap;
-          pending = p;
-          rejected = r;
+          applied = _toInt(summary["applied"]) ?? 0;
+          approved = _toInt(summary["approved"]) ?? 0;
+          pending = _toInt(summary["pending"]) ?? 0;
+          rejected = _toInt(summary["rejected"]) ?? 0;
+          cancelled = _toInt(summary["cancelled"]) ?? 0;
+          noShow = _toInt(summary["no_show"] ?? summary["noShow"]) ?? 0;
           loadingStats = false;
+          statsError = null;
         });
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         setState(() {
           loadingStats = false;
+          statsError = e.toString().replaceFirst("Exception: ", "");
         });
       }
     }
@@ -134,10 +123,10 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
             ),
             ElevatedButton(
               onPressed: isLoading
-                   ? null
-                   : () async {
-                       if (titleController.text.trim().isEmpty ||
-                           messageController.text.trim().isEmpty) {
+                  ? null
+                  : () async {
+                      if (titleController.text.trim().isEmpty ||
+                          messageController.text.trim().isEmpty) {
                         messenger.showSnackBar(
                           const SnackBar(
                             content: Text("Please fill in all fields"),
@@ -148,18 +137,18 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
 
                       setState(() => isLoading = true);
                       final rawId = widget.event["id"];
-                       final eventId = rawId is int
-                           ? rawId
-                           : int.tryParse(rawId?.toString() ?? "");
-                       if (eventId == null) {
-                         if (dialogContext.mounted) {
-                           setState(() => isLoading = false);
-                         }
-                         messenger.showSnackBar(
-                           const SnackBar(content: Text("Invalid event id")),
-                         );
-                         return;
-                       }
+                      final eventId = rawId is int
+                          ? rawId
+                          : int.tryParse(rawId?.toString() ?? "");
+                      if (eventId == null) {
+                        if (dialogContext.mounted) {
+                          setState(() => isLoading = false);
+                        }
+                        messenger.showSnackBar(
+                          const SnackBar(content: Text("Invalid event id")),
+                        );
+                        return;
+                      }
 
                       try {
                         await AdminService.sendEventNotification(
@@ -201,6 +190,7 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     final event = widget.event;
+    final eventId = _toInt(event["id"]);
     final bannerUrl = event["banner_url"];
 
     return Scaffold(
@@ -302,21 +292,103 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
 
                       if (loadingStats)
                         const Center(child: CircularProgressIndicator())
+                      else if (statsError != null)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.red.withValues(alpha: 0.2),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.error_outline,
+                                color: Colors.red,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  statsError!,
+                                  style: const TextStyle(color: Colors.red),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: loadStats,
+                                child: const Text("Retry"),
+                              ),
+                            ],
+                          ),
+                        )
                       else
-                        Row(
-                          children: [
-                            _StatBox(
-                                "Applied", applied.toString(), Icons.people),
-                            _StatBox("Approved", approved.toString(),
-                                Icons.check_circle,
-                                color: Colors.green),
-                            _StatBox(
-                                "Pending", pending.toString(), Icons.schedule,
-                                color: Colors.orange),
-                            _StatBox(
-                                "Rejected", rejected.toString(), Icons.cancel,
-                                color: Colors.red),
-                          ],
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final itemWidth = constraints.maxWidth >= 720
+                                ? (constraints.maxWidth - 24) / 4
+                                : (constraints.maxWidth - 8) / 2;
+                            return Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                SizedBox(
+                                  width: itemWidth,
+                                  child: _StatBox(
+                                    "Applied",
+                                    applied.toString(),
+                                    Icons.people,
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: itemWidth,
+                                  child: _StatBox(
+                                    "Approved",
+                                    approved.toString(),
+                                    Icons.check_circle,
+                                    color: Colors.green,
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: itemWidth,
+                                  child: _StatBox(
+                                    "Pending",
+                                    pending.toString(),
+                                    Icons.schedule,
+                                    color: Colors.orange,
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: itemWidth,
+                                  child: _StatBox(
+                                    "Rejected",
+                                    rejected.toString(),
+                                    Icons.cancel,
+                                    color: Colors.red,
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: itemWidth,
+                                  child: _StatBox(
+                                    "Cancelled",
+                                    cancelled.toString(),
+                                    Icons.remove_circle_outline,
+                                    color: Colors.grey.shade700,
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: itemWidth,
+                                  child: _StatBox(
+                                    "No-show",
+                                    noShow.toString(),
+                                    Icons.person_off_outlined,
+                                    color: Colors.deepOrange,
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
                         ),
 
                       const SizedBox(height: 24),
@@ -340,7 +412,8 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
                       _detailRow("End Time", _fmtTime(event["end_time"])),
                       _detailRow(
                         "Max Volunteers",
-                        (event["volunteers_required"] ?? event["max_volunteers"])
+                        (event["volunteers_required"] ??
+                                    event["max_volunteers"])
                                 ?.toString() ??
                             "Unlimited",
                       ),
@@ -397,15 +470,19 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
                         children: [
                           Expanded(
                             child: ElevatedButton.icon(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => AdminApplicationsScreen(
-                                        eventId: widget.event["id"]),
-                                  ),
-                                );
-                              },
+                              onPressed: eventId == null
+                                  ? null
+                                  : () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              AdminApplicationsScreen(
+                                            eventId: eventId,
+                                          ),
+                                        ),
+                                      );
+                                    },
                               icon: const Icon(Icons.people),
                               label: const Text("View Applications"),
                             ),
@@ -463,47 +540,32 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
   static String _formatEventDateRange(Map event) {
     final startDateRaw = event["event_date"]?.toString();
     final endDateRaw = event["end_date"]?.toString();
-    
+
     if (startDateRaw == null || startDateRaw.isEmpty) return "-";
-    
-    final startDate = startDateRaw.split("T")[0];
-    
+    final startDate = IstDateTime.formatDate(startDateRaw);
+
     // If no end date, show single date
     if (endDateRaw == null || endDateRaw.isEmpty) {
       return startDate;
     }
-    
-    final endDate = endDateRaw.split("T")[0];
-    
+
+    final endDate = IstDateTime.formatDate(endDateRaw);
+
     // If dates are the same, show single date
     if (startDate == endDate) {
       return startDate;
     }
-    
+
     // Show date range for multi-day events
     return "$startDate to $endDate";
   }
 
   static String _fmtDate(dynamic value) {
-    if (value == null) return "-";
-    final text = value.toString();
-    if (text.isEmpty) return "-";
-    return text.split("T")[0];
+    return IstDateTime.formatDate(value);
   }
 
   static String _fmtTime(dynamic value) {
-    if (value == null) return "-";
-    final text = value.toString();
-    if (text.isEmpty) return "-";
-
-    // Handle datetime format (e.g., "2024-01-01T14:30:00.000Z")
-    final parts = text.split("T");
-    if (parts.length > 1) {
-      return parts[1].split(".")[0];
-    }
-
-    // If no "T" separator, return the time as-is (assuming it's already in time format)
-    return text;
+    return IstDateTime.formatTime(value);
   }
 
   int? _toInt(dynamic value) {
@@ -524,35 +586,32 @@ class _StatBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: color?.withValues(alpha: 0.1) ?? const Color(0xFFF7F9FD),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: color?.withValues(alpha: 0.3) ?? Colors.grey.shade300,
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color?.withValues(alpha: 0.1) ?? const Color(0xFFF7F9FD),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color?.withValues(alpha: 0.3) ?? Colors.grey.shade300,
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 20, color: color),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
           ),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, size: 20, color: color),
-            const SizedBox(height: 6),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-            Text(
-              label,
-              style: TextStyle(fontSize: 12, color: color),
-            ),
-          ],
-        ),
+          Text(
+            label,
+            style: TextStyle(fontSize: 12, color: color),
+          ),
+        ],
       ),
     );
   }

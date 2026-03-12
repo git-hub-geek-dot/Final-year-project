@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:frontend/widgets/app_background.dart';
 import 'package:frontend/widgets/error_state.dart';
 import '../../services/admin_service.dart';
+import '../../utils/ist_date_time.dart';
 import 'admin_event_details_screen.dart';
 
 class AdminEventsScreen extends StatefulWidget {
@@ -171,7 +172,6 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
 
                       return Column(
                         children: [
-
                           Padding(
                             padding: const EdgeInsets.all(8),
                             child: TextField(
@@ -182,7 +182,6 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
                               onChanged: (v) => setState(() => search = v),
                             ),
                           ),
-
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 8),
                             child: Row(
@@ -213,7 +212,6 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
                               ],
                             ),
                           ),
-
                           Expanded(
                             child: filtered.isEmpty
                                 ? const Center(child: Text("No events found"))
@@ -389,12 +387,11 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
 
   String _formatEventDate(String? dateString) {
     if (dateString == null) return "Date TBA";
-    final date = DateTime.tryParse(dateString);
+    final date = IstDateTime.tryParse(dateString);
     if (date == null) return "Invalid Date";
 
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final eventDate = DateTime(date.year, date.month, date.day);
+    final today = IstDateTime.startOfDay(IstDateTime.now());
+    final eventDate = IstDateTime.startOfDay(date);
 
     if (eventDate == today) {
       return "Today, ${date.hour}:${date.minute.toString().padLeft(2, '0')}";
@@ -421,8 +418,8 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
         break;
       case "event_date":
       default:
-        final aDate = DateTime.tryParse((a["event_date"] ?? "").toString());
-        final bDate = DateTime.tryParse((b["event_date"] ?? "").toString());
+        final aDate = IstDateTime.tryParse((a["event_date"] ?? "").toString());
+        final bDate = IstDateTime.tryParse((b["event_date"] ?? "").toString());
         result = (aDate ?? DateTime(1970)).compareTo(bDate ?? DateTime(1970));
         break;
     }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/notification_api_service.dart';
+import '../../utils/ist_date_time.dart';
 
 class EventAnnouncementsScreen extends StatefulWidget {
   final int eventId;
@@ -45,15 +46,14 @@ class _EventAnnouncementsScreenState extends State<EventAnnouncementsScreen> {
           .whereType<Map>()
           .map((e) => e.cast<String, dynamic>())
           .where((row) {
-            final data = (row["data"] is Map)
-                ? (row["data"] as Map).cast<String, dynamic>()
-                : <String, dynamic>{};
-            final type = (data["type"] ?? "").toString();
-            final rawEventId = data["eventId"] ?? data["event_id"];
-            final eventId = int.tryParse(rawEventId?.toString() ?? "");
-            return type == "event_announcement" && eventId == widget.eventId;
-          })
-          .toList();
+        final data = (row["data"] is Map)
+            ? (row["data"] as Map).cast<String, dynamic>()
+            : <String, dynamic>{};
+        final type = (data["type"] ?? "").toString();
+        final rawEventId = data["eventId"] ?? data["event_id"];
+        final eventId = int.tryParse(rawEventId?.toString() ?? "");
+        return type == "event_announcement" && eventId == widget.eventId;
+      }).toList();
 
       setState(() {
         items = filtered;
@@ -69,7 +69,7 @@ class _EventAnnouncementsScreenState extends State<EventAnnouncementsScreen> {
 
   String _formatTime(String? raw) {
     if (raw == null || raw.isEmpty) return "";
-    final dt = DateTime.tryParse(raw);
+    final dt = IstDateTime.tryParse(raw);
     if (dt == null) return "";
     final y = dt.year.toString().padLeft(4, '0');
     final m = dt.month.toString().padLeft(2, '0');
@@ -102,9 +102,11 @@ class _EventAnnouncementsScreenState extends State<EventAnnouncementsScreen> {
                       separatorBuilder: (_, __) => const SizedBox(height: 10),
                       itemBuilder: (context, index) {
                         final row = items[index];
-                        final title = (row["title"] ?? "Announcement").toString();
+                        final title =
+                            (row["title"] ?? "Announcement").toString();
                         final body = (row["body"] ?? "").toString();
-                        final createdAt = _formatTime(row["created_at"]?.toString());
+                        final createdAt =
+                            _formatTime(row["created_at"]?.toString());
 
                         return Container(
                           padding: const EdgeInsets.all(14),

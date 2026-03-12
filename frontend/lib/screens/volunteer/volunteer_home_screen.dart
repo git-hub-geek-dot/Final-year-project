@@ -12,6 +12,7 @@ import '../../services/saved_events_service.dart';
 import '../../services/token_service.dart';
 import '../../services/notification_api_service.dart';
 import '../../theme/app_colors.dart';
+import '../../utils/ist_date_time.dart';
 import '../chat/chat_inbox_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../../widgets/robust_image.dart';
@@ -495,8 +496,8 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
         .toList();
 
     upcoming.sort((a, b) {
-      final aDate = DateTime.tryParse(a["event_date"]?.toString() ?? "");
-      final bDate = DateTime.tryParse(b["event_date"]?.toString() ?? "");
+      final aDate = IstDateTime.tryParse(a["event_date"]?.toString() ?? "");
+      final bDate = IstDateTime.tryParse(b["event_date"]?.toString() ?? "");
       if (aDate == null || bDate == null) return 0;
       return aDate.compareTo(bDate);
     });
@@ -524,8 +525,8 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
         .toList();
 
     ongoing.sort((a, b) {
-      final aDate = DateTime.tryParse(a["event_date"]?.toString() ?? "");
-      final bDate = DateTime.tryParse(b["event_date"]?.toString() ?? "");
+      final aDate = IstDateTime.tryParse(a["event_date"]?.toString() ?? "");
+      final bDate = IstDateTime.tryParse(b["event_date"]?.toString() ?? "");
       if (aDate == null || bDate == null) return 0;
       return aDate.compareTo(bDate);
     });
@@ -554,7 +555,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     final endDateTime = endTime.trim().isEmpty
         ? DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59)
         : _dateWithTime(endDate, endTime);
-    return DateTime.now().isAfter(endDateTime);
+    return IstDateTime.now().isAfter(endDateTime);
   }
 
   List<Map<String, dynamic>> _getPendingRatingApplications() {
@@ -687,7 +688,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
 
   DateTime? _parseEventDate(String? rawDate) {
     if (rawDate == null || rawDate.isEmpty) return null;
-    return DateTime.tryParse(rawDate);
+    return IstDateTime.tryParse(rawDate);
   }
 
   DateTime _dateWithTime(DateTime date, String? rawTime) {
@@ -708,7 +709,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     if (startDate == null) return false;
     final startDateTime =
         _dateWithTime(startDate, event["start_time"]?.toString());
-    final now = DateTime.now();
+    final now = IstDateTime.now();
     return startDateTime.isAfter(now);
   }
 
@@ -722,7 +723,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     if (endDateTime.isBefore(startDateTime)) {
       endDateTime = startDateTime;
     }
-    final now = DateTime.now();
+    final now = IstDateTime.now();
     return !now.isBefore(startDateTime) && !now.isAfter(endDateTime);
   }
 
@@ -791,16 +792,16 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
         }
 
         // If same category match and distance, sort by date
-        final aDate = DateTime.tryParse(a["event_date"]?.toString() ?? "");
-        final bDate = DateTime.tryParse(b["event_date"]?.toString() ?? "");
+        final aDate = IstDateTime.tryParse(a["event_date"]?.toString() ?? "");
+        final bDate = IstDateTime.tryParse(b["event_date"]?.toString() ?? "");
         if (aDate == null || bDate == null) return 0;
         return aDate.compareTo(bDate);
       });
     } else {
       // No applications yet, fallback to date-based sorting
       upcoming.sort((a, b) {
-        final aDate = DateTime.tryParse(a["event_date"]?.toString() ?? "");
-        final bDate = DateTime.tryParse(b["event_date"]?.toString() ?? "");
+        final aDate = IstDateTime.tryParse(a["event_date"]?.toString() ?? "");
+        final bDate = IstDateTime.tryParse(b["event_date"]?.toString() ?? "");
         if (aDate == null || bDate == null) return 0;
         return aDate.compareTo(bDate);
       });
@@ -1245,7 +1246,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
 
     if (startDateRaw == null || startDateRaw.isEmpty) return "";
 
-    final startParsed = DateTime.tryParse(startDateRaw);
+    final startParsed = IstDateTime.tryParse(startDateRaw);
     if (startParsed == null) return "";
 
     final startFormatted =
@@ -1256,7 +1257,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
       return startFormatted;
     }
 
-    final endParsed = DateTime.tryParse(endDateRaw);
+    final endParsed = IstDateTime.tryParse(endDateRaw);
     if (endParsed == null) return startFormatted;
 
     // If dates are the same, show single date
@@ -1359,12 +1360,11 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
   bool _isPastEventDate(String? rawDate) {
     if (rawDate == null || rawDate.isEmpty) return false;
 
-    final parsed = DateTime.tryParse(rawDate);
+    final parsed = IstDateTime.tryParse(rawDate);
     if (parsed == null) return false;
 
-    final now = DateTime.now();
-    final eventDateOnly = DateTime(parsed.year, parsed.month, parsed.day);
-    final today = DateTime(now.year, now.month, now.day);
+    final eventDateOnly = IstDateTime.startOfDay(parsed);
+    final today = IstDateTime.startOfDay(IstDateTime.now());
 
     return eventDateOnly.isBefore(today);
   }
@@ -1469,7 +1469,8 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
               onTap: (i) => setState(() => selectedIndex = i),
               items: const [
                 BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-                BottomNavigationBarItem(icon: Icon(Icons.event), label: "Events"),
+                BottomNavigationBarItem(
+                    icon: Icon(Icons.event), label: "Events"),
                 BottomNavigationBarItem(
                     icon: Icon(Icons.leaderboard), label: "Leaderboard"),
                 BottomNavigationBarItem(

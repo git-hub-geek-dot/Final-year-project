@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:frontend/widgets/app_background.dart';
 import 'package:frontend/widgets/error_state.dart';
 import '../../services/admin_service.dart';
+import '../../utils/ist_date_time.dart';
 
 class AdminUsersScreen extends StatefulWidget {
   const AdminUsersScreen({super.key});
@@ -21,7 +22,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   final Set<int> selectedUserIds = {};
 
   String search = "";
-  String statusFilter = "all"; // all | active | inactive | banned
+  String statusFilter = "all"; // all | active | inactive | banned | suspended
   String roleFilter = "all"; // all | volunteer | organiser | admin
   String sortField = "created_at"; // name | created_at | status
   bool sortAsc = false;
@@ -74,16 +75,46 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
   bool get _selectionMode => selectedUserIds.isNotEmpty;
 
+  DateTime? _parseDateTime(dynamic value) {
+    if (value == null) return null;
+    return IstDateTime.tryParse(value);
+  }
+
+  bool _isCurrentlySuspended(Map user) {
+    final suspendedUntil = _parseDateTime(user["suspended_until"]);
+    return suspendedUntil != null && suspendedUntil.isAfter(IstDateTime.now());
+  }
+
+  String _effectiveStatus(Map user) {
+    if (_isCurrentlySuspended(user)) return "suspended";
+    return (user["status"] ?? "").toString().toLowerCase();
+  }
+
+  String _statusLabel(String status) {
+    switch (status.toLowerCase()) {
+      case 'active':
+        return 'Active';
+      case 'inactive':
+        return 'Inactive';
+      case 'banned':
+        return 'Banned';
+      case 'suspended':
+        return 'Suspended';
+      default:
+        return status;
+    }
+  }
+
   List<Map<String, dynamic>> _getFilteredUsers() {
     final filtered = users
         .where((u) {
           final name = (u["name"] ?? "").toString().toLowerCase();
           final email = (u["email"] ?? "").toString().toLowerCase();
-          final matchSearch =
-              name.contains(search) || email.contains(search);
+          final matchSearch = name.contains(search) || email.contains(search);
+          final effectiveStatus = _effectiveStatus(u as Map);
 
           final matchStatus =
-              statusFilter == "all" || u["status"] == statusFilter;
+              statusFilter == "all" || effectiveStatus == statusFilter;
 
           final matchRole = roleFilter == "all" || u["role"] == roleFilter;
 
@@ -393,12 +424,9 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     final isAdmin = user["role"] == "admin";
     final isVerified = user["isVerified"] == true;
     final strikeCount = (user["strike_count"] as num?)?.toInt() ?? 0;
-    final suspendedUntilRaw = user["suspended_until"];
-    final suspendedUntil = suspendedUntilRaw == null
-        ? null
-        : DateTime.tryParse(suspendedUntilRaw.toString());
-    final isSuspended =
-        suspendedUntil != null && suspendedUntil.isAfter(DateTime.now());
+    final suspendedUntil = _parseDateTime(user["suspended_until"]);
+    final effectiveStatus = _effectiveStatus(user);
+    final isSuspended = effectiveStatus == "suspended";
     final userId = (user["id"] as num?)?.toInt();
     final canSelect = !isAdmin && userId != null;
     final selected = userId != null && selectedUserIds.contains(userId);
@@ -465,7 +493,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                           ),
                         ),
                         SizedBox(width: isSmallScreen ? 6 : 8),
-                        _buildStatusBadge(user["status"], isSuspended),
+                        _buildStatusBadge(effectiveStatus),
                       ],
                     ),
 
@@ -537,7 +565,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                     if (isSuspended) ...[
                       SizedBox(height: isSmallScreen ? 3 : 4),
                       Text(
-                        "Suspended until ${_formatDateTime(suspendedUntil)}",
+                        "Suspended until ${_formatDateTime(suspendedUntil!)}",
                         style: TextStyle(
                           color: Colors.red.shade700,
                           fontSize: isSmallScreen ? 11 : 12,
@@ -863,37 +891,36 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     );
   }
 
-  Widget _buildStatusBadge(String status, bool isSuspended) {
+  Widget _buildStatusBadge(String status) {
     Color color;
     IconData icon;
     String label;
 
-    if (isSuspended) {
-      color = Colors.red;
-      icon = Icons.pause_circle;
-      label = "Suspended";
-    } else {
-      switch (status) {
-        case 'active':
-          color = Colors.green;
-          icon = Icons.check_circle;
-          label = "Active";
-          break;
-        case 'inactive':
-          color = Colors.orange;
-          icon = Icons.pause_circle;
-          label = "Inactive";
-          break;
-        case 'banned':
-          color = Colors.red;
-          icon = Icons.block;
-          label = "Banned";
-          break;
-        default:
-          color = Colors.grey;
-          icon = Icons.help;
-          label = status;
-      }
+    switch (status) {
+      case 'active':
+        color = Colors.green;
+        icon = Icons.check_circle;
+        label = "Active";
+        break;
+      case 'inactive':
+        color = Colors.orange;
+        icon = Icons.pause_circle;
+        label = "Inactive";
+        break;
+      case 'banned':
+        color = Colors.red;
+        icon = Icons.block;
+        label = "Banned";
+        break;
+      case 'suspended':
+        color = Colors.red;
+        icon = Icons.pause_circle;
+        label = "Suspended";
+        break;
+      default:
+        color = Colors.grey;
+        icon = Icons.help;
+        label = status;
     }
 
     return Container(
@@ -1064,6 +1091,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                   selected: statusFilter == 'banned',
                                   onSelected: (selected) =>
                                       setState(() => statusFilter = 'banned'),
+                                ),
+                                _buildFilterChip(
+                                  label: 'Suspended',
+                                  selected: statusFilter == 'suspended',
+                                  onSelected: (selected) => setState(
+                                      () => statusFilter = 'suspended'),
                                 ),
                                 const SizedBox(width: 16),
                                 _buildFilterChip(
@@ -1242,20 +1275,17 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     final name = user["name"] ?? "-";
     final email = user["email"] ?? "-";
     final role = user["role"] ?? "-";
-    final status = user["status"] ?? "-";
+    final status = _statusLabel(_effectiveStatus(user));
     final city = user["city"] ?? "-";
     final contact = user["contact_number"] ?? "-";
-    final createdAt = (user["created_at"] ?? "-").toString();
+    final joinedAt = _parseDateTime(user["created_at"]);
+    final createdAt = joinedAt == null ? "-" : _formatDateTime(joinedAt);
     final profileUrl = (user["profile_picture_url"] ?? "").toString();
     final isVerified = user["isVerified"] == true;
     final strikeCount = (user["strike_count"] as num?)?.toInt() ?? 0;
     final strikeHistory = (user["strike_history"] as List?) ?? [];
-    final suspendedUntilRaw = user["suspended_until"];
-    final suspendedUntil = suspendedUntilRaw == null
-        ? null
-        : DateTime.tryParse(suspendedUntilRaw.toString());
-    final isSuspended =
-        suspendedUntil != null && suspendedUntil.isAfter(DateTime.now());
+    final suspendedUntil = _parseDateTime(user["suspended_until"]);
+    final isSuspended = _isCurrentlySuspended(user);
     final suspensionReason = (user["suspension_reason"] ?? "-").toString();
     final adminNote = (user["admin_note"] ?? "").toString();
 
@@ -1268,63 +1298,63 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-            Center(
-              child: CircleAvatar(
-                radius: 36,
-                backgroundImage:
-                    profileUrl.isNotEmpty ? NetworkImage(profileUrl) : null,
-                onBackgroundImageError:
-                    profileUrl.isNotEmpty ? (_, __) {} : null,
-                child: profileUrl.isEmpty
-                    ? const Icon(Icons.person, size: 36)
-                    : null,
+              Center(
+                child: CircleAvatar(
+                  radius: 36,
+                  backgroundImage:
+                      profileUrl.isNotEmpty ? NetworkImage(profileUrl) : null,
+                  onBackgroundImageError:
+                      profileUrl.isNotEmpty ? (_, __) {} : null,
+                  child: profileUrl.isEmpty
+                      ? const Icon(Icons.person, size: 36)
+                      : null,
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            _detailRow("Name", name),
-            _detailRow("Email", email),
-            _detailRow("Role", role),
-            _detailRow("Verified", isVerified ? "Yes" : "No"),
-            _detailRow("Status", status),
-            _detailRow("Strikes", strikeCount.toString()),
-            if (strikeHistory.isNotEmpty) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 12),
+              _detailRow("Name", name),
+              _detailRow("Email", email),
+              _detailRow("Role", role),
+              _detailRow("Verified", isVerified ? "Yes" : "No"),
+              _detailRow("Status", status),
+              _detailRow("Strikes", strikeCount.toString()),
+              if (strikeHistory.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                const Text(
+                  "Strike History",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 6),
+                ...strikeHistory.map((entry) {
+                  final reason = (entry["reason"] ?? "-").toString();
+                  final createdAtRaw = entry["created_at"];
+                  final createdAt = createdAtRaw == null
+                      ? "-"
+                      : _formatDateTime(
+                          IstDateTime.tryParse(createdAtRaw) ??
+                              DateTime.fromMillisecondsSinceEpoch(0),
+                        );
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text("- $createdAt: $reason"),
+                  );
+                }),
+              ],
+              _detailRow(
+                "Suspended",
+                isSuspended ? _formatDateTime(suspendedUntil!) : "No",
+              ),
+              if (isSuspended) _detailRow("Reason", suspensionReason),
+              _detailRow("City", city),
+              _detailRow("Contact", contact),
+              _detailRow("Joined", createdAt),
+              const SizedBox(height: 8),
               const Text(
-                "Strike History",
+                "Admin Note",
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 6),
-              ...strikeHistory.map((entry) {
-                final reason = (entry["reason"] ?? "-").toString();
-                final createdAtRaw = entry["created_at"];
-                final createdAt = createdAtRaw == null
-                    ? "-"
-                    : _formatDateTime(
-                        DateTime.tryParse(createdAtRaw.toString()) ??
-                            DateTime.fromMillisecondsSinceEpoch(0),
-                      );
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Text("- $createdAt: $reason"),
-                );
-              }),
+              const SizedBox(height: 4),
+              Text(adminNote.isEmpty ? "-" : adminNote),
             ],
-            _detailRow(
-              "Suspended",
-              isSuspended ? _formatDateTime(suspendedUntil) : "No",
-            ),
-            if (isSuspended) _detailRow("Reason", suspensionReason),
-            _detailRow("City", city),
-            _detailRow("Contact", contact),
-            _detailRow("Joined", createdAt),
-            const SizedBox(height: 8),
-            const Text(
-              "Admin Note",
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            Text(adminNote.isEmpty ? "-" : adminNote),
-          ],
           ),
         ),
         actions: [
@@ -1544,14 +1574,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             .compareTo((b["name"] ?? "").toString().toLowerCase());
         break;
       case "status":
-        result = (a["status"] ?? "")
-            .toString()
-            .compareTo((b["status"] ?? "").toString());
+        result = _effectiveStatus(a).compareTo(_effectiveStatus(b));
         break;
       case "created_at":
       default:
-        final aDate = DateTime.tryParse((a["created_at"] ?? "").toString());
-        final bDate = DateTime.tryParse((b["created_at"] ?? "").toString());
+        final aDate = IstDateTime.tryParse((a["created_at"] ?? "").toString());
+        final bDate = IstDateTime.tryParse((b["created_at"] ?? "").toString());
         result = (aDate ?? DateTime(1970)).compareTo(bDate ?? DateTime(1970));
         break;
     }

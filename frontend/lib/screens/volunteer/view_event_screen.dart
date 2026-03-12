@@ -8,6 +8,7 @@ import '../../services/rating_service.dart';
 import '../../services/saved_events_service.dart';
 import '../../services/verification_service.dart';
 import '../../services/event_service.dart';
+import '../../utils/ist_date_time.dart';
 import 'view_organiser_profile_screen.dart';
 import 'get_verified_screen.dart';
 import '../chat/event_group_chat_screen.dart';
@@ -718,8 +719,8 @@ Join on VolunteerX
                       MaterialPageRoute(
                         builder: (_) => EventAnnouncementsScreen(
                           eventId: eventId,
-                          eventTitle: (widget.event["title"] ?? "Event")
-                              .toString(),
+                          eventTitle:
+                              (widget.event["title"] ?? "Event").toString(),
                         ),
                       ),
                     );
@@ -743,8 +744,8 @@ Join on VolunteerX
                       MaterialPageRoute(
                         builder: (_) => EventGroupChatScreen(
                           eventId: eventId,
-                          eventTitle: (widget.event["title"] ?? "Event")
-                              .toString(),
+                          eventTitle:
+                              (widget.event["title"] ?? "Event").toString(),
                         ),
                       ),
                     );
@@ -797,7 +798,7 @@ Join on VolunteerX
     final eventDateRaw = widget.event["event_date"]?.toString();
     if (eventDateRaw == null || eventDateRaw.isEmpty) return null;
 
-    final eventDate = DateTime.tryParse(eventDateRaw);
+    final eventDate = IstDateTime.tryParse(eventDateRaw);
     if (eventDate == null) return null;
 
     final startTimeRaw = widget.event["start_time"]?.toString();
@@ -831,7 +832,7 @@ Join on VolunteerX
   double? _hoursBeforeEvent() {
     final start = _eventStartDateTime();
     if (start == null) return null;
-    return start.difference(DateTime.now()).inMinutes / 60.0;
+    return start.difference(IstDateTime.now()).inMinutes / 60.0;
   }
 
   bool _isWithinLockWindow() {
@@ -1164,12 +1165,11 @@ Join on VolunteerX
     final endDateRaw = widget.event["end_date"]?.toString();
     final relevantDateRaw = endDateRaw ?? eventDateRaw;
 
-    final parsed = DateTime.tryParse(relevantDateRaw);
+    final parsed = IstDateTime.tryParse(relevantDateRaw);
     if (parsed == null) return false;
 
-    final now = DateTime.now();
-    final eventDateOnly = DateTime(parsed.year, parsed.month, parsed.day);
-    final today = DateTime(now.year, now.month, now.day);
+    final eventDateOnly = IstDateTime.startOfDay(parsed);
+    final today = IstDateTime.startOfDay(IstDateTime.now());
 
     return eventDateOnly.isBefore(today);
   }

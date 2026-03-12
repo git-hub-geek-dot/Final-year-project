@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../services/event_service.dart';
+import '../../utils/ist_date_time.dart';
 import '../../widgets/organiser_bottom_nav.dart';
 
 class EditEventScreen extends StatefulWidget {
@@ -217,7 +218,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
 
   DateTime? _parseDate(dynamic value) {
     if (value == null) return null;
-    return DateTime.tryParse(value.toString());
+    return IstDateTime.tryParse(value);
   }
 
   TimeOfDay? _parseTime(dynamic value) {
@@ -245,10 +246,11 @@ class _EditEventScreenState extends State<EditEventScreen> {
   }
 
   Future<void> pickDate(bool isStart) async {
+    final today = IstDateTime.startOfDay(IstDateTime.now());
     final picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime.now(),
+      initialDate: today,
+      firstDate: today,
       lastDate: DateTime(2100),
     );
     if (picked != null) {
@@ -267,10 +269,11 @@ class _EditEventScreenState extends State<EditEventScreen> {
   }
 
   Future<void> pickDeadline() async {
+    final today = IstDateTime.startOfDay(IstDateTime.now());
     final picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime.now(),
+      initialDate: today,
+      firstDate: today,
       lastDate: DateTime(2100),
     );
     if (picked != null) setState(() => applicationDeadline = picked);
@@ -289,19 +292,22 @@ class _EditEventScreenState extends State<EditEventScreen> {
 
     setState(() {
       dailySchedules.clear();
-      
+
       DateTime current = eventStartDate!;
       int dayIndex = 0;
-      
-      while (current.isBefore(eventEndDate!) || current.isAtSameMomentAs(eventEndDate!)) {
+
+      while (current.isBefore(eventEndDate!) ||
+          current.isAtSameMomentAs(eventEndDate!)) {
         dayIndex++;
         dailySchedules.add({
           'date': _fmtDate(current),
-          'start_time': eventStartTime != null ? _fmtTime(eventStartTime!) : '09:00:00',
-          'end_time': eventEndTime != null ? _fmtTime(eventEndTime!) : '17:00:00',
+          'start_time':
+              eventStartTime != null ? _fmtTime(eventStartTime!) : '09:00:00',
+          'end_time':
+              eventEndTime != null ? _fmtTime(eventEndTime!) : '17:00:00',
           'dayNumber': dayIndex,
         });
-        
+
         current = current.add(const Duration(days: 1));
       }
     });
@@ -487,7 +493,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
                 "Application Deadline", applicationDeadline, pickDeadline),
           ]),
           // Daily Schedules Section for Multi-day Events
-          if (eventStartDate != null && eventEndDate != null && eventStartDate != eventEndDate)
+          if (eventStartDate != null &&
+              eventEndDate != null &&
+              eventStartDate != eventEndDate)
             _sectionCard("Daily Schedules", [
               Padding(
                 padding: const EdgeInsets.only(bottom: 12.0),
@@ -525,7 +533,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
                                 ),
                                 if (dailySchedules.length > 1)
                                   IconButton(
-                                    icon: const Icon(Icons.delete, color: Colors.red),
+                                    icon: const Icon(Icons.delete,
+                                        color: Colors.red),
                                     onPressed: () => _removeScheduleDay(index),
                                     padding: EdgeInsets.zero,
                                     constraints: const BoxConstraints(),
@@ -554,7 +563,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: InkWell(
-                                    onTap: () => _editScheduleTime(index, false),
+                                    onTap: () =>
+                                        _editScheduleTime(index, false),
                                     child: Container(
                                       padding: const EdgeInsets.all(12),
                                       decoration: BoxDecoration(
@@ -593,18 +603,16 @@ class _EditEventScreenState extends State<EditEventScreen> {
                             ? Image.network(
                                 bannerImage!.path,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) =>
-                                    const Center(
-                                      child: Icon(Icons.broken_image),
-                                    ),
+                                errorBuilder: (_, __, ___) => const Center(
+                                  child: Icon(Icons.broken_image),
+                                ),
                               )
                             : Image.file(
                                 File(bannerImage!.path),
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) =>
-                                    const Center(
-                                      child: Icon(Icons.broken_image),
-                                    ),
+                                errorBuilder: (_, __, ___) => const Center(
+                                  child: Icon(Icons.broken_image),
+                                ),
                               ),
                       )
                     : existingBanner != null

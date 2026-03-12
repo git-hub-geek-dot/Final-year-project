@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/event_service.dart';
+import '../../utils/ist_date_time.dart';
 import '../../widgets/organiser_bottom_nav.dart';
 import 'view_application_screen.dart';
 import '../notifications/notifications_screen.dart';
@@ -85,8 +86,7 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
   DateTime _appliedAt(Map application) {
     final raw = application["applied_at"];
     if (raw == null) return DateTime.fromMillisecondsSinceEpoch(0);
-    return DateTime.tryParse(raw.toString()) ??
-        DateTime.fromMillisecondsSinceEpoch(0);
+    return IstDateTime.tryParse(raw) ?? DateTime.fromMillisecondsSinceEpoch(0);
   }
 
   int _asInt(dynamic value) {
@@ -431,7 +431,7 @@ class ApplicationCard extends StatelessWidget {
 
   String get appliedDateText {
     if (appliedAt == null) return "Applied: -";
-    final parsed = DateTime.tryParse(appliedAt.toString());
+    final parsed = IstDateTime.tryParse(appliedAt);
     if (parsed == null) return "Applied: -";
     final month = parsed.month.toString().padLeft(2, '0');
     final day = parsed.day.toString().padLeft(2, '0');

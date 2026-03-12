@@ -5,6 +5,7 @@ import 'package:frontend/widgets/app_background.dart';
 import 'package:frontend/widgets/error_state.dart';
 
 import '../../services/admin_service.dart';
+import '../../utils/ist_date_time.dart';
 
 class AdminReportsScreen extends StatefulWidget {
   const AdminReportsScreen({super.key});
@@ -89,10 +90,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
   }
 
   String _formatDate(dynamic raw) {
-    if (raw == null) return "-";
-    final dt = DateTime.tryParse(raw.toString());
-    if (dt == null) return "-";
-    return "${dt.year.toString().padLeft(4, '0')}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+    return IstDateTime.formatDateTime(raw);
   }
 
   Color _statusColor(String status) {
@@ -104,6 +102,25 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
       default:
         return Colors.orange;
     }
+  }
+
+  String _formatActionTaken(dynamic raw) {
+    final action = (raw ?? "").toString().trim().toLowerCase();
+    if (action.isEmpty) return "-";
+    if (action == "none") return "Resolved without action";
+    if (action == "dismissed") return "Dismissed";
+    if (action == "cancel_event") return "Event removed";
+    if (action.startsWith("strike_")) {
+      final suffix = action.substring("strike_".length).replaceAll("_", " ");
+      return "Strike: $suffix";
+    }
+    if (action.startsWith("suspend_") && action.endsWith("_days")) {
+      final days = action
+          .substring("suspend_".length, action.length - "_days".length)
+          .replaceAll("_", " ");
+      return "Suspended user ($days days)";
+    }
+    return action.replaceAll("_", " ");
   }
 
   String _targetTitle(Map report) {
@@ -346,7 +363,9 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
               if (report["resolved_at"] != null)
                 Text("Resolved: ${_formatDate(report["resolved_at"])}"),
               if ((report["action_taken"] ?? "").toString().isNotEmpty)
-                Text("Action: ${report["action_taken"]}"),
+                Text(
+                  "Action: ${_formatActionTaken(report["action_taken"])}",
+                ),
               if ((report["admin_note"] ?? "").toString().isNotEmpty)
                 Text("Admin note: ${report["admin_note"]}"),
             ],
@@ -423,7 +442,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
               onPressed: () async {
                 Navigator.pop(ctx);
                 final reason = await _promptText(
-                  title: "Cancel event",
+                  title: "Remove event",
                   hint: "Reason shown to organiser (optional)",
                   maxLength: 500,
                   isRequired: false,
@@ -438,7 +457,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                   cancelReason: reason,
                 );
               },
-              child: const Text("Cancel event"),
+              child: const Text("Remove event"),
             ),
         ],
       ),
@@ -487,8 +506,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                                 isExpanded: true,
                                 items: const [
                                   DropdownMenuItem(
-                                      value: "pending",
-                                      child: Text("Pending")),
+                                      value: "pending", child: Text("Pending")),
                                   DropdownMenuItem(
                                       value: "resolved",
                                       child: Text("Resolved")),

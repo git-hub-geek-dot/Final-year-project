@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../utils/ist_date_time.dart';
+
 class NotificationItem {
   final String id;
   final String title;
@@ -34,13 +36,9 @@ class NotificationItem {
       title: (json["title"] ?? "").toString(),
       body: (json["body"] ?? "").toString(),
       data: (json["data"] as Map?)?.cast<String, dynamic>() ?? {},
-      receivedAt: DateTime.tryParse(
-            (json["receivedAt"] ?? "").toString(),
-          ) ??
-          DateTime.now(),
-      readAt: json["readAt"] != null
-          ? DateTime.tryParse(json["readAt"].toString())
-          : null,
+      receivedAt: IstDateTime.tryParse(json["receivedAt"]) ?? IstDateTime.now(),
+      readAt:
+          json["readAt"] != null ? IstDateTime.tryParse(json["readAt"]) : null,
     );
   }
 }
@@ -97,7 +95,7 @@ class NotificationStore {
         body: item.body,
         data: item.data,
         receivedAt: item.receivedAt,
-        readAt: item.readAt ?? DateTime.now(),
+        readAt: item.readAt ?? IstDateTime.now(),
       );
     }).toList();
 
@@ -110,7 +108,7 @@ class NotificationStore {
   static Future<void> markAllRead() async {
     final prefs = await SharedPreferences.getInstance();
     final existing = await getAll();
-    final now = DateTime.now();
+    final now = IstDateTime.now();
     final updated = existing.map((item) {
       if (item.readAt != null) return item;
       return NotificationItem(

@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 
 import '../../services/chat_service.dart';
+import '../../utils/ist_date_time.dart';
 import '../../services/token_service.dart';
 import '../../services/report_service.dart';
 
@@ -87,8 +88,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final data = await ChatService.fetchMessages(widget.threadId);
       final pendingLocal = _messages
           .where((m) =>
-              _deliveryStatus(m) == "failed" ||
-              _deliveryStatus(m) == "sending")
+              _deliveryStatus(m) == "failed" || _deliveryStatus(m) == "sending")
           .map((m) {
         final copy = _normalizeMessage(Map<String, dynamic>.from(m));
         if (_deliveryStatus(copy) == "sending") {
@@ -106,8 +106,7 @@ class _ChatScreenState extends State<ChatScreen> {
         final localServerId = local["id"];
 
         final exists = messages.any((server) {
-          final serverClientId =
-              (server["client_message_id"] ?? "").toString();
+          final serverClientId = (server["client_message_id"] ?? "").toString();
           final sameClientId = localClientId.isNotEmpty &&
               serverClientId.isNotEmpty &&
               localClientId == serverClientId;
@@ -266,7 +265,7 @@ class _ChatScreenState extends State<ChatScreen> {
       "thread_id": widget.threadId,
       "sender_id": _userId,
       "message": text,
-      "created_at": DateTime.now().toIso8601String(),
+      "created_at": IstDateTime.now().toIso8601String(),
       "client_message_id": clientMessageId,
       "delivery_status": "sending",
       "local_only": true,
@@ -354,7 +353,8 @@ class _ChatScreenState extends State<ChatScreen> {
     );
     if (idx < 0) return;
 
-    final current = _normalizeMessage(Map<String, dynamic>.from(_messages[idx]));
+    final current =
+        _normalizeMessage(Map<String, dynamic>.from(_messages[idx]));
     if (_deliveryStatus(current) == "sent") return;
 
     if (!mounted) return;
@@ -377,7 +377,8 @@ class _ChatScreenState extends State<ChatScreen> {
     );
     if (idx < 0) return;
 
-    final current = _normalizeMessage(Map<String, dynamic>.from(_messages[idx]));
+    final current =
+        _normalizeMessage(Map<String, dynamic>.from(_messages[idx]));
     if (_deliveryStatus(current) == "sent") return;
 
     if (!mounted) return;
@@ -512,9 +513,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<String> _connectionErrorMessage() async {
     final baseUrl = ChatService.socketUrl();
     try {
-      await http
-          .get(Uri.parse(baseUrl))
-          .timeout(const Duration(seconds: 2));
+      await http.get(Uri.parse(baseUrl)).timeout(const Duration(seconds: 2));
       return "Disconnected from chat server. Please try again.";
     } on TimeoutException {
       return "Disconnected from chat server. Please try again.";

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../services/chat_service.dart';
 import '../../services/token_service.dart';
+import '../../utils/ist_date_time.dart';
 import 'chat_screen.dart';
 
 class ChatInboxScreen extends StatefulWidget {
@@ -38,9 +39,9 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
 
   String _formatThreadTime(dynamic raw) {
     if (raw == null) return "";
-    final dt = DateTime.tryParse(raw.toString());
+    final dt = IstDateTime.tryParse(raw);
     if (dt == null) return "";
-    final now = DateTime.now();
+    final now = IstDateTime.now();
     final isToday =
         dt.year == now.year && dt.month == now.month && dt.day == now.day;
     if (isToday) {
@@ -96,7 +97,8 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                         item["last_message"] ?? "No messages yet";
                     final unreadCount = item["unread_count"] is int
                         ? item["unread_count"] as int
-                        : int.tryParse(item["unread_count"]?.toString() ?? "") ??
+                        : int.tryParse(
+                                item["unread_count"]?.toString() ?? "") ??
                             0;
                     final timeText = _formatThreadTime(item["last_message_at"]);
 

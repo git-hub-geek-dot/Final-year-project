@@ -5,6 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/api_config.dart';
+import '../utils/ist_date_time.dart';
 import 'notification_store.dart';
 import 'token_service.dart';
 
@@ -73,8 +74,8 @@ class NotificationService {
         message.data["message"]?.toString() ??
         "";
 
-    final id = message.messageId ??
-        DateTime.now().millisecondsSinceEpoch.toString();
+    final id =
+        message.messageId ?? DateTime.now().millisecondsSinceEpoch.toString();
 
     await NotificationStore.add(
       NotificationItem(
@@ -82,7 +83,7 @@ class NotificationService {
         title: title,
         body: body,
         data: Map<String, dynamic>.from(message.data),
-        receivedAt: DateTime.now(),
+        receivedAt: IstDateTime.now(),
       ),
     );
   }

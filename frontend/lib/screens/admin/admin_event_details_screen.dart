@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/widgets/app_background.dart';
 import '../../services/admin_service.dart';
+import '../../utils/ist_date_time.dart';
 import 'admin_applications_screen.dart';
 import '../../widgets/robust_image.dart';
 
@@ -66,8 +67,7 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
           pending = _toInt(summary["pending"]) ?? 0;
           rejected = _toInt(summary["rejected"]) ?? 0;
           cancelled = _toInt(summary["cancelled"]) ?? 0;
-          noShow =
-              _toInt(summary["no_show"] ?? summary["noShow"]) ?? 0;
+          noShow = _toInt(summary["no_show"] ?? summary["noShow"]) ?? 0;
           loadingStats = false;
           statsError = null;
         });
@@ -76,8 +76,7 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
       if (mounted) {
         setState(() {
           loadingStats = false;
-          statsError =
-              e.toString().replaceFirst("Exception: ", "");
+          statsError = e.toString().replaceFirst("Exception: ", "");
         });
       }
     }
@@ -124,10 +123,10 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
             ),
             ElevatedButton(
               onPressed: isLoading
-                   ? null
-                   : () async {
-                       if (titleController.text.trim().isEmpty ||
-                           messageController.text.trim().isEmpty) {
+                  ? null
+                  : () async {
+                      if (titleController.text.trim().isEmpty ||
+                          messageController.text.trim().isEmpty) {
                         messenger.showSnackBar(
                           const SnackBar(
                             content: Text("Please fill in all fields"),
@@ -138,18 +137,18 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
 
                       setState(() => isLoading = true);
                       final rawId = widget.event["id"];
-                       final eventId = rawId is int
-                           ? rawId
-                           : int.tryParse(rawId?.toString() ?? "");
-                       if (eventId == null) {
-                         if (dialogContext.mounted) {
-                           setState(() => isLoading = false);
-                         }
-                         messenger.showSnackBar(
-                           const SnackBar(content: Text("Invalid event id")),
-                         );
-                         return;
-                       }
+                      final eventId = rawId is int
+                          ? rawId
+                          : int.tryParse(rawId?.toString() ?? "");
+                      if (eventId == null) {
+                        if (dialogContext.mounted) {
+                          setState(() => isLoading = false);
+                        }
+                        messenger.showSnackBar(
+                          const SnackBar(content: Text("Invalid event id")),
+                        );
+                        return;
+                      }
 
                       try {
                         await AdminService.sendEventNotification(
@@ -413,7 +412,8 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
                       _detailRow("End Time", _fmtTime(event["end_time"])),
                       _detailRow(
                         "Max Volunteers",
-                        (event["volunteers_required"] ?? event["max_volunteers"])
+                        (event["volunteers_required"] ??
+                                    event["max_volunteers"])
                                 ?.toString() ??
                             "Unlimited",
                       ),
@@ -473,15 +473,16 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
                               onPressed: eventId == null
                                   ? null
                                   : () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => AdminApplicationsScreen(
-                                      eventId: eventId,
-                                    ),
-                                  ),
-                                );
-                              },
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              AdminApplicationsScreen(
+                                            eventId: eventId,
+                                          ),
+                                        ),
+                                      );
+                                    },
                               icon: const Icon(Icons.people),
                               label: const Text("View Applications"),
                             ),
@@ -539,47 +540,32 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
   static String _formatEventDateRange(Map event) {
     final startDateRaw = event["event_date"]?.toString();
     final endDateRaw = event["end_date"]?.toString();
-    
+
     if (startDateRaw == null || startDateRaw.isEmpty) return "-";
-    
-    final startDate = startDateRaw.split("T")[0];
-    
+    final startDate = IstDateTime.formatDate(startDateRaw);
+
     // If no end date, show single date
     if (endDateRaw == null || endDateRaw.isEmpty) {
       return startDate;
     }
-    
-    final endDate = endDateRaw.split("T")[0];
-    
+
+    final endDate = IstDateTime.formatDate(endDateRaw);
+
     // If dates are the same, show single date
     if (startDate == endDate) {
       return startDate;
     }
-    
+
     // Show date range for multi-day events
     return "$startDate to $endDate";
   }
 
   static String _fmtDate(dynamic value) {
-    if (value == null) return "-";
-    final text = value.toString();
-    if (text.isEmpty) return "-";
-    return text.split("T")[0];
+    return IstDateTime.formatDate(value);
   }
 
   static String _fmtTime(dynamic value) {
-    if (value == null) return "-";
-    final text = value.toString();
-    if (text.isEmpty) return "-";
-
-    // Handle datetime format (e.g., "2024-01-01T14:30:00.000Z")
-    final parts = text.split("T");
-    if (parts.length > 1) {
-      return parts[1].split(".")[0];
-    }
-
-    // If no "T" separator, return the time as-is (assuming it's already in time format)
-    return text;
+    return IstDateTime.formatTime(value);
   }
 
   int? _toInt(dynamic value) {

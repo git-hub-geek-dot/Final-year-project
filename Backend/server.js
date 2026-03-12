@@ -1,3 +1,6 @@
+const { applyProcessTimezone } = require("./config/timezone");
+
+applyProcessTimezone();
 require("dotenv").config();
 // TEMP DEBUG (remove later): verify Render provides DATABASE_URL
 console.log("[TEMP DEBUG] DATABASE_URL present:", Boolean(process.env.DATABASE_URL));

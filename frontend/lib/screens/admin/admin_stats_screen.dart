@@ -9,6 +9,7 @@ import 'admin_applications_screen.dart';
 import 'admin_verification_screen.dart';
 import 'admin_reports_screen.dart';
 import '../../services/admin_service.dart';
+import '../../utils/ist_date_time.dart';
 
 class AdminStatsScreen extends StatefulWidget {
   const AdminStatsScreen({super.key});
@@ -33,7 +34,7 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
     setState(() {
       statsFuture = AdminService.getStats().then((data) {
         if (mounted) {
-          setState(() => lastUpdated = DateTime.now());
+          setState(() => lastUpdated = IstDateTime.now());
         }
         return data;
       });
@@ -296,7 +297,8 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
           );
         }),
         titlesData: FlTitlesData(
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           rightTitles:
               const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           leftTitles: AxisTitles(
@@ -348,7 +350,7 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
   }
 
   String _formatDayLabel(String value) {
-    final parsed = DateTime.tryParse(value);
+    final parsed = IstDateTime.tryParse(value);
     if (parsed == null) return value;
     final mm = parsed.month.toString().padLeft(2, '0');
     final dd = parsed.day.toString().padLeft(2, '0');
@@ -394,7 +396,7 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
 
   String _formatLastUpdated(DateTime? value) {
     if (value == null) return "-";
-    final now = DateTime.now();
+    final now = IstDateTime.now();
     final diff = now.difference(value);
 
     if (diff.inSeconds < 10) return "just now";
@@ -407,9 +409,8 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
     if (diff.inHours < 24) {
       return "${diff.inHours}h ago";
     }
-    return value.toLocal().toString().split(".")[0];
+    return IstDateTime.formatDateTime(value);
   }
-
 }
 
 class _TimePoint {

@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import '../../config/api_config.dart';
 import '../../services/chat_service.dart';
 import '../../services/token_service.dart';
+import '../../utils/ist_date_time.dart';
 import '../../widgets/organiser_bottom_nav.dart';
 import '../chat/chat_screen.dart';
 import '../rating/rating_screen.dart';
@@ -317,7 +318,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
 
   DateTime? _parseDate(dynamic value) {
     if (value == null) return null;
-    return DateTime.tryParse(value.toString());
+    return IstDateTime.tryParse(value);
   }
 
   DateTime _dateWithTime(DateTime date, dynamic rawTime) {
@@ -346,7 +347,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
     if (eventDate == null) return false;
     final endDate = _parseDate(app["end_date"]) ?? eventDate;
     final endDateTime = _dateWithTime(endDate, app["end_time"]);
-    return DateTime.now().isAfter(endDateTime);
+    return IstDateTime.now().isAfter(endDateTime);
   }
 
   @override

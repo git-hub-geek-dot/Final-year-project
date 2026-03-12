@@ -5,6 +5,7 @@ import '../../services/event_service.dart';
 import '../../services/token_service.dart';
 import '../../services/verification_service.dart';
 import '../../services/notification_api_service.dart';
+import '../../utils/ist_date_time.dart';
 import '../../widgets/organiser_bottom_nav.dart';
 import 'create_event_screen.dart';
 import 'review_application_screen.dart';
@@ -798,7 +799,7 @@ Color _statusBg(String status) {
 
 DateTime? _parseEventDate(dynamic value) {
   if (value == null) return null;
-  return DateTime.tryParse(value.toString());
+  return IstDateTime.tryParse(value);
 }
 
 int? _readIntFromKeys(Map event, List<String> keys) {
@@ -814,7 +815,7 @@ int? _readIntFromKeys(Map event, List<String> keys) {
 }
 
 Map<String, dynamic>? _urgencyBadge(Map event, String status) {
-  final now = DateTime.now();
+  final now = IstDateTime.now();
   final eventDate = _parseEventDate(event['event_date']);
   final deadline = _parseEventDate(event['application_deadline']);
 
@@ -927,7 +928,7 @@ List<String> _healthSignals(
   final deadline = _parseEventDate(event['application_deadline']);
   if (status == 'upcoming' &&
       deadline != null &&
-      deadline.isBefore(DateTime.now())) {
+      deadline.isBefore(IstDateTime.now())) {
     signals.add('Application deadline passed');
   }
 

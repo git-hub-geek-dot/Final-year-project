@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../services/event_service.dart';
+import '../../utils/ist_date_time.dart';
 import '../../widgets/organiser_bottom_nav.dart';
 import '../chat/event_group_chat_screen.dart';
 import 'edit_event_screen.dart';
@@ -870,21 +871,21 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     final bgColor = isDeleted
         ? const Color(0xFFF3F4F6)
         : isCancelled
-        ? const Color(0xFFFEE2E2)
-        : isCompleted
-            ? const Color(0xFFEDE9FE)
-            : isDraft
-                ? const Color(0xFFE5E7EB)
-                : Colors.green.shade100;
+            ? const Color(0xFFFEE2E2)
+            : isCompleted
+                ? const Color(0xFFEDE9FE)
+                : isDraft
+                    ? const Color(0xFFE5E7EB)
+                    : Colors.green.shade100;
     final dotColor = isDeleted
         ? const Color(0xFF6B7280)
         : isCancelled
-        ? const Color(0xFFDC2626)
-        : isCompleted
-            ? const Color(0xFF7C3AED)
-            : isDraft
-                ? const Color(0xFF4B5563)
-                : Colors.green;
+            ? const Color(0xFFDC2626)
+            : isCompleted
+                ? const Color(0xFF7C3AED)
+                : isDraft
+                    ? const Color(0xFF4B5563)
+                    : Colors.green;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -921,14 +922,14 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
 
     if (startDateRaw == null || startDateRaw.isEmpty) return "-";
 
-    final startDate = startDateRaw.split("T")[0];
+    final startDate = IstDateTime.formatDate(startDateRaw);
 
     // If no end date, show single date
     if (endDateRaw == null || endDateRaw.isEmpty) {
       return startDate;
     }
 
-    final endDate = endDateRaw.split("T")[0];
+    final endDate = IstDateTime.formatDate(endDateRaw);
 
     // If dates are the same, show single date
     if (startDate == endDate) {
@@ -940,17 +941,11 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
   }
 
   static String _fmtDate(dynamic value) {
-    if (value == null) return "-";
-    final text = value.toString();
-    if (text.isEmpty) return "-";
-    return text.split("T")[0];
+    return IstDateTime.formatDate(value);
   }
 
   static String _fmtTime(dynamic value) {
-    if (value == null) return "-";
-    final text = value.toString();
-    if (text.isEmpty) return "-";
-    return text.split(".")[0];
+    return IstDateTime.formatTime(value);
   }
 }
 

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../services/chat_service.dart';
 import '../../services/token_service.dart';
+import '../../utils/ist_date_time.dart';
 
 class EventGroupChatScreen extends StatefulWidget {
   final int eventId;
@@ -122,7 +123,7 @@ class _EventGroupChatScreenState extends State<EventGroupChatScreen> {
 
   String _formatTime(dynamic raw) {
     if (raw == null) return "";
-    final dt = DateTime.tryParse(raw.toString());
+    final dt = IstDateTime.tryParse(raw);
     if (dt == null) return "";
     final hh = dt.hour.toString().padLeft(2, '0');
     final mm = dt.minute.toString().padLeft(2, '0');
@@ -161,8 +162,9 @@ class _EventGroupChatScreenState extends State<EventGroupChatScreen> {
                           final time = _formatTime(row["created_at"]);
 
                           return Align(
-                            alignment:
-                                mine ? Alignment.centerRight : Alignment.centerLeft,
+                            alignment: mine
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
                             child: Container(
                               margin: const EdgeInsets.symmetric(
                                 horizontal: 12,

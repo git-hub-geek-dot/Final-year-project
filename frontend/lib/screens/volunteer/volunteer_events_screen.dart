@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../utils/ist_date_time.dart';
 import 'view_event_screen.dart';
 
 class VolunteerEventsScreen extends StatefulWidget {
@@ -445,8 +446,7 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
   }
 
   List<Map<String, dynamic>> _filteredEvents() {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final today = IstDateTime.startOfDay(IstDateTime.now());
 
     final list = widget.events.whereType<Map<String, dynamic>>().where((event) {
       final title = (event["title"] ?? "").toString().toLowerCase();
@@ -459,16 +459,15 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
           cats.contains(selectedCategory);
 
       final startDate =
-          DateTime.tryParse(event["event_date"]?.toString() ?? "");
+          IstDateTime.tryParse(event["event_date"]?.toString() ?? "");
       if (startDate == null) return false;
 
-      final endDate = DateTime.tryParse(event["end_date"]?.toString() ??
+      final endDate = IstDateTime.tryParse(event["end_date"]?.toString() ??
           event["event_date"]?.toString() ??
           "");
       final relevantDate = endDate ?? startDate;
 
-      final dateOnly =
-          DateTime(relevantDate.year, relevantDate.month, relevantDate.day);
+      final dateOnly = IstDateTime.startOfDay(relevantDate);
       final isCompleted = event["computed_status"]?.toString() == "completed";
       final isPast = dateOnly.isBefore(today) || isCompleted;
       final isOngoing = dateOnly.isAtSameMomentAs(today) && !isCompleted;
@@ -525,8 +524,8 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
       }
 
       // Then sort by date
-      final aDate = DateTime.tryParse(a["event_date"]?.toString() ?? "");
-      final bDate = DateTime.tryParse(b["event_date"]?.toString() ?? "");
+      final aDate = IstDateTime.tryParse(a["event_date"]?.toString() ?? "");
+      final bDate = IstDateTime.tryParse(b["event_date"]?.toString() ?? "");
       if (aDate == null || bDate == null) return 0;
       return aDate.compareTo(bDate);
     });
@@ -924,7 +923,7 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
 
     if (startDateRaw == null || startDateRaw.isEmpty) return "";
 
-    final startParsed = DateTime.tryParse(startDateRaw);
+    final startParsed = IstDateTime.tryParse(startDateRaw);
     if (startParsed == null) return "";
 
     final startFormatted =
@@ -935,7 +934,7 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
       return startFormatted;
     }
 
-    final endParsed = DateTime.tryParse(endDateRaw);
+    final endParsed = IstDateTime.tryParse(endDateRaw);
     if (endParsed == null) return startFormatted;
 
     // If dates are the same, show single date

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:frontend/widgets/app_background.dart';
 import 'package:frontend/widgets/error_state.dart';
 import '../../services/admin_service.dart';
+import '../../utils/ist_date_time.dart';
 
 class AdminUsersScreen extends StatefulWidget {
   const AdminUsersScreen({super.key});
@@ -76,12 +77,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
   DateTime? _parseDateTime(dynamic value) {
     if (value == null) return null;
-    return DateTime.tryParse(value.toString());
+    return IstDateTime.tryParse(value);
   }
 
   bool _isCurrentlySuspended(Map user) {
     final suspendedUntil = _parseDateTime(user["suspended_until"]);
-    return suspendedUntil != null && suspendedUntil.isAfter(DateTime.now());
+    return suspendedUntil != null && suspendedUntil.isAfter(IstDateTime.now());
   }
 
   String _effectiveStatus(Map user) {
@@ -109,8 +110,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         .where((u) {
           final name = (u["name"] ?? "").toString().toLowerCase();
           final email = (u["email"] ?? "").toString().toLowerCase();
-          final matchSearch =
-              name.contains(search) || email.contains(search);
+          final matchSearch = name.contains(search) || email.contains(search);
           final effectiveStatus = _effectiveStatus(u as Map);
 
           final matchStatus =
@@ -1095,8 +1095,8 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                 _buildFilterChip(
                                   label: 'Suspended',
                                   selected: statusFilter == 'suspended',
-                                  onSelected: (selected) =>
-                                      setState(() => statusFilter = 'suspended'),
+                                  onSelected: (selected) => setState(
+                                      () => statusFilter = 'suspended'),
                                 ),
                                 const SizedBox(width: 16),
                                 _buildFilterChip(
@@ -1278,7 +1278,8 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     final status = _statusLabel(_effectiveStatus(user));
     final city = user["city"] ?? "-";
     final contact = user["contact_number"] ?? "-";
-    final createdAt = (user["created_at"] ?? "-").toString();
+    final joinedAt = _parseDateTime(user["created_at"]);
+    final createdAt = joinedAt == null ? "-" : _formatDateTime(joinedAt);
     final profileUrl = (user["profile_picture_url"] ?? "").toString();
     final isVerified = user["isVerified"] == true;
     final strikeCount = (user["strike_count"] as num?)?.toInt() ?? 0;
@@ -1297,63 +1298,63 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-            Center(
-              child: CircleAvatar(
-                radius: 36,
-                backgroundImage:
-                    profileUrl.isNotEmpty ? NetworkImage(profileUrl) : null,
-                onBackgroundImageError:
-                    profileUrl.isNotEmpty ? (_, __) {} : null,
-                child: profileUrl.isEmpty
-                    ? const Icon(Icons.person, size: 36)
-                    : null,
+              Center(
+                child: CircleAvatar(
+                  radius: 36,
+                  backgroundImage:
+                      profileUrl.isNotEmpty ? NetworkImage(profileUrl) : null,
+                  onBackgroundImageError:
+                      profileUrl.isNotEmpty ? (_, __) {} : null,
+                  child: profileUrl.isEmpty
+                      ? const Icon(Icons.person, size: 36)
+                      : null,
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            _detailRow("Name", name),
-            _detailRow("Email", email),
-            _detailRow("Role", role),
-            _detailRow("Verified", isVerified ? "Yes" : "No"),
-            _detailRow("Status", status),
-            _detailRow("Strikes", strikeCount.toString()),
-            if (strikeHistory.isNotEmpty) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 12),
+              _detailRow("Name", name),
+              _detailRow("Email", email),
+              _detailRow("Role", role),
+              _detailRow("Verified", isVerified ? "Yes" : "No"),
+              _detailRow("Status", status),
+              _detailRow("Strikes", strikeCount.toString()),
+              if (strikeHistory.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                const Text(
+                  "Strike History",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 6),
+                ...strikeHistory.map((entry) {
+                  final reason = (entry["reason"] ?? "-").toString();
+                  final createdAtRaw = entry["created_at"];
+                  final createdAt = createdAtRaw == null
+                      ? "-"
+                      : _formatDateTime(
+                          IstDateTime.tryParse(createdAtRaw) ??
+                              DateTime.fromMillisecondsSinceEpoch(0),
+                        );
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text("- $createdAt: $reason"),
+                  );
+                }),
+              ],
+              _detailRow(
+                "Suspended",
+                isSuspended ? _formatDateTime(suspendedUntil!) : "No",
+              ),
+              if (isSuspended) _detailRow("Reason", suspensionReason),
+              _detailRow("City", city),
+              _detailRow("Contact", contact),
+              _detailRow("Joined", createdAt),
+              const SizedBox(height: 8),
               const Text(
-                "Strike History",
+                "Admin Note",
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 6),
-              ...strikeHistory.map((entry) {
-                final reason = (entry["reason"] ?? "-").toString();
-                final createdAtRaw = entry["created_at"];
-                final createdAt = createdAtRaw == null
-                    ? "-"
-                    : _formatDateTime(
-                        DateTime.tryParse(createdAtRaw.toString()) ??
-                            DateTime.fromMillisecondsSinceEpoch(0),
-                      );
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Text("- $createdAt: $reason"),
-                );
-              }),
+              const SizedBox(height: 4),
+              Text(adminNote.isEmpty ? "-" : adminNote),
             ],
-            _detailRow(
-              "Suspended",
-              isSuspended ? _formatDateTime(suspendedUntil!) : "No",
-            ),
-            if (isSuspended) _detailRow("Reason", suspensionReason),
-            _detailRow("City", city),
-            _detailRow("Contact", contact),
-            _detailRow("Joined", createdAt),
-            const SizedBox(height: 8),
-            const Text(
-              "Admin Note",
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            Text(adminNote.isEmpty ? "-" : adminNote),
-          ],
           ),
         ),
         actions: [
@@ -1577,8 +1578,8 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         break;
       case "created_at":
       default:
-        final aDate = DateTime.tryParse((a["created_at"] ?? "").toString());
-        final bDate = DateTime.tryParse((b["created_at"] ?? "").toString());
+        final aDate = IstDateTime.tryParse((a["created_at"] ?? "").toString());
+        final bDate = IstDateTime.tryParse((b["created_at"] ?? "").toString());
         result = (aDate ?? DateTime(1970)).compareTo(bDate ?? DateTime(1970));
         break;
     }

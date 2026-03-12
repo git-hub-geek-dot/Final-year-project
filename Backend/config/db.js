@@ -1,5 +1,6 @@
 const { Pool } = require("pg");
 require("dotenv").config();
+const { IST_TIME_ZONE } = require("./timezone");
 
 const sslModeRequired = /sslmode=require|sslmode=verify-ca|sslmode=verify-full/i.test(
   process.env.DATABASE_URL || ""
@@ -23,6 +24,12 @@ const rejectUnauthorized = ["true", "1", "yes"].includes(
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: useSsl ? { rejectUnauthorized } : undefined,
+});
+
+pool.on("connect", (client) => {
+  client.query(`SET TIME ZONE '${IST_TIME_ZONE}'`).catch((err) => {
+    console.error("[DB] Failed to set session timezone:", err);
+  });
 });
 
 module.exports = pool;

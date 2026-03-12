@@ -3,6 +3,7 @@ import 'package:frontend/widgets/app_background.dart';
 import 'package:frontend/widgets/error_state.dart';
 
 import '../../services/admin_service.dart';
+import '../../utils/ist_date_time.dart';
 
 class AdminApplicationsScreen extends StatefulWidget {
   final int? eventId;
@@ -30,7 +31,6 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
   }
 
   Future<void> _fetchApplications({bool reset = false}) async {
-
     if (reset) {
       setState(() {
         loading = true;
@@ -181,20 +181,23 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
                 : Builder(
                     builder: (context) {
                       final filtered = apps.where((a) {
-                        final matchStatus =
-                            statusFilter == "all" || a["status"] == statusFilter;
+                        final matchStatus = statusFilter == "all" ||
+                            a["status"] == statusFilter;
                         final matchEvent = widget.eventId == null ||
                             _toInt(a["event_id"]) == widget.eventId;
 
                         final searchText = search.toLowerCase();
-                        final volunteerName =
-                            (a["volunteer_name"] ?? "").toString().toLowerCase();
-                        final volunteerEmail =
-                            (a["volunteer_email"] ?? "").toString().toLowerCase();
+                        final volunteerName = (a["volunteer_name"] ?? "")
+                            .toString()
+                            .toLowerCase();
+                        final volunteerEmail = (a["volunteer_email"] ?? "")
+                            .toString()
+                            .toLowerCase();
                         final eventTitle =
                             (a["event_title"] ?? "").toString().toLowerCase();
-                        final organiserName =
-                            (a["organiser_name"] ?? "").toString().toLowerCase();
+                        final organiserName = (a["organiser_name"] ?? "")
+                            .toString()
+                            .toLowerCase();
 
                         final matchSearch = searchText.isEmpty ||
                             volunteerName.contains(searchText) ||
@@ -297,11 +300,11 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
                                 : ListView.builder(
                                     itemCount: filtered.length,
                                     itemBuilder: (context, i) {
-                                      final app =
-                                          Map<String, dynamic>.from(
-                                            filtered[i] as Map,
-                                          );
-                                      return _buildApplicationCard(context, app);
+                                      final app = Map<String, dynamic>.from(
+                                        filtered[i] as Map,
+                                      );
+                                      return _buildApplicationCard(
+                                          context, app);
                                     },
                                   ),
                           ),
@@ -423,10 +426,10 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
 
   String _appliedAgo(dynamic value) {
     if (value == null) return "Applied recently";
-    final parsed = DateTime.tryParse(value.toString());
+    final parsed = IstDateTime.tryParse(value);
     if (parsed == null) return "Applied recently";
 
-    final diff = DateTime.now().difference(parsed.toLocal());
+    final diff = IstDateTime.now().difference(parsed);
     if (diff.inDays > 0) return "Applied ${diff.inDays}d ago";
     if (diff.inHours > 0) return "Applied ${diff.inHours}h ago";
     if (diff.inMinutes > 0) return "Applied ${diff.inMinutes}m ago";
@@ -661,17 +664,11 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
   }
 
   String _fmtDate(dynamic value) {
-    if (value == null) return "-";
-    final text = value.toString();
-    if (text.isEmpty) return "-";
-    return text.split("T")[0];
+    return IstDateTime.formatDate(value);
   }
 
   String _fmtDateTime(dynamic value) {
-    if (value == null) return "-";
-    final text = value.toString();
-    if (text.isEmpty) return "-";
-    return text.replaceAll("T", " ").split(".")[0];
+    return IstDateTime.formatDateTime(value);
   }
 
   int? _toInt(dynamic value) {
@@ -691,18 +688,19 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
             .compareTo((b["volunteer_name"] ?? "").toString().toLowerCase());
         break;
       case "status":
-        result =
-            (a["status"] ?? "").toString().compareTo((b["status"] ?? "").toString());
+        result = (a["status"] ?? "")
+            .toString()
+            .compareTo((b["status"] ?? "").toString());
         break;
       case "event_date":
-        final aDate = DateTime.tryParse((a["event_date"] ?? "").toString());
-        final bDate = DateTime.tryParse((b["event_date"] ?? "").toString());
+        final aDate = IstDateTime.tryParse((a["event_date"] ?? "").toString());
+        final bDate = IstDateTime.tryParse((b["event_date"] ?? "").toString());
         result = (aDate ?? DateTime(1970)).compareTo(bDate ?? DateTime(1970));
         break;
       case "applied_at":
       default:
-        final aDate = DateTime.tryParse((a["applied_at"] ?? "").toString());
-        final bDate = DateTime.tryParse((b["applied_at"] ?? "").toString());
+        final aDate = IstDateTime.tryParse((a["applied_at"] ?? "").toString());
+        final bDate = IstDateTime.tryParse((b["applied_at"] ?? "").toString());
         result = (aDate ?? DateTime(1970)).compareTo(bDate ?? DateTime(1970));
         break;
     }

@@ -7,6 +7,7 @@ import '../../config/api_config.dart';
 import '../../services/notification_store.dart';
 import '../../services/notification_api_service.dart';
 import '../../services/token_service.dart';
+import '../../utils/ist_date_time.dart';
 import '../../widgets/app_background.dart';
 import '../chat/chat_screen.dart';
 import '../organiser/attendance_feedback_screen.dart';
@@ -60,9 +61,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         limit: 20,
       );
       final rows = (data["items"] as List?) ?? [];
-      final mapped = rows
-          .map((e) => _fromApi(Map<String, dynamic>.from(e)))
-          .toList();
+      final mapped =
+          rows.map((e) => _fromApi(Map<String, dynamic>.from(e))).toList();
       final totalPages = (data["totalPages"] as num?)?.toInt() ?? _page;
 
       setState(() {
@@ -124,12 +124,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   NotificationItem _fromApi(Map<String, dynamic> row) {
     final createdRaw = row["created_at"] ?? row["createdAt"];
-    final createdAt = DateTime.tryParse(createdRaw?.toString() ?? "") ??
-        DateTime.now();
+    final createdAt = IstDateTime.tryParse(createdRaw) ?? IstDateTime.now();
     final readRaw = row["read_at"] ?? row["readAt"];
-    final readAt = readRaw != null
-        ? DateTime.tryParse(readRaw.toString())
-        : null;
+    final readAt = readRaw != null ? IstDateTime.tryParse(readRaw) : null;
     final data = (row["data"] as Map?)?.cast<String, dynamic>() ?? {};
 
     return NotificationItem(
@@ -166,7 +163,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Future<void> _markRead(NotificationItem item) async {
     if (item.id.isEmpty || !_isUnread(item)) return;
 
-    final now = DateTime.now();
+    final now = IstDateTime.now();
     if (_usingLocal) {
       await NotificationStore.markRead(item.id);
       _setItemRead(item.id, now);
@@ -182,7 +179,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Future<void> _markAllRead() async {
-    final now = DateTime.now();
+    final now = IstDateTime.now();
     if (_usingLocal) {
       await NotificationStore.markAllRead();
       setState(() {
@@ -411,8 +408,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 context: context,
                 builder: (ctx) => AlertDialog(
                   title: const Text("Clear notifications"),
-                  content:
-                      const Text("Delete all notifications?"),
+                  content: const Text("Delete all notifications?"),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(ctx, false),
@@ -454,8 +450,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         child: ListView.separated(
                           itemCount: _items.length +
                               (_usingLocal || _page > _totalPages ? 0 : 1),
-                          separatorBuilder: (_, __) =>
-                              const Divider(height: 1),
+                          separatorBuilder: (_, __) => const Divider(height: 1),
                           itemBuilder: (context, index) {
                             if (!_usingLocal && index == _items.length) {
                               return Padding(
@@ -463,9 +458,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                     const EdgeInsets.symmetric(vertical: 12),
                                 child: Center(
                                   child: ElevatedButton(
-                                    onPressed: _loadingMore
-                                        ? null
-                                        : () => _fetch(),
+                                    onPressed:
+                                        _loadingMore ? null : () => _fetch(),
                                     child: _loadingMore
                                         ? const SizedBox(
                                             width: 18,
@@ -498,8 +492,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               title: Text(
                                 item.title,
                                 style: TextStyle(
-                                  fontWeight:
-                                      isUnread ? FontWeight.w700 : FontWeight.w500,
+                                  fontWeight: isUnread
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
                                 ),
                               ),
                               subtitle: Text(subtitleParts.join("\n")),

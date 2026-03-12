@@ -5,6 +5,7 @@ import 'package:frontend/widgets/app_background.dart';
 import 'package:frontend/widgets/error_state.dart';
 
 import '../../services/admin_service.dart';
+import '../../utils/ist_date_time.dart';
 
 class AdminReportsScreen extends StatefulWidget {
   const AdminReportsScreen({super.key});
@@ -89,10 +90,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
   }
 
   String _formatDate(dynamic raw) {
-    if (raw == null) return "-";
-    final dt = DateTime.tryParse(raw.toString());
-    if (dt == null) return "-";
-    return "${dt.year.toString().padLeft(4, '0')}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+    return IstDateTime.formatDateTime(raw);
   }
 
   Color _statusColor(String status) {
@@ -508,8 +506,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                                 isExpanded: true,
                                 items: const [
                                   DropdownMenuItem(
-                                      value: "pending",
-                                      child: Text("Pending")),
+                                      value: "pending", child: Text("Pending")),
                                   DropdownMenuItem(
                                       value: "resolved",
                                       child: Text("Resolved")),

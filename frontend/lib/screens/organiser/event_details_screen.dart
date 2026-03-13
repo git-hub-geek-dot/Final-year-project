@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../services/event_service.dart';
+import '../../utils/application_status.dart';
 import '../../utils/ist_date_time.dart';
 import '../../widgets/organiser_bottom_nav.dart';
 import '../chat/event_group_chat_screen.dart';
@@ -43,13 +44,13 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
       int ap = 0, p = 0, r = 0;
 
       for (final x in list) {
-        final s = (x["status"] ?? "pending").toString().toLowerCase();
+        final s = normalizeApplicationStatus(x["status"]);
 
-        if (s == "accepted" || s == "approved") {
+        if (s == "approved") {
           ap++;
         } else if (s == "rejected") {
           r++;
-        } else {
+        } else if (s == "pending" || s == "waitlisted") {
           p++;
         }
       }
@@ -514,7 +515,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                                   "Applied", applied.toString(), Icons.person),
                               _statBox("Approved", approved.toString(),
                                   Icons.check_circle),
-                              _statBox("Pending", pending.toString(),
+                              _statBox("Pending / Waitlisted", pending.toString(),
                                   Icons.hourglass_bottom),
                               _statBox("Rejected", rejected.toString(),
                                   Icons.cancel),

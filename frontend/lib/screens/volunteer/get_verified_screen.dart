@@ -44,12 +44,20 @@ class _VolunteerGetVerifiedScreenState
   }
 
   Future<void> _loadVerificationStatus() async {
-    final status = await VerificationService.getStatus();
-    if (!mounted) return;
-    setState(() {
-      _verificationStatus = status;
-      _checkingStatus = false;
-    });
+    try {
+      final status = await VerificationService.getStatus();
+      if (!mounted) return;
+      setState(() {
+        _verificationStatus = status?.toLowerCase();
+        _checkingStatus = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _verificationStatus = null;
+        _checkingStatus = false;
+      });
+    }
   }
 
   Future<void> submitVerification() async {
@@ -106,6 +114,8 @@ class _VolunteerGetVerifiedScreenState
         final message = (data["message"] ?? "Submission failed").toString();
         if (message.toLowerCase().contains("already verified")) {
           setState(() => _verificationStatus = "approved");
+        } else if (message.toLowerCase().contains("under review")) {
+          setState(() => _verificationStatus = "pending");
         }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -207,6 +217,22 @@ class _VolunteerGetVerifiedScreenState
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            if (status == 'rejected') ...[
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.shade50,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.red.shade100),
+                                ),
+                                child: const Text(
+                                  "Your previous verification request was rejected. Please review your details and submit again.",
+                                  style: TextStyle(color: Colors.redAccent),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
                             const Text(
                               "Volunteer Verification",
                               style: TextStyle(
@@ -215,7 +241,7 @@ class _VolunteerGetVerifiedScreenState
                             const SizedBox(height: 16),
 
                             DropdownButtonFormField<String>(
-                              value: _idType,
+                              initialValue: _idType,
                               decoration: const InputDecoration(
                                 labelText: "ID Type",
                                 border: OutlineInputBorder(),

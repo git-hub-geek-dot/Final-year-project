@@ -3,6 +3,7 @@ import 'package:frontend/widgets/app_background.dart';
 import 'package:frontend/widgets/error_state.dart';
 
 import '../../services/admin_service.dart';
+import '../../utils/application_status.dart';
 import '../../utils/ist_date_time.dart';
 
 class AdminApplicationsScreen extends StatefulWidget {
@@ -129,37 +130,11 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
   }
 
   Color statusColor(String status) {
-    switch (status.toLowerCase()) {
-      case "approved":
-      case "accepted":
-        return Colors.green;
-      case "no_show":
-        return Colors.deepOrange;
-      case "rejected":
-      case "cancelled":
-        return Colors.red;
-      case "pending":
-      default:
-        return Colors.orange;
-    }
+    return applicationStatusColor(status);
   }
 
   String statusLabel(String status) {
-    switch (status.toLowerCase()) {
-      case "accepted":
-      case "approved":
-        return "Approved";
-      case "rejected":
-        return "Rejected";
-      case "cancelled":
-        return "Cancelled";
-      case "no_show":
-        return "No-show";
-      case "pending":
-        return "Pending";
-      default:
-        return status;
-    }
+    return applicationStatusLabel(status);
   }
 
   @override
@@ -181,8 +156,10 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
                 : Builder(
                     builder: (context) {
                       final filtered = apps.where((a) {
+                        final normalizedStatus =
+                            normalizeApplicationStatus(a["status"]);
                         final matchStatus = statusFilter == "all" ||
-                            a["status"] == statusFilter;
+                            normalizedStatus == statusFilter;
                         final matchEvent = widget.eventId == null ||
                             _toInt(a["event_id"]) == widget.eventId;
 
@@ -239,6 +216,10 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
                                     DropdownMenuItem(
                                       value: "approved",
                                       child: Text("Approved"),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: "waitlisted",
+                                      child: Text("Waitlisted"),
                                     ),
                                     DropdownMenuItem(
                                       value: "rejected",
@@ -325,9 +306,13 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
     final eventDate = _fmtDate(app["event_date"]);
     final eventCreatedAt = _fmtDateTime(app["event_created_at"]);
     final appliedAt = _fmtDateTime(app["applied_at"]);
-    final status = app["status"] ?? "-";
-    final statusText = statusLabel(status.toString());
-    final cancelReason = (app["admin_cancel_reason"] ?? "").toString();
+    final status = normalizeApplicationStatus(app["status"]);
+    final statusText = statusLabel(status);
+    final cancelReason = (app["admin_cancel_reason"] ?? "").toString().trim();
+    final volunteerReason =
+        (app["volunteer_cancel_reason"] ?? "").toString().trim();
+    final resolvedReason =
+        cancelReason.isNotEmpty ? cancelReason : volunteerReason;
 
     showDialog(
       context: context,
@@ -349,8 +334,9 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
               const SizedBox(height: 8),
               _detailRow("Status", statusText),
               _detailRow("Applied", appliedAt),
-              if (status == "cancelled" && cancelReason.isNotEmpty)
-                _detailRow("Reason", cancelReason),
+              if ((status == "cancelled" || status == "no_show") &&
+                  resolvedReason.isNotEmpty)
+                _detailRow("Reason", resolvedReason),
             ],
           ),
         ),
@@ -389,6 +375,8 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
         return "No pending applications found";
       case "approved":
         return "No approved applications found";
+      case "waitlisted":
+        return "No waitlisted applications found";
       case "rejected":
         return "No rejected applications found";
       case "cancelled":
@@ -402,20 +390,7 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
   }
 
   IconData _statusIcon(String status) {
-    switch (status.toLowerCase()) {
-      case "approved":
-      case "accepted":
-        return Icons.check_circle;
-      case "rejected":
-        return Icons.block;
-      case "cancelled":
-        return Icons.cancel;
-      case "no_show":
-        return Icons.person_off;
-      case "pending":
-      default:
-        return Icons.hourglass_top;
-    }
+    return applicationStatusIcon(status);
   }
 
   String _initialLetter(String text) {
@@ -519,10 +494,18 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
     BuildContext context,
     Map<String, dynamic> app,
   ) {
-    final statusRaw = (app["status"] ?? "").toString().toLowerCase();
-    final status = statusRaw.isEmpty ? "pending" : statusRaw;
-    final isCancelled = status == "cancelled";
+    final status = normalizeApplicationStatus(app["status"]);
+    final isFinalStatus = const {
+      "cancelled",
+      "rejected",
+      "no_show",
+      "completed",
+    }.contains(status);
     final cancelReason = (app["admin_cancel_reason"] ?? "").toString().trim();
+    final volunteerReason =
+        (app["volunteer_cancel_reason"] ?? "").toString().trim();
+    final resolvedReason =
+        cancelReason.isNotEmpty ? cancelReason : volunteerReason;
 
     final eventTitle = (app["event_title"] ?? "-").toString();
     final volunteerName = (app["volunteer_name"] ?? "-").toString();
@@ -606,7 +589,8 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
                   _metaChip(Icons.schedule, appliedAgo),
                 ],
               ),
-              if (isCancelled && cancelReason.isNotEmpty) ...[
+              if ((status == "cancelled" || status == "no_show") &&
+                  resolvedReason.isNotEmpty) ...[
                 const SizedBox(height: 4),
                 Container(
                   width: double.infinity,
@@ -627,7 +611,7 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          "Cancellation reason: $cancelReason",
+                          "Reason: $resolvedReason",
                           style: const TextStyle(fontSize: 12),
                         ),
                       ),
@@ -644,7 +628,7 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
                     label: const Text("View details"),
                   ),
                   const Spacer(),
-                  if (!isCancelled)
+                  if (!isFinalStatus)
                     OutlinedButton.icon(
                       onPressed: () => _cancelApplication(context, app),
                       icon: const Icon(Icons.cancel, size: 18),
@@ -688,9 +672,9 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
             .compareTo((b["volunteer_name"] ?? "").toString().toLowerCase());
         break;
       case "status":
-        result = (a["status"] ?? "")
-            .toString()
-            .compareTo((b["status"] ?? "").toString());
+        result = normalizeApplicationStatus(a["status"]).compareTo(
+          normalizeApplicationStatus(b["status"]),
+        );
         break;
       case "event_date":
         final aDate = IstDateTime.tryParse((a["event_date"] ?? "").toString());

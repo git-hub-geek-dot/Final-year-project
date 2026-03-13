@@ -73,12 +73,6 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
           applications = [];
         }
 
-        applications = applications.where((app) {
-          final status = app["status"]?.toString().toLowerCase() ?? "";
-          if (status == "approved" || status == "accepted") return true;
-          return !_isPastEventDate(app["event_date"]?.toString());
-        }).toList();
-
         setState(() {
           loading = false;
         });
@@ -130,28 +124,46 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
     }
   }
 
+  String _normalizedStatus(String status) {
+    final normalized = status.toLowerCase();
+    return normalized == "accepted" ? "approved" : normalized;
+  }
+
   Color statusColor(String status) {
-    switch (status.toLowerCase()) {
+    switch (_normalizedStatus(status)) {
       case "approved":
-      case "accepted":
         return Colors.green;
       case "rejected":
+        return Colors.red;
       case "cancelled":
         return Colors.red;
-      default:
+      case "waitlisted":
+        return Colors.amber.shade700;
+      case "completed":
+        return Colors.blueGrey;
+      case "no_show":
+        return Colors.deepOrange;
+      case "pending":
         return Colors.orange;
+      default:
+        return Colors.blueGrey;
     }
   }
 
   String statusLabel(String status) {
-    switch (status.toLowerCase()) {
-      case "accepted":
+    switch (_normalizedStatus(status)) {
       case "approved":
         return "Approved";
       case "rejected":
         return "Rejected";
       case "cancelled":
         return "Cancelled";
+      case "waitlisted":
+        return "Waitlisted";
+      case "completed":
+        return "Completed";
+      case "no_show":
+        return "No-show";
       case "pending":
         return "Pending";
       default:
@@ -159,21 +171,8 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
     }
   }
 
-  bool _isPastEventDate(String? rawDate) {
-    if (rawDate == null || rawDate.isEmpty) return false;
-
-    final parsed = IstDateTime.tryParse(rawDate);
-    if (parsed == null) return false;
-
-    final eventDateOnly = IstDateTime.startOfDay(parsed);
-    final today = IstDateTime.startOfDay(IstDateTime.now());
-
-    return eventDateOnly.isBefore(today);
-  }
-
   bool _isCancelableStatus(String status) {
-    final normalized = status.toLowerCase();
-    return normalized == "approved" || normalized == "accepted";
+    return _normalizedStatus(status) == "approved";
   }
 
   DateTime? _parseEventStartDateTime(Map app) {
@@ -217,14 +216,208 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
     return start.difference(IstDateTime.now()).inMinutes / 60.0;
   }
 
+  bool _hasEventStarted(Map app) {
+    final hoursBefore = _hoursBeforeEvent(app);
+    return hoursBefore != null && hoursBefore <= 0;
+  }
+
+  bool _isWithinLockWindow(Map app) {
+    final hoursBefore = _hoursBeforeEvent(app);
+    return hoursBefore != null && hoursBefore > 0 && hoursBefore <= 48;
+  }
+
+  bool _isEventCompleted(Map app) {
+    if (app["event_completed"] == true) return true;
+
+    final eventStatus = (app["event_status"] ?? "").toString().toLowerCase();
+    return eventStatus == "completed" ||
+        _normalizedStatus((app["status"] ?? "").toString()) == "completed";
+  }
+
+  bool _canCancelApplication(Map app) {
+    final status = (app["status"] ?? "pending").toString();
+    return _isCancelableStatus(status) &&
+        !_isEventCompleted(app) &&
+        !_hasEventStarted(app);
+  }
+
+  String _formatEventDate(String? rawDate) {
+    if (rawDate == null || rawDate.isEmpty) return "Date not available";
+
+    final parsed = IstDateTime.tryParse(rawDate);
+    if (parsed == null) {
+      return rawDate.split("T")[0];
+    }
+
+    final day = parsed.day.toString().padLeft(2, "0");
+    final month = parsed.month.toString().padLeft(2, "0");
+    return "$day/$month/${parsed.year}";
+  }
+
+  String _formatTime(dynamic rawTime) {
+    if (rawTime == null) return "";
+    final text = rawTime.toString();
+    if (text.isEmpty) return "";
+
+    final parsed = DateTime.tryParse(text);
+    if (parsed != null) {
+      final hour = parsed.hour.toString().padLeft(2, "0");
+      final minute = parsed.minute.toString().padLeft(2, "0");
+      return "$hour:$minute";
+    }
+
+    final parts = text.split(":");
+    if (parts.length >= 2) {
+      final hour = parts[0].padLeft(2, "0");
+      final minute = parts[1].padLeft(2, "0");
+      return "$hour:$minute";
+    }
+
+    return text;
+  }
+
+  String _eventMeta(Map app) {
+    final parts = <String>[];
+    parts.add(_formatEventDate(app["event_date"]?.toString()));
+
+    final start = _formatTime(app["start_time"]);
+    final end = _formatTime(app["end_time"]);
+    if (start.isNotEmpty && end.isNotEmpty) {
+      parts.add("$start - $end");
+    } else if (start.isNotEmpty) {
+      parts.add(start);
+    }
+
+    return parts.join("  |  ");
+  }
+
+  String? _statusDescription(Map app) {
+    final status = _normalizedStatus((app["status"] ?? "pending").toString());
+    final adminCancelReason =
+        (app["admin_cancel_reason"] ?? "").toString().trim();
+    final volunteerCancelReason =
+        (app["volunteer_cancel_reason"] ?? "").toString().trim();
+
+    switch (status) {
+      case "pending":
+        return "Your application is under review.";
+      case "waitlisted":
+        return "This event is full right now. You will be notified if a spot opens.";
+      case "approved":
+        if (_isEventCompleted(app)) {
+          return "You were approved for this event. The event has now ended.";
+        }
+        return "You are confirmed for this event.";
+      case "rejected":
+        return "This application was not approved.";
+      case "cancelled":
+        if (adminCancelReason.isNotEmpty) {
+          return "Cancelled by admin. Reason: $adminCancelReason";
+        }
+        if (volunteerCancelReason.isNotEmpty) {
+          return "You cancelled your participation. Reason: $volunteerCancelReason";
+        }
+        return "This application was cancelled.";
+      case "completed":
+        return "Your participation for this event is completed.";
+      case "no_show":
+        return "You were marked as no-show for this event.";
+      default:
+        return null;
+    }
+  }
+
+  String? _appealStatusLabel(String status) {
+    switch (status.toLowerCase()) {
+      case "eligible":
+        return "Appeal available";
+      case "pending":
+        return "Appeal pending";
+      case "approved":
+        return "Appeal approved";
+      case "rejected":
+        return "Appeal rejected";
+      default:
+        return null;
+    }
+  }
+
+  Widget _infoChip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withOpacity(0.25)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildInfoChips(Map app) {
+    final chips = <Widget>[];
+    final strikeIssued = app["strike_issued"] == true;
+    final warningIssued = app["warning_issued"] == true;
+    final appealStatus = (app["strike_appeal_status"] ?? "none").toString();
+    final appealLabel = _appealStatusLabel(appealStatus);
+
+    if (_isEventCompleted(app)) {
+      chips.add(_infoChip("Event completed", Colors.blueGrey));
+    }
+    if (warningIssued) {
+      chips.add(_infoChip("Warning issued", Colors.deepOrange));
+    }
+    if (strikeIssued) {
+      chips.add(_infoChip("Strike applied", Colors.redAccent));
+    }
+    if (appealLabel != null) {
+      final Color appealColor;
+      switch (appealStatus.toLowerCase()) {
+        case "approved":
+          appealColor = Colors.green;
+          break;
+        case "rejected":
+          appealColor = Colors.red;
+          break;
+        case "pending":
+          appealColor = Colors.blue;
+          break;
+        default:
+          appealColor = Colors.orange;
+      }
+      chips.add(_infoChip(appealLabel, appealColor));
+    }
+
+    return chips;
+  }
+
   Future<void> _cancelApplication(Map app) async {
     final appIdRaw = app["id"];
     final appId =
         appIdRaw is int ? appIdRaw : int.tryParse(appIdRaw.toString());
     if (appId == null) return;
 
+    if (_isEventCompleted(app) || _hasEventStarted(app)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "This event has already started. Cancellation is no longer available.",
+          ),
+        ),
+      );
+      return;
+    }
+
     final hoursBefore = _hoursBeforeEvent(app);
-    final isWithinLockWindow = hoursBefore != null && hoursBefore <= 48;
+    final isWithinLockWindow = _isWithinLockWindow(app);
     final title = (app["title"] ?? "this event").toString();
 
     final reasonController = TextEditingController();
@@ -614,99 +807,162 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                   : ListView.builder(
                       padding: const EdgeInsets.all(16),
                       itemCount: applications.length,
-                      itemBuilder: (context, index) {
-                        final app = applications[index];
+                       itemBuilder: (context, index) {
+                         final app = applications[index];
 
-                        final title = app["title"] ?? "Unknown Event";
-                        final location = app["location"] ?? "";
-                        final status = app["status"] ?? "pending";
-                        final cancelReason =
-                            (app["admin_cancel_reason"] ?? "").toString();
-                        final appIdRaw = app["id"];
-                        final appId = appIdRaw is int
-                            ? appIdRaw
-                            : int.tryParse(appIdRaw.toString());
-                        final canCancel =
-                            _isCancelableStatus(status.toString());
-                        final hoursBefore = _hoursBeforeEvent(app);
-                        final isWithinLockWindow =
-                            hoursBefore != null && hoursBefore <= 48;
-                        final isCancelling = appId != null &&
-                            cancellingApplicationId != null &&
-                            appId == cancellingApplicationId;
-                        final strikeIssued = app["strike_issued"] == true;
-                        final appealStatus =
-                            (app["strike_appeal_status"] ?? "none").toString();
-                        final canAppeal = strikeIssued &&
-                            (appealStatus == "eligible" ||
-                                appealStatus == "none");
-                        final subtitle =
-                            status.toString().toLowerCase() == "cancelled" &&
-                                    cancelReason.isNotEmpty
-                                ? "$location\nReason: $cancelReason"
-                                : location.toString();
+                         final title = app["title"] ?? "Unknown Event";
+                         final location = app["location"] ?? "";
+                         final status = _normalizedStatus(
+                           (app["status"] ?? "pending").toString(),
+                         );
+                         final appIdRaw = app["id"];
+                         final appId = appIdRaw is int
+                             ? appIdRaw
+                             : int.tryParse(appIdRaw.toString());
+                         final canCancel = _canCancelApplication(app);
+                         final isWithinLockWindow = _isWithinLockWindow(app);
+                         final isCancelling = appId != null &&
+                             cancellingApplicationId != null &&
+                             appId == cancellingApplicationId;
+                         final strikeIssued = app["strike_issued"] == true;
+                         final appealStatus =
+                             (app["strike_appeal_status"] ?? "none")
+                                 .toString()
+                                 .toLowerCase();
+                         final canAppeal = strikeIssued &&
+                             (appealStatus == "eligible" ||
+                                 appealStatus == "none");
+                         final infoChips = _buildInfoChips(app);
+                         final statusDescription = _statusDescription(app);
 
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          child: ListTile(
-                            title: Text(title),
-                            subtitle: Text(subtitle),
-                            isThreeLine: status.toString().toLowerCase() ==
-                                    "cancelled" &&
-                                cancelReason.isNotEmpty,
-                            onTap: () async {
-                              final raw = app["event_id"];
-                              final eventId = raw is int
-                                  ? raw
-                                  : int.tryParse(raw?.toString() ?? "");
-                              if (eventId == null) return;
-                              await openEventDetails(eventId);
-                            },
-                            trailing: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Chip(
-                                  label: Text(statusLabel(status.toString())
-                                      .toUpperCase()),
-                                  backgroundColor:
-                                      statusColor(status).withOpacity(0.15),
-                                  labelStyle:
-                                      TextStyle(color: statusColor(status)),
-                                ),
-                                if (canCancel)
-                                  TextButton(
-                                    onPressed: isCancelling
-                                        ? null
-                                        : () => _cancelApplication(app),
-                                    style: isWithinLockWindow
-                                        ? TextButton.styleFrom(
-                                            foregroundColor: Colors.grey,
-                                          )
-                                        : null,
-                                    child: isCancelling
-                                        ? const SizedBox(
-                                            width: 14,
-                                            height: 14,
-                                            child: CircularProgressIndicator(
-                                                strokeWidth: 2),
-                                          )
-                                        : Text(
-                                            isWithinLockWindow
-                                                ? "Cancel (Locked)"
-                                                : "Cancel",
-                                          ),
-                                  ),
-                                if (canAppeal)
-                                  TextButton(
-                                    onPressed: () => _submitStrikeAppeal(app),
-                                    child: const Text("Appeal"),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
+                         return Card(
+                           margin: const EdgeInsets.only(bottom: 12),
+                           clipBehavior: Clip.antiAlias,
+                           child: InkWell(
+                             onTap: () async {
+                               final raw = app["event_id"];
+                               final eventId = raw is int
+                                   ? raw
+                                   : int.tryParse(raw?.toString() ?? "");
+                               if (eventId == null) return;
+                               await openEventDetails(eventId);
+                             },
+                             child: Padding(
+                               padding: const EdgeInsets.all(16),
+                               child: Column(
+                                 crossAxisAlignment: CrossAxisAlignment.start,
+                                 children: [
+                                   Row(
+                                     crossAxisAlignment:
+                                         CrossAxisAlignment.start,
+                                     children: [
+                                       Expanded(
+                                         child: Column(
+                                           crossAxisAlignment:
+                                               CrossAxisAlignment.start,
+                                           children: [
+                                             Text(
+                                               title.toString(),
+                                               style: const TextStyle(
+                                                 fontSize: 16,
+                                                 fontWeight: FontWeight.w700,
+                                               ),
+                                             ),
+                                             const SizedBox(height: 4),
+                                             if (location.toString().isNotEmpty)
+                                               Text(
+                                                 location.toString(),
+                                                 style: TextStyle(
+                                                   color: Colors.grey.shade700,
+                                                 ),
+                                               ),
+                                             const SizedBox(height: 4),
+                                             Text(
+                                               _eventMeta(app),
+                                               style: TextStyle(
+                                                 color: Colors.grey.shade600,
+                                                 fontSize: 12,
+                                               ),
+                                             ),
+                                           ],
+                                         ),
+                                       ),
+                                       const SizedBox(width: 12),
+                                       Chip(
+                                         label: Text(
+                                           statusLabel(status).toUpperCase(),
+                                         ),
+                                         backgroundColor:
+                                             statusColor(status).withOpacity(0.15),
+                                         labelStyle: TextStyle(
+                                           color: statusColor(status),
+                                         ),
+                                         side: BorderSide(
+                                           color:
+                                               statusColor(status).withOpacity(0.25),
+                                         ),
+                                       ),
+                                     ],
+                                   ),
+                                   if (statusDescription != null) ...[
+                                     const SizedBox(height: 10),
+                                     Text(
+                                       statusDescription,
+                                       style: TextStyle(
+                                         color: Colors.grey.shade800,
+                                         height: 1.35,
+                                       ),
+                                     ),
+                                   ],
+                                   if (infoChips.isNotEmpty) ...[
+                                     const SizedBox(height: 12),
+                                     Wrap(
+                                       spacing: 8,
+                                       runSpacing: 8,
+                                       children: infoChips,
+                                     ),
+                                   ],
+                                   if (canCancel || canAppeal) ...[
+                                     const SizedBox(height: 12),
+                                     Wrap(
+                                       spacing: 8,
+                                       runSpacing: 8,
+                                       children: [
+                                         if (canCancel)
+                                           OutlinedButton(
+                                             onPressed: isCancelling
+                                                 ? null
+                                                 : () => _cancelApplication(app),
+                                             child: isCancelling
+                                                 ? const SizedBox(
+                                                     width: 14,
+                                                     height: 14,
+                                                     child:
+                                                         CircularProgressIndicator(
+                                                       strokeWidth: 2,
+                                                     ),
+                                                   )
+                                                 : Text(
+                                                     isWithinLockWindow
+                                                         ? "Cancel participation"
+                                                         : "Cancel",
+                                                   ),
+                                           ),
+                                         if (canAppeal)
+                                           TextButton(
+                                             onPressed:
+                                                 () => _submitStrikeAppeal(app),
+                                             child: const Text("Submit appeal"),
+                                           ),
+                                       ],
+                                     ),
+                                   ],
+                                 ],
+                               ),
+                             ),
+                           ),
+                         );
+                       },
                     ),
     );
   }

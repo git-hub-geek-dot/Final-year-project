@@ -126,8 +126,8 @@ const getApplications = async (req, res) => {
     const whereClause = hasEventIdFilter ? "WHERE a.event_id = $1" : "";
     const normalizedStatusExpr = `
       CASE
+        WHEN a.status = 'waitlisted' THEN 'waitlisted'
         WHEN a.status IN ('accepted', 'completed') THEN 'approved'
-        WHEN a.status = 'waitlisted' THEN 'pending'
         ELSE a.status
       END
     `;
@@ -160,6 +160,7 @@ const getApplications = async (req, res) => {
       applied: total,
       approved: 0,
       pending: 0,
+      waitlisted: 0,
       rejected: 0,
       cancelled: 0,
       no_show: 0,
@@ -171,6 +172,8 @@ const getApplications = async (req, res) => {
 
       if (status === "approved") {
         summary.approved += count;
+      } else if (status === "waitlisted") {
+        summary.waitlisted += count;
       } else if (status === "rejected") {
         summary.rejected += count;
       } else if (status === "cancelled") {
@@ -1156,6 +1159,21 @@ const approveVerification = async (req, res) => {
     await client.query(
       "UPDATE verification_requests SET status = 'approved', updated_at = NOW() WHERE id = $1",
       [requestId]
+    );
+    await client.query(
+      `
+      UPDATE verification_requests
+      SET status = 'rejected',
+          admin_remark = COALESCE(
+            admin_remark,
+            'Superseded by an approved verification request.'
+          ),
+          updated_at = NOW()
+      WHERE user_id = $1
+        AND status = 'pending'
+        AND id <> $2
+      `,
+      [userId, requestId]
     );
     await client.query(
       'UPDATE users SET "isVerified" = TRUE WHERE id = $1',

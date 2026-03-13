@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/event_service.dart';
+import '../../utils/application_status.dart';
 import '../../utils/ist_date_time.dart';
 import '../../widgets/organiser_bottom_nav.dart';
 import 'view_application_screen.dart';
@@ -17,7 +18,7 @@ class ReviewApplicationsScreen extends StatefulWidget {
 
 class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
   String selectedStatus =
-      "pending"; // pending | approved | rejected | waitlisted
+      "pending"; // pending | approved | waitlisted | rejected | cancelled | no_show | completed
   String selectedSort = "newest"; // newest | oldest | name
   bool loading = true;
   String? loadError;
@@ -69,12 +70,7 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
   }
 
   String _normalizedStatus(Map application) {
-    final status =
-        (application["status"] ?? "pending").toString().toLowerCase();
-    if (status == "accepted" || status == "approved") return "approved";
-    if (status == "waitlisted") return "waitlisted";
-    if (status == "rejected") return "rejected";
-    return "pending";
+    return normalizeApplicationStatus(application["status"]);
   }
 
   List get filtered {
@@ -146,6 +142,12 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
         return "No waitlisted applications yet";
       case "rejected":
         return "No rejected applications yet";
+      case "cancelled":
+        return "No cancelled applications yet";
+      case "no_show":
+        return "No no-show applications yet";
+      case "completed":
+        return "No completed applications yet";
       case "pending":
       default:
         return "No pending applications yet";
@@ -157,6 +159,9 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
     var approved = 0;
     var rejected = 0;
     var waitlisted = 0;
+    var cancelled = 0;
+    var noShow = 0;
+    var completed = 0;
 
     for (final application in applications) {
       final status = _normalizedStatus(application);
@@ -168,6 +173,12 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
         waitlisted++;
       } else if (status == "rejected") {
         rejected++;
+      } else if (status == "cancelled") {
+        cancelled++;
+      } else if (status == "no_show") {
+        noShow++;
+      } else if (status == "completed") {
+        completed++;
       }
     }
 
@@ -176,6 +187,9 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
       "approved": approved,
       "waitlisted": waitlisted,
       "rejected": rejected,
+      "cancelled": cancelled,
+      "no_show": noShow,
+      "completed": completed,
     };
   }
 
@@ -265,6 +279,30 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
                           selectedStatus == "rejected",
                           () {
                             setState(() => selectedStatus = "rejected");
+                          },
+                        ),
+                        const SizedBox(width: 10),
+                        toggleButton(
+                          "Cancelled (${counts["cancelled"]})",
+                          selectedStatus == "cancelled",
+                          () {
+                            setState(() => selectedStatus = "cancelled");
+                          },
+                        ),
+                        const SizedBox(width: 10),
+                        toggleButton(
+                          "No-show (${counts["no_show"]})",
+                          selectedStatus == "no_show",
+                          () {
+                            setState(() => selectedStatus = "no_show");
+                          },
+                        ),
+                        const SizedBox(width: 10),
+                        toggleButton(
+                          "Completed (${counts["completed"]})",
+                          selectedStatus == "completed",
+                          () {
+                            setState(() => selectedStatus = "completed");
                           },
                         ),
                       ],
@@ -402,31 +440,11 @@ class ApplicationCard extends StatelessWidget {
   });
 
   String get statusLabel {
-    switch (status) {
-      case "approved":
-        return "APPROVED";
-      case "waitlisted":
-        return "WAITLISTED";
-      case "rejected":
-        return "REJECTED";
-      case "pending":
-      default:
-        return "PENDING";
-    }
+    return applicationStatusLabel(status).toUpperCase();
   }
 
   Color get statusColor {
-    switch (status) {
-      case "approved":
-        return Colors.green.shade700;
-      case "waitlisted":
-        return Colors.deepPurple.shade700;
-      case "rejected":
-        return Colors.red.shade700;
-      case "pending":
-      default:
-        return Colors.orange.shade700;
-    }
+    return applicationStatusColor(status);
   }
 
   String get appliedDateText {

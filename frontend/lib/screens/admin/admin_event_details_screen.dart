@@ -20,6 +20,7 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
   int applied = 0;
   int approved = 0;
   int pending = 0;
+  int waitlisted = 0;
   int rejected = 0;
   int cancelled = 0;
   int noShow = 0;
@@ -65,6 +66,7 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
           applied = _toInt(summary["applied"]) ?? 0;
           approved = _toInt(summary["approved"]) ?? 0;
           pending = _toInt(summary["pending"]) ?? 0;
+          waitlisted = _toInt(summary["waitlisted"]) ?? 0;
           rejected = _toInt(summary["rejected"]) ?? 0;
           cancelled = _toInt(summary["cancelled"]) ?? 0;
           noShow = _toInt(summary["no_show"] ?? summary["noShow"]) ?? 0;
@@ -357,6 +359,15 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
                                     pending.toString(),
                                     Icons.schedule,
                                     color: Colors.orange,
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: itemWidth,
+                                  child: _StatBox(
+                                    "Waitlisted",
+                                    waitlisted.toString(),
+                                    Icons.hourglass_bottom,
+                                    color: Colors.amber.shade700,
                                   ),
                                 ),
                                 SizedBox(

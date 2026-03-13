@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import '../../config/api_config.dart';
 import '../../services/chat_service.dart';
 import '../../services/token_service.dart';
+import '../../utils/application_status.dart';
 import '../../utils/ist_date_time.dart';
 import '../../widgets/organiser_bottom_nav.dart';
 import '../chat/chat_screen.dart';
@@ -136,7 +137,9 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Application ${statusLabel(status).toUpperCase()} ✅"),
+            content: Text(
+              "Application marked as ${statusLabel(status).toLowerCase()}.",
+            ),
           ),
         );
 
@@ -227,33 +230,11 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
   }
 
   Color statusColor(String status) {
-    switch (status.toLowerCase()) {
-      case "accepted":
-      case "approved":
-        return Colors.green;
-      case "waitlisted":
-        return Colors.deepPurple;
-      case "rejected":
-        return Colors.red;
-      default:
-        return Colors.orange;
-    }
+    return applicationStatusColor(status);
   }
 
   String statusLabel(String status) {
-    switch (status.toLowerCase()) {
-      case "accepted":
-      case "approved":
-        return "Approved";
-      case "waitlisted":
-        return "Waitlisted";
-      case "rejected":
-        return "Rejected";
-      case "pending":
-        return "Pending";
-      default:
-        return status;
-    }
+    return applicationStatusLabel(status);
   }
 
   int _asInt(dynamic value) {
@@ -282,12 +263,32 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
   }
 
   bool _isApprovedStatus(String status) {
-    return status == "approved" || status == "accepted";
+    return isApprovedApplicationStatus(status);
+  }
+
+  bool _isReviewActionable(String status) {
+    return isActionableReviewStatus(status);
+  }
+
+  String _finalStatusMessage(String status) {
+    switch (normalizeApplicationStatus(status)) {
+      case "approved":
+        return "This application is already approved.";
+      case "rejected":
+        return "This application is already rejected.";
+      case "cancelled":
+        return "This application has been cancelled.";
+      case "completed":
+        return "This participation is already completed.";
+      case "no_show":
+        return "This volunteer was marked as no-show.";
+      default:
+        return "This application can no longer be changed.";
+    }
   }
 
   bool _isApproveBlockedByCapacity() {
-    final currentStatus =
-        (application?["status"] ?? "pending").toString().toLowerCase();
+    final currentStatus = normalizeApplicationStatus(application?["status"]);
     if (_isApprovedStatus(currentStatus)) return false;
     if (volunteersRequired > 0) {
       return approvedCount >= volunteersRequired;
@@ -372,14 +373,12 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
         app?["contact"]?.toString() ??
         "-";
     final status = app?["status"]?.toString() ?? "pending";
-    final normalizedStatus = status.toLowerCase();
-    final isAlreadyApproved = _isApprovedStatus(normalizedStatus);
-    final isAlreadyRejected = normalizedStatus == "rejected";
-    final hasFinalDecision = isAlreadyApproved || isAlreadyRejected;
+    final normalizedStatus = normalizeApplicationStatus(status);
+    final canReviewApplication = _isReviewActionable(normalizedStatus);
     final approveBlockedByCapacity =
-        !hasFinalDecision && _isApproveBlockedByCapacity();
+        canReviewApplication && _isApproveBlockedByCapacity();
     final showRatingAction =
-        normalizedStatus == "accepted" || normalizedStatus == "approved";
+        normalizedStatus == "approved" || normalizedStatus == "completed";
     final canRateVolunteer = showRatingAction && _isEventCompleted(app);
 
     final eventsCount = _asInt(
@@ -617,7 +616,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                                   ),
                                 ),
                               ],
-                              if (!hasFinalDecision) ...[
+                              if (canReviewApplication) ...[
                                 SizedBox(height: compact ? 8 : 12),
                                 Row(
                                   children: [
@@ -697,9 +696,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                                     ),
                                   ),
                                   child: Text(
-                                    isAlreadyApproved
-                                        ? "This application is already approved."
-                                        : "This application is already rejected.",
+                                    _finalStatusMessage(normalizedStatus),
                                     style: TextStyle(
                                       color: Colors.grey.shade700,
                                       fontSize: 13,

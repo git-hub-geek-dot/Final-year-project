@@ -185,11 +185,7 @@ exports.getApplicationStatus = async (req, res) => {
     }
 
     const rawStatus = (result.rows[0].status || "").toString().toLowerCase();
-    const status = rawStatus === "waitlisted"
-      ? "pending"
-      : rawStatus === "accepted"
-        ? "approved"
-        : rawStatus;
+    const status = rawStatus === "accepted" ? "approved" : rawStatus;
 
     res.json({
       applied: true,
@@ -268,7 +264,6 @@ exports.getMyApplications = async (req, res) => {
       SELECT 
         a.id,
         CASE
-          WHEN a.status = 'waitlisted' THEN 'pending'
           WHEN a.status = 'accepted' THEN 'approved'
           ELSE a.status
         END AS status,
@@ -406,6 +401,13 @@ exports.cancelMyApplication = async (req, res) => {
     }
 
     const hoursBeforeStart = (eventStart.getTime() - Date.now()) / (1000 * 60 * 60);
+
+    if (hoursBeforeStart <= 0) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        error: "Event has already started. Application can no longer be cancelled",
+      });
+    }
 
     let cancellationWindow = "outside_72";
     let warningIssued = false;

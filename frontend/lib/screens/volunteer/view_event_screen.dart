@@ -28,6 +28,7 @@ class ViewEventScreen extends StatefulWidget {
 
 class _ViewEventScreenState extends State<ViewEventScreen> {
   bool isLoadingStatus = true;
+  bool isLoadingVerification = true;
   bool isApplying = false;
   bool isSaved = false;
   String? organiserPhotoUrl;
@@ -54,10 +55,18 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
   }
 
   Future<void> _loadVerificationStatus() async {
-    final status = await VerificationService.getStatus();
-    if (mounted) {
+    try {
+      final status = await VerificationService.getStatus();
+      if (!mounted) return;
       setState(() {
-        verificationStatus = status;
+        verificationStatus = status?.toLowerCase();
+        isLoadingVerification = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        verificationStatus = null;
+        isLoadingVerification = false;
       });
     }
   }
@@ -431,9 +440,8 @@ Join on VolunteerX
             ),
           ),
           if ((widget.event["computed_status"] == "completed") &&
-              (applicationStatus == "approved" ||
-                  applicationStatus == "accepted" ||
-                  applicationStatus == "completed")) ...[
+              (_normalizedStatus(applicationStatus ?? "") == "approved" ||
+                  _normalizedStatus(applicationStatus ?? "") == "completed")) ...[
             const SizedBox(height: 12),
             if (isLoadingRating)
               const Center(child: CircularProgressIndicator())
@@ -636,7 +644,7 @@ Join on VolunteerX
     final isCompleted = computedStatus == "completed" || _isPastEvent();
     final isClosed = status != null && status != "open";
 
-    if (isCompleted || isClosed) {
+    if (applicationStatus == null && (isCompleted || isClosed)) {
       final closedLabel =
           isCompleted ? "Event completed" : "Applications closed";
       return SizedBox(
@@ -694,13 +702,19 @@ Join on VolunteerX
       );
     }
 
-    final canCancel = _isCancelableStatus(applicationStatus!);
-    final isApprovedState = _isApprovedStatus(applicationStatus!);
+    final currentStatus = _normalizedStatus(applicationStatus!);
+    final canCancel = _isCancelableStatus(currentStatus) && !_hasEventStarted();
+    final isApprovedState = _isApprovedStatus(currentStatus);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (isApprovedState)
+        _statusPill(
+          _statusText(currentStatus),
+          _statusColor(currentStatus),
+        ),
+        if (isApprovedState && !isCompleted) ...[
+          const SizedBox(height: 10),
           Row(
             children: [
               Expanded(
@@ -754,11 +768,7 @@ Join on VolunteerX
               ),
             ],
           )
-        else
-          _statusPill(
-            _statusText(applicationStatus!),
-            _statusColor(applicationStatus!),
-          ),
+        ],
         if (canCancel) ...[
           const SizedBox(height: 10),
           SizedBox(
@@ -785,13 +795,11 @@ Join on VolunteerX
   }
 
   bool _isCancelableStatus(String status) {
-    final normalized = status.toLowerCase();
-    return normalized == "approved" || normalized == "accepted";
+    return _normalizedStatus(status) == "approved";
   }
 
   bool _isApprovedStatus(String status) {
-    final normalized = status.toLowerCase();
-    return normalized == "approved" || normalized == "accepted";
+    return _normalizedStatus(status) == "approved";
   }
 
   DateTime? _eventStartDateTime() {
@@ -835,14 +843,24 @@ Join on VolunteerX
     return start.difference(IstDateTime.now()).inMinutes / 60.0;
   }
 
+  bool _hasEventStarted() {
+    final hours = _hoursBeforeEvent();
+    return hours != null && hours <= 0;
+  }
+
   bool _isWithinLockWindow() {
     final hours = _hoursBeforeEvent();
-    return hours != null && hours <= 48;
+    return hours != null && hours > 0 && hours <= 48;
   }
 
   Future<void> _showCancelDialog() async {
     if (applicationId == null) {
       _snack("Application not found for cancellation");
+      return;
+    }
+
+    if (_hasEventStarted()) {
+      _snack("This event has already started. Cancellation is no longer available.");
       return;
     }
 
@@ -1333,12 +1351,16 @@ Join on VolunteerX
     );
   }
 
+  String _normalizedStatus(String status) {
+    final normalized = status.toLowerCase();
+    return normalized == "accepted" ? "approved" : normalized;
+  }
+
   Color _statusColor(String status) {
-    switch (status) {
+    switch (_normalizedStatus(status)) {
       case "pending":
         return Colors.orange;
       case "approved":
-      case "accepted":
         return Colors.green;
       case "rejected":
         return Colors.red;
@@ -1346,28 +1368,33 @@ Join on VolunteerX
         return Colors.red;
       case "waitlisted":
         return Colors.amber;
+      case "completed":
+        return Colors.blueGrey;
+      case "no_show":
+        return Colors.deepOrange;
       default:
         return Colors.grey;
     }
   }
 
   String _statusText(String status) {
-    if (status == "approved") {
-      return "Application Approved";
-    }
-    switch (status) {
+    switch (_normalizedStatus(status)) {
       case "pending":
-        return "⏳ Application Pending";
-      case "accepted":
-        return "✅ Application Approved";
+        return "Application Pending";
+      case "approved":
+        return "Application Approved";
       case "rejected":
-        return "❌ Application Rejected";
+        return "Application Rejected";
       case "cancelled":
         return "Application Cancelled";
       case "waitlisted":
-        return "⏳ Waitlisted";
+        return "Application Waitlisted";
+      case "completed":
+        return "Event Completed";
+      case "no_show":
+        return "No-show Recorded";
       default:
-        return "";
+        return "Application Status Updated";
     }
   }
 
@@ -1376,7 +1403,18 @@ Join on VolunteerX
   }
 
   // ================= TERMS =================
-  void _showTerms(BuildContext context) {
+  Future<void> _showTerms(BuildContext context) async {
+    if (isLoadingVerification || verificationStatus == null) {
+      await _loadVerificationStatus();
+    }
+
+    if (!mounted) return;
+
+    if (verificationStatus == null) {
+      _snack("Couldn't verify your account status. Please try again.");
+      return;
+    }
+
     // Check verification status first
     if (verificationStatus != "approved") {
       _showVerificationRequiredDialog(context);

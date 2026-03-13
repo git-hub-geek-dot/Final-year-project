@@ -1,30 +1,41 @@
 const pool = require("../config/db");
 
+function normalizeRole(value) {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
 // ================= SUBMIT VERIFICATION REQUEST =================
 exports.submitRequest = async (req, res) => {
+  const client = await pool.connect();
   try {
     const userId = req.user.id;
 
-    // 🔒 Check if user already verified
-    const userResult = await pool.query(
-      'SELECT "isVerified" AS "isVerified" FROM users WHERE id = $1',
+    await client.query("BEGIN");
+
+    // Lock the user row so duplicate submit attempts are serialized.
+    const userResult = await client.query(
+      'SELECT role, "isVerified" AS "isVerified" FROM users WHERE id = $1 FOR UPDATE',
       [userId]
     );
 
-    if (userResult.rows[0]?.isVerified) {
-      return res.status(400).json({ message: "User already verified" });
+    if (userResult.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ message: "User not found" });
     }
 
-    // 🔒 Check for existing pending request
-    const existing = await pool.query(
-      "SELECT id FROM verification_requests WHERE user_id = $1 AND status = 'pending'",
-      [userId]
-    );
+    const user = userResult.rows[0];
+    const accountRole = normalizeRole(user.role);
 
-    if (existing.rows.length > 0) {
-      return res
-        .status(400)
-        .json({ message: "Verification already under review" });
+    if (!["volunteer", "organiser"].includes(accountRole)) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({
+        message: "Only volunteers and organisers can request verification",
+      });
+    }
+
+    if (user.isVerified) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ message: "User already verified" });
     }
 
     const {
@@ -38,27 +49,68 @@ exports.submitRequest = async (req, res) => {
       websiteLink,
     } = req.body;
 
-    // ------------------ SERVER-SIDE VALIDATION ------------------
-    if (!role) {
-      return res.status(400).json({ message: "Role is required" });
+    const requestedRole = normalizeRole(role);
+    if (requestedRole && requestedRole !== accountRole) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        message: "Verification role must match your account role",
+      });
     }
 
-    if (!idType) {
+    const trimmedIdType =
+      typeof idType === "string" ? idType.trim().toLowerCase() : "";
+    const trimmedIdNumber = String(idNumber || "").trim();
+    const trimmedIdDocumentUrl =
+      typeof idDocumentUrl === "string" ? idDocumentUrl.trim() : "";
+    const trimmedSelfieUrl =
+      typeof selfieUrl === "string" ? selfieUrl.trim() : "";
+    const trimmedOrganisationName =
+      typeof organisationName === "string" ? organisationName.trim() : "";
+    const trimmedEventProofUrl =
+      typeof eventProofUrl === "string" ? eventProofUrl.trim() : "";
+    const trimmedWebsiteLink =
+      typeof websiteLink === "string" ? websiteLink.trim() : "";
+
+    // ------------------ SERVER-SIDE VALIDATION ------------------
+    if (!trimmedIdType) {
+      await client.query("ROLLBACK");
       return res.status(400).json({ message: "ID type is required" });
     }
 
-    if (!idNumber || idNumber.toString().trim().length < 3) {
+    if (!trimmedIdNumber || trimmedIdNumber.length < 3) {
+      await client.query("ROLLBACK");
       return res.status(400).json({ message: "Valid ID number is required" });
     }
 
-    if (!idDocumentUrl || idDocumentUrl.toString().trim() === "") {
+    if (!trimmedIdDocumentUrl) {
+      await client.query("ROLLBACK");
       return res.status(400).json({ message: "ID document URL is required" });
     }
 
-    if (!selfieUrl || selfieUrl.toString().trim() === "") {
+    if (!trimmedSelfieUrl) {
+      await client.query("ROLLBACK");
       return res.status(400).json({ message: "Selfie URL is required" });
     }
+
+    if (accountRole === "organiser" && !trimmedOrganisationName) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        message: "Organisation name is required for organisers",
+      });
+    }
     // ------------------------------------------------------------
+
+    const existing = await client.query(
+      "SELECT id FROM verification_requests WHERE user_id = $1 AND status = 'pending' LIMIT 1",
+      [userId]
+    );
+
+    if (existing.rowCount > 0) {
+      await client.query("ROLLBACK");
+      return res
+        .status(400)
+        .json({ message: "Verification already under review" });
+    }
 
     const insertQuery = `
       INSERT INTO verification_requests
@@ -70,25 +122,38 @@ exports.submitRequest = async (req, res) => {
 
     const values = [
       userId,
-      role,
-      idType,
-      idNumber,
-      idDocumentUrl,
-      selfieUrl,
-      organisationName,
-      eventProofUrl,
-      websiteLink,
+      accountRole,
+      trimmedIdType,
+      trimmedIdNumber,
+      trimmedIdDocumentUrl,
+      trimmedSelfieUrl,
+      trimmedOrganisationName || null,
+      trimmedEventProofUrl || null,
+      trimmedWebsiteLink || null,
     ];
 
-    const result = await pool.query(insertQuery, values);
+    const result = await client.query(insertQuery, values);
+    await client.query("COMMIT");
 
     res.status(201).json({
       message: "Verification request submitted",
       request: result.rows[0],
     });
   } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (_) {}
+
+    if (err?.code === "23505") {
+      return res
+        .status(400)
+        .json({ message: "Verification already under review" });
+    }
+
     console.error("VERIFICATION SUBMIT ERROR:", err);
     res.status(500).json({ message: "Server error" });
+  } finally {
+    client.release();
   }
 };
 

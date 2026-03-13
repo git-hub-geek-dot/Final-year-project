@@ -690,7 +690,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
         );
 
         final cancelEventButton = OutlinedButton.icon(
-          onPressed: (cancellingEvent || isCancelledEvent)
+          onPressed: (cancellingEvent || isCancelledEvent || isCompletedEvent)
               ? null
               : () => _cancelEvent(event),
           style: OutlinedButton.styleFrom(
@@ -709,7 +709,13 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                   ),
                 )
               : const Icon(Icons.event_busy),
-          label: Text(isCancelledEvent ? "Event Cancelled" : "Cancel Event"),
+          label: Text(
+            isCompletedEvent
+                ? "Event Completed"
+                : isCancelledEvent
+                    ? "Event Cancelled"
+                    : "Cancel Event",
+          ),
         );
 
         if (isNarrow) {

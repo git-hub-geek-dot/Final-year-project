@@ -34,6 +34,12 @@ enum EventType {
   unpaid
 }
 
+enum PaymentRateType {
+  per_day
+  per_hour
+  fixed
+}
+
 enum VerificationStatus {
   pending
   approved
@@ -131,7 +137,9 @@ model Event {
   applicationDeadline  DateTime?        @map("application_deadline") @db.Date
   bannerUrl            String?          @map("banner_url")
   eventType            EventType        @default(unpaid) @map("event_type")
-  paymentPerDay        Decimal?         @map("payment_per_day") @db.Decimal(10, 2)
+  paymentAmount        Decimal?         @map("payment_amount") @db.Decimal(10, 2)
+  paymentRateType      PaymentRateType? @map("payment_rate_type")
+  paymentClearanceDate DateTime?        @map("payment_clearance_date") @db.Date
   startTime            DateTime?        @map("start_time") @db.Time(6)
   endTime              DateTime?        @map("end_time") @db.Time(6)
   createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamp(6)

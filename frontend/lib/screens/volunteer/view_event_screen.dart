@@ -9,6 +9,7 @@ import '../../services/saved_events_service.dart';
 import '../../services/verification_service.dart';
 import '../../services/event_service.dart';
 import '../../utils/ist_date_time.dart';
+import '../../utils/payment_format.dart';
 import 'view_organiser_profile_screen.dart';
 import 'get_verified_screen.dart';
 import '../chat/event_group_chat_screen.dart';
@@ -434,11 +435,24 @@ Join on VolunteerX
           ),
           _iconRow(
             Icons.payments,
-            _paymentText(
+            _paymentSummaryText(
               widget.event["event_type"],
-              widget.event["payment_per_day"],
+              widget.event["payment_amount"],
+              widget.event["payment_rate_type"],
             ),
           ),
+          if (_paymentClearanceText(
+                widget.event["event_type"],
+                widget.event["payment_clearance_date"],
+              ) !=
+              null)
+            _iconRow(
+              Icons.schedule,
+              _paymentClearanceText(
+                widget.event["event_type"],
+                widget.event["payment_clearance_date"],
+              )!,
+            ),
           if ((widget.event["computed_status"] == "completed") &&
               (_normalizedStatus(applicationStatus ?? "") == "approved" ||
                   _normalizedStatus(applicationStatus ?? "") == "completed")) ...[
@@ -1221,6 +1235,29 @@ Join on VolunteerX
       return "Paid";
     }
     return "Unpaid";
+  }
+
+  String _paymentSummaryText(
+    dynamic eventType,
+    dynamic paymentAmount,
+    dynamic paymentRateType,
+  ) {
+    _paymentText(eventType, paymentAmount);
+    return formatEventPaymentText(eventType, paymentAmount, paymentRateType);
+  }
+
+  String? _paymentClearanceText(dynamic eventType, dynamic paymentClearanceDate) {
+    final type = eventType?.toString().toLowerCase();
+    if (type != "paid") {
+      return null;
+    }
+
+    final rawDate = paymentClearanceDate?.toString();
+    if (rawDate == null || rawDate.trim().isEmpty) {
+      return null;
+    }
+
+    return "Payment clears by: ${IstDateTime.formatDate(rawDate)}";
   }
 
   Widget _card({required Widget child}) {

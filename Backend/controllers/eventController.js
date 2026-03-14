@@ -7,6 +7,48 @@ const {
   notifyOngoingAttendanceUpdatesForOrganiser,
 } = require("../services/eventAttendanceNotificationService");
 
+const VALID_PAYMENT_RATE_TYPES = new Set(["per_day", "per_hour", "fixed"]);
+
+function normalizeDateOnly(value) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const raw =
+    value instanceof Date ? value.toISOString().slice(0, 10) : value.toString().trim();
+
+  if (!raw || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return null;
+  }
+
+  const parsed = new Date(`${raw}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return raw;
+}
+
+function normalizePaymentRateType(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return VALID_PAYMENT_RATE_TYPES.has(normalized) ? normalized : null;
+}
+
+function isDateOnOrAfter(leftDate, rightDate) {
+  const left = normalizeDateOnly(leftDate);
+  const right = normalizeDateOnly(rightDate);
+
+  if (!left || !right) {
+    return false;
+  }
+
+  return new Date(`${left}T00:00:00Z`).getTime() >= new Date(`${right}T00:00:00Z`).getTime();
+}
+
 /*
 EVENTS TABLE (SOURCE OF TRUTH)
 
@@ -64,7 +106,9 @@ exports.createEvent = async (req, res) => {
       volunteers_required,
       application_deadline,
       event_type,
-      payment_per_day,
+      payment_amount,
+      payment_rate_type,
+      payment_clearance_date,
       banner_url,
       categories,
       responsibilities,
@@ -90,6 +134,18 @@ exports.createEvent = async (req, res) => {
       : null;
     const hasValidVolunteers =
       Number.isInteger(parsedVolunteers) && parsedVolunteers >= 1;
+    const hasPaymentRateTypeInput =
+      payment_rate_type !== undefined &&
+      payment_rate_type !== null &&
+      payment_rate_type.toString().trim() !== "";
+    const normalizedPaymentRateType =
+      normalizePaymentRateType(payment_rate_type);
+    const hasPaymentClearanceDateInput =
+      payment_clearance_date !== undefined &&
+      payment_clearance_date !== null &&
+      payment_clearance_date.toString().trim() !== "";
+    const normalizedPaymentClearanceDate =
+      normalizeDateOnly(payment_clearance_date);
 
     if (
       !saveAsDraft &&
@@ -113,20 +169,67 @@ exports.createEvent = async (req, res) => {
       });
     }
 
+    if (hasPaymentClearanceDateInput && !normalizedPaymentClearanceDate) {
+      return res.status(400).json({
+        error: "Payment clearance date must be a valid date",
+      });
+    }
+
+    if (hasPaymentRateTypeInput && !normalizedPaymentRateType) {
+      return res.status(400).json({
+        error: "Payment rate type must be per_day, per_hour, or fixed",
+      });
+    }
+
     if (
       !saveAsDraft &&
       event_type === "paid" &&
-      (!payment_per_day || payment_per_day <= 0)
+      (!payment_amount || payment_amount <= 0)
     ) {
       return res.status(400).json({
-        error: "Payment per day is required for paid events",
+        error: "Payment amount is required for paid events",
+      });
+    }
+
+    if (
+      !saveAsDraft &&
+      event_type === "paid" &&
+      !normalizedPaymentRateType
+    ) {
+      return res.status(400).json({
+        error: "Payment rate type is required for paid events",
+      });
+    }
+
+    if (
+      !saveAsDraft &&
+      event_type === "paid" &&
+      !normalizedPaymentClearanceDate
+    ) {
+      return res.status(400).json({
+        error: "Payment clearance date is required for paid events",
       });
     }
 
     const safeEventType = event_type === "paid" ? "paid" : "unpaid";
     const safeVolunteersRequired = hasVolunteersInput ? parsedVolunteers : 0;
-    const safePaymentPerDay =
-      safeEventType === "paid" && payment_per_day ? payment_per_day : null;
+    const safePaymentAmount =
+      safeEventType === "paid" && payment_amount ? payment_amount : null;
+    const safePaymentRateType =
+      safeEventType === "paid" ? normalizedPaymentRateType : null;
+    const safePaymentClearanceDate =
+      safeEventType === "paid" ? normalizedPaymentClearanceDate : null;
+
+    if (
+      safeEventType === "paid" &&
+      end_date &&
+      safePaymentClearanceDate &&
+      !isDateOnOrAfter(safePaymentClearanceDate, end_date)
+    ) {
+      return res.status(400).json({
+        error: "Payment clearance date cannot be before the event end date",
+      });
+    }
 
     const eventResult = await pool.query(
       `
@@ -140,13 +243,15 @@ exports.createEvent = async (req, res) => {
         volunteers_required,
         application_deadline,
         event_type,
-        payment_per_day,
+        payment_amount,
+        payment_rate_type,
+        payment_clearance_date,
         banner_url,
         start_time,
         end_time,
         status
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
       RETURNING *
       `,
       [
@@ -159,7 +264,9 @@ exports.createEvent = async (req, res) => {
         safeVolunteersRequired,
         application_deadline ?? null,
         safeEventType,
-        safePaymentPerDay,
+        safePaymentAmount,
+        safePaymentRateType,
+        safePaymentClearanceDate,
         banner_url ?? null,
         start_time ?? null,
         end_time ?? null,
@@ -552,7 +659,9 @@ exports.updateEvent = async (req, res) => {
       application_deadline,
       volunteers_required,
       event_type,
-      payment_per_day,
+      payment_amount,
+      payment_rate_type,
+      payment_clearance_date,
       banner_url,
       start_time,
       end_time,
@@ -566,10 +675,73 @@ exports.updateEvent = async (req, res) => {
     const parsedVolunteers = Number.parseInt(volunteers_required, 10);
     const hasValidVolunteers =
       Number.isInteger(parsedVolunteers) && parsedVolunteers >= 1;
+    const safeEventType = event_type === "paid" ? "paid" : "unpaid";
+    const hasPaymentRateTypeInput =
+      payment_rate_type !== undefined &&
+      payment_rate_type !== null &&
+      payment_rate_type.toString().trim() !== "";
+    const normalizedPaymentRateType =
+      normalizePaymentRateType(payment_rate_type);
+    const hasPaymentClearanceDateInput =
+      payment_clearance_date !== undefined &&
+      payment_clearance_date !== null &&
+      payment_clearance_date.toString().trim() !== "";
+    const normalizedPaymentClearanceDate =
+      normalizeDateOnly(payment_clearance_date);
+    const safePaymentAmount =
+      safeEventType === "paid" && payment_amount ? payment_amount : null;
+    const safePaymentRateType =
+      safeEventType === "paid" ? normalizedPaymentRateType : null;
+    const safePaymentClearanceDate =
+      safeEventType === "paid" ? normalizedPaymentClearanceDate : null;
 
     if (!hasValidVolunteers) {
       return res.status(400).json({
         error: "volunteers_required must be at least 1",
+      });
+    }
+
+    if (hasPaymentClearanceDateInput && !normalizedPaymentClearanceDate) {
+      return res.status(400).json({
+        error: "Payment clearance date must be a valid date",
+      });
+    }
+
+    if (hasPaymentRateTypeInput && !normalizedPaymentRateType) {
+      return res.status(400).json({
+        error: "Payment rate type must be per_day, per_hour, or fixed",
+      });
+    }
+
+    if (
+      safeEventType === "paid" &&
+      (!safePaymentAmount || Number(safePaymentAmount) <= 0)
+    ) {
+      return res.status(400).json({
+        error: "Payment amount is required for paid events",
+      });
+    }
+
+    if (safeEventType === "paid" && !safePaymentRateType) {
+      return res.status(400).json({
+        error: "Payment rate type is required for paid events",
+      });
+    }
+
+    if (safeEventType === "paid" && !safePaymentClearanceDate) {
+      return res.status(400).json({
+        error: "Payment clearance date is required for paid events",
+      });
+    }
+
+    if (
+      safeEventType === "paid" &&
+      end_date &&
+      safePaymentClearanceDate &&
+      !isDateOnOrAfter(safePaymentClearanceDate, end_date)
+    ) {
+      return res.status(400).json({
+        error: "Payment clearance date cannot be before the event end date",
       });
     }
 
@@ -620,15 +792,17 @@ exports.updateEvent = async (req, res) => {
         application_deadline = $6,
         volunteers_required = $7,
         event_type = $8,
-        payment_per_day = $9,
-        banner_url = $10,
-        start_time = $11,
-        end_time = $12,
+        payment_amount = $9,
+        payment_rate_type = $10,
+        payment_clearance_date = $11,
+        banner_url = $12,
+        start_time = $13,
+        end_time = $14,
         status = CASE
-          WHEN $13::boolean = true AND status = 'draft' THEN 'open'
+          WHEN $15::boolean = true AND status = 'draft' THEN 'open'
           ELSE status
         END
-      WHERE id = $14 AND organiser_id = $15
+      WHERE id = $16 AND organiser_id = $17
       RETURNING *
       `,
       [
@@ -639,8 +813,10 @@ exports.updateEvent = async (req, res) => {
         end_date,
         application_deadline,
         parsedVolunteers,
-        event_type,
-        payment_per_day,
+        safeEventType,
+        safePaymentAmount,
+        safePaymentRateType,
+        safePaymentClearanceDate,
         banner_url,
         start_time,
         end_time,
@@ -1281,7 +1457,9 @@ exports.publishEvent = async (req, res) => {
         application_deadline,
         volunteers_required,
         event_type,
-        payment_per_day,
+        payment_amount,
+        payment_rate_type,
+        payment_clearance_date,
         start_time,
         end_time,
         status
@@ -1324,9 +1502,30 @@ exports.publishEvent = async (req, res) => {
     if (!event.end_time) missingFields.push("end_time");
     if (
       event.event_type === "paid" &&
-      (!event.payment_per_day || Number(event.payment_per_day) <= 0)
+      (!event.payment_amount || Number(event.payment_amount) <= 0)
     ) {
-      missingFields.push("payment_per_day");
+      missingFields.push("payment_amount");
+    }
+    if (
+      event.event_type === "paid" &&
+      !normalizePaymentRateType(event.payment_rate_type)
+    ) {
+      missingFields.push("payment_rate_type");
+    }
+    if (
+      event.event_type === "paid" &&
+      !event.payment_clearance_date
+    ) {
+      missingFields.push("payment_clearance_date");
+    }
+    if (
+      event.event_type === "paid" &&
+      event.payment_clearance_date &&
+      !isDateOnOrAfter(event.payment_clearance_date, event.end_date)
+    ) {
+      return res.status(400).json({
+        error: "Payment clearance date cannot be before the event end date",
+      });
     }
 
     if (missingFields.length > 0) {

@@ -31,11 +31,13 @@ class _EditEventScreenState extends State<EditEventScreen> {
   DateTime? eventStartDate;
   DateTime? eventEndDate;
   DateTime? applicationDeadline;
+  DateTime? paymentClearanceDate;
   TimeOfDay? eventStartTime;
   TimeOfDay? eventEndTime;
 
   bool loading = false;
   String eventType = "unpaid";
+  String paymentRateType = "per_day";
   bool _isDraftEvent = false;
 
   final List<String> categories = [
@@ -83,7 +85,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
 
     eventType = e["event_type"] ?? "unpaid";
     if (eventType == "paid") {
-      paymentController.text = e["payment_per_day"]?.toString() ?? "";
+      paymentController.text = e["payment_amount"]?.toString() ?? "";
+      paymentRateType = (e["payment_rate_type"] ?? "per_day").toString();
+      paymentClearanceDate = _parseDate(e["payment_clearance_date"]);
     }
 
     eventStartDate = _parseDate(e["event_date"]);
@@ -118,6 +122,17 @@ class _EditEventScreenState extends State<EditEventScreen> {
     existingBanner = e["banner_url"]?.toString();
   }
 
+  void _setEventType(String value) {
+    setState(() {
+      eventType = value;
+      if (value != "paid") {
+        paymentController.clear();
+        paymentClearanceDate = null;
+        paymentRateType = "per_day";
+      }
+    });
+  }
+
   Future<void> _loadMissingMetadataFromServer() async {
     if (selectedCategories.isNotEmpty && responsibilities.isNotEmpty) {
       return;
@@ -137,15 +152,14 @@ class _EditEventScreenState extends State<EditEventScreen> {
         }
       }
 
-      if (fresh == null) {
-        fresh = await EventService.fetchEventById(eventId);
-      }
+      fresh ??= await EventService.fetchEventById(eventId);
+      final freshEvent = fresh;
 
       if (!mounted) return;
 
-      final fetchedCategories = _stringListFromAny(fresh["categories"]);
+      final fetchedCategories = _stringListFromAny(freshEvent["categories"]);
       final fetchedResponsibilities =
-          _stringListFromAny(fresh["responsibilities"]);
+          _stringListFromAny(freshEvent["responsibilities"]);
 
       if (fetchedCategories.isEmpty && fetchedResponsibilities.isEmpty) return;
 
@@ -159,6 +173,10 @@ class _EditEventScreenState extends State<EditEventScreen> {
           responsibilities
             ..clear()
             ..addAll(fetchedResponsibilities);
+        }
+        if (paymentClearanceDate == null) {
+          paymentClearanceDate =
+              _parseDate(freshEvent["payment_clearance_date"]);
         }
       });
     } catch (_) {
@@ -254,7 +272,18 @@ class _EditEventScreenState extends State<EditEventScreen> {
       lastDate: DateTime(2100),
     );
     if (picked != null) {
-      setState(() => isStart ? eventStartDate = picked : eventEndDate = picked);
+      setState(() {
+        if (isStart) {
+          eventStartDate = picked;
+          return;
+        }
+
+        eventEndDate = picked;
+        if (paymentClearanceDate != null &&
+            paymentClearanceDate!.isBefore(picked)) {
+          paymentClearanceDate = null;
+        }
+      });
     }
   }
 
@@ -277,6 +306,27 @@ class _EditEventScreenState extends State<EditEventScreen> {
       lastDate: DateTime(2100),
     );
     if (picked != null) setState(() => applicationDeadline = picked);
+  }
+
+  Future<void> pickPaymentClearanceDate() async {
+    final today = IstDateTime.startOfDay(IstDateTime.now());
+    final firstDate =
+        eventEndDate != null && eventEndDate!.isAfter(today) ? eventEndDate! : today;
+    final initialDate = paymentClearanceDate != null &&
+            !paymentClearanceDate!.isBefore(firstDate)
+        ? paymentClearanceDate!
+        : firstDate;
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: DateTime(2100),
+    );
+
+    if (picked != null) {
+      setState(() => paymentClearanceDate = picked);
+    }
   }
 
   Future<void> pickBannerImage() async {
@@ -391,9 +441,17 @@ class _EditEventScreenState extends State<EditEventScreen> {
       return;
     }
     if (eventType == "paid") {
-      final pay = double.tryParse(paymentController.text);
-      if (pay == null || pay <= 0) {
-        _toast("Enter valid payment per day");
+      final amount = double.tryParse(paymentController.text);
+      if (amount == null || amount <= 0) {
+        _toast("Enter valid payment amount");
+        return;
+      }
+      if (paymentClearanceDate == null) {
+        _toast("Select payment clearance date");
+        return;
+      }
+      if (eventEndDate != null && paymentClearanceDate!.isBefore(eventEndDate!)) {
+        _toast("Payment clearance date cannot be before the event end date");
         return;
       }
     }
@@ -417,8 +475,12 @@ class _EditEventScreenState extends State<EditEventScreen> {
         applicationDeadline: _fmtDate(applicationDeadline!),
         volunteersRequired: _parseVolunteers()!,
         eventType: eventType,
-        paymentPerDay:
+        paymentAmount:
             eventType == "paid" ? double.parse(paymentController.text) : null,
+        paymentRateType: eventType == "paid" ? paymentRateType : null,
+        paymentClearanceDate: eventType == "paid" && paymentClearanceDate != null
+            ? _fmtDate(paymentClearanceDate!)
+            : null,
         bannerUrl: bannerUrl,
         categories: selectedCategories,
         responsibilities: responsibilities,
@@ -633,17 +695,24 @@ class _EditEventScreenState extends State<EditEventScreen> {
               value: "paid",
               groupValue: eventType,
               title: const Text("Paid"),
-              onChanged: (v) => setState(() => eventType = v!),
+              onChanged: (v) => _setEventType(v!),
             ),
             RadioListTile(
               value: "unpaid",
               groupValue: eventType,
               title: const Text("Unpaid"),
-              onChanged: (v) => setState(() => eventType = v!),
+              onChanged: (v) => _setEventType(v!),
             ),
-            if (eventType == "paid")
-              _input("Payment per day", paymentController,
+            if (eventType == "paid") ...[
+              _input("Payment Amount", paymentController,
                   keyboardType: TextInputType.number),
+              _paymentRateField(),
+              _dateTile(
+                "Payment Clearance Date",
+                paymentClearanceDate,
+                pickPaymentClearanceDate,
+              ),
+            ],
           ]),
           _sectionCard("Responsibilities", [
             Row(
@@ -823,6 +892,28 @@ class _EditEventScreenState extends State<EditEventScreen> {
           hintText: hint,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         ),
+      ),
+    );
+  }
+
+  Widget _paymentRateField() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: DropdownButtonFormField<String>(
+        value: paymentRateType,
+        decoration: InputDecoration(
+          labelText: "Payment Rate",
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        items: const [
+          DropdownMenuItem(value: "per_day", child: Text("Per Day")),
+          DropdownMenuItem(value: "per_hour", child: Text("Per Hour")),
+          DropdownMenuItem(value: "fixed", child: Text("Fixed Amount")),
+        ],
+        onChanged: (value) {
+          if (value == null) return;
+          setState(() => paymentRateType = value);
+        },
       ),
     );
   }

@@ -30,11 +30,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   DateTime? eventStartDate;
   DateTime? eventEndDate;
   DateTime? applicationDeadline;
+  DateTime? paymentClearanceDate;
   TimeOfDay? eventStartTime;
   TimeOfDay? eventEndTime;
 
   bool loading = false;
   String eventType = "unpaid";
+  String paymentRateType = "per_day";
 
   final List<String> categories = [
     "Education",
@@ -72,6 +74,17 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     final text = volunteersController.text.trim();
     if (text.isEmpty) return null;
     return int.tryParse(text);
+  }
+
+  void _setEventType(String value) {
+    setState(() {
+      eventType = value;
+      if (value != "paid") {
+        paymentController.clear();
+        paymentClearanceDate = null;
+        paymentRateType = "per_day";
+      }
+    });
   }
 
   void _toast(String msg) {
@@ -116,7 +129,18 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       lastDate: DateTime(2100),
     );
     if (picked != null) {
-      setState(() => isStart ? eventStartDate = picked : eventEndDate = picked);
+      setState(() {
+        if (isStart) {
+          eventStartDate = picked;
+          return;
+        }
+
+        eventEndDate = picked;
+        if (paymentClearanceDate != null &&
+            paymentClearanceDate!.isBefore(picked)) {
+          paymentClearanceDate = null;
+        }
+      });
     }
   }
 
@@ -139,6 +163,27 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       lastDate: DateTime(2100),
     );
     if (picked != null) setState(() => applicationDeadline = picked);
+  }
+
+  Future<void> pickPaymentClearanceDate() async {
+    final today = IstDateTime.startOfDay(IstDateTime.now());
+    final firstDate =
+        eventEndDate != null && eventEndDate!.isAfter(today) ? eventEndDate! : today;
+    final initialDate = paymentClearanceDate != null &&
+            !paymentClearanceDate!.isBefore(firstDate)
+        ? paymentClearanceDate!
+        : firstDate;
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: DateTime(2100),
+    );
+
+    if (picked != null) {
+      setState(() => paymentClearanceDate = picked);
+    }
   }
 
   Future<void> pickBannerImage() async {
@@ -249,9 +294,17 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     }
 
     if (!saveAsDraft && eventType == "paid") {
-      final pay = double.tryParse(paymentController.text);
-      if (pay == null || pay <= 0) {
-        _toast("Enter valid payment per day");
+      final amount = double.tryParse(paymentController.text);
+      if (amount == null || amount <= 0) {
+        _toast("Enter valid payment amount");
+        return;
+      }
+      if (paymentClearanceDate == null) {
+        _toast("Select payment clearance date");
+        return;
+      }
+      if (eventEndDate != null && paymentClearanceDate!.isBefore(eventEndDate!)) {
+        _toast("Payment clearance date cannot be before the event end date");
         return;
       }
     }
@@ -278,8 +331,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             applicationDeadline == null ? null : _fmtDate(applicationDeadline!),
         volunteersRequired: _parseVolunteers(),
         eventType: eventType,
-        paymentPerDay: eventType == "paid"
+        paymentAmount: eventType == "paid"
             ? double.tryParse(paymentController.text)
+            : null,
+        paymentRateType: eventType == "paid" ? paymentRateType : null,
+        paymentClearanceDate: eventType == "paid" && paymentClearanceDate != null
+            ? _fmtDate(paymentClearanceDate!)
             : null,
         bannerUrl: bannerUrl,
         categories: selectedCategories,
@@ -488,17 +545,24 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
               value: "paid",
               groupValue: eventType,
               title: const Text("Paid"),
-              onChanged: (v) => setState(() => eventType = v!),
+              onChanged: (v) => _setEventType(v!),
             ),
             RadioListTile(
               value: "unpaid",
               groupValue: eventType,
               title: const Text("Unpaid"),
-              onChanged: (v) => setState(() => eventType = v!),
+              onChanged: (v) => _setEventType(v!),
             ),
-            if (eventType == "paid")
-              _input("Payment per day", paymentController,
+            if (eventType == "paid") ...[
+              _input("Payment Amount", paymentController,
                   keyboardType: TextInputType.number),
+              _paymentRateField(),
+              _dateTile(
+                "Payment Clearance Date",
+                paymentClearanceDate,
+                pickPaymentClearanceDate,
+              ),
+            ],
           ]),
           _sectionCard("Responsibilities", [
             Row(
@@ -645,6 +709,33 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           hintText: hint,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         ),
+      ),
+    );
+  }
+
+  Widget _paymentRateField() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: DropdownButtonFormField<String>(
+        value: paymentRateType,
+        decoration: InputDecoration(
+          labelText: "Payment Rate",
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        items: const [
+          DropdownMenuItem(value: "per_day", child: Text("Per Day")),
+          DropdownMenuItem(value: "per_hour", child: Text("Per Hour")),
+          DropdownMenuItem(value: "fixed", child: Text("Fixed Amount")),
+        ],
+        onChanged: (value) {
+          if (value == null) return;
+          setState(() => paymentRateType = value);
+        },
+        selectedItemBuilder: (context) => const [
+          Text("Per Day"),
+          Text("Per Hour"),
+          Text("Fixed Amount"),
+        ],
       ),
     );
   }

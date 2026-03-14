@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../services/event_service.dart';
 import '../../utils/application_status.dart';
 import '../../utils/ist_date_time.dart';
+import '../../utils/payment_format.dart';
 import '../../widgets/organiser_bottom_nav.dart';
 import '../chat/event_group_chat_screen.dart';
 import 'edit_event_screen.dart';
@@ -547,6 +548,10 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                     const SizedBox(height: 12),
                     _infoRow(Icons.location_on, event["location"]),
                     _infoRow(Icons.category, event["event_type"]),
+                    if (_paymentText(event) != null)
+                      _infoRow(Icons.payments, _paymentText(event)),
+                    if (_paymentClearanceText(event) != null)
+                      _infoRow(Icons.schedule, _paymentClearanceText(event)),
                     _infoRow(Icons.calendar_today, eventDateRangeText),
                     _infoRow(Icons.access_time,
                         "Time: $startTimeText - $endTimeText"),
@@ -921,6 +926,33 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
         ],
       ),
     );
+  }
+
+  static String? _paymentText(Map event) {
+    final type = event["event_type"]?.toString().toLowerCase();
+    if (type != "paid") {
+      return null;
+    }
+
+    return formatPaidPaymentAmount(
+          event["payment_amount"],
+          event["payment_rate_type"],
+        ) ??
+        "Paid event";
+  }
+
+  static String? _paymentClearanceText(Map event) {
+    final type = event["event_type"]?.toString().toLowerCase();
+    if (type != "paid") {
+      return null;
+    }
+
+    final rawDate = event["payment_clearance_date"]?.toString();
+    if (rawDate == null || rawDate.trim().isEmpty) {
+      return null;
+    }
+
+    return "Payment clears by: ${_fmtDate(rawDate)}";
   }
 
   static String _formatEventDateRange(Map event) {

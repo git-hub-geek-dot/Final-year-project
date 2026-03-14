@@ -308,7 +308,8 @@ exports.getMyApplications = async (req, res) => {
             AND r.ratee_id = e.organiser_id
         ) AS has_rated,
         e.event_type,
-        e.payment_per_day,
+        e.payment_amount,
+        e.payment_rate_type,
         COALESCE(
           array_agg(DISTINCT c.name) FILTER (WHERE c.name IS NOT NULL),
           '{}'
@@ -321,10 +322,10 @@ exports.getMyApplications = async (req, res) => {
       GROUP BY a.id, a.status, a.admin_cancel_reason, a.volunteer_cancel_reason, a.cancellation_supporting_document_url,
            a.cancellation_window, a.strike_issued, a.warning_issued, a.volunteer_cancelled_at,
            a.strike_appeal_status, a.strike_appeal_submitted_at,
-           a.applied_at, a.compensation_status, e.id, e.organiser_id, e.title, e.location,
-               e.event_date, e.start_time, e.end_date, e.end_time, e.status, e.event_type, e.payment_per_day
-      ORDER BY a.applied_at DESC
-      `,
+            a.applied_at, a.compensation_status, e.id, e.organiser_id, e.title, e.location,
+                e.event_date, e.start_time, e.end_date, e.end_time, e.status, e.event_type, e.payment_amount, e.payment_rate_type
+       ORDER BY a.applied_at DESC
+       `,
       [volunteerId]
     );
 

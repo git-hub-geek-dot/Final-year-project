@@ -1,9 +1,11 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../../config/api_config.dart';
 import '../../services/token_service.dart';
+import '../../utils/payment_format.dart';
 
 class CompensationStatusScreen extends StatefulWidget {
   const CompensationStatusScreen({super.key});
@@ -106,8 +108,7 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
           setState(() {
             applications = applications.map((app) {
               if (app["id"] == updated["id"]) {
-                app["compensation_status"] =
-                    updated["compensation_status"];
+                app["compensation_status"] = updated["compensation_status"];
               }
               return app;
             }).toList();
@@ -154,6 +155,24 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
     }
   }
 
+  String _paymentSubtitle(Map app) {
+    final location = (app["location"] ?? "").toString();
+    final paymentText = formatPaidPaymentAmount(
+      app["payment_amount"],
+      app["payment_rate_type"],
+    );
+
+    if (paymentText == null) {
+      return location;
+    }
+
+    if (location.isEmpty) {
+      return paymentText;
+    }
+
+    return "$location - $paymentText";
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -181,17 +200,16 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
                       itemBuilder: (context, index) {
                         final app = applications[index];
                         final title = app["title"] ?? "Unknown Event";
-                        final location = app["location"] ?? "";
+                        final location = (app["location"] ?? "").toString();
                         final eventType =
                             (app["event_type"] ?? "unpaid").toString();
-                        final paymentPerDay = app["payment_per_day"];
                         final status =
                             (app["compensation_status"] ?? "pending")
                                 .toString();
 
                         final isPaid = eventType.toLowerCase() == "paid";
-                        final subtitle = isPaid && paymentPerDay != null
-                            ? "$location • ₹$paymentPerDay/day"
+                        final subtitle = isPaid
+                            ? _paymentSubtitle(app)
                             : location;
 
                         return Card(
@@ -209,8 +227,8 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
                             onTap: !isPaid
                                 ? null
                                 : () async {
-                                    final choice = await showModalBottomSheet<
-                                        String>(
+                                    final choice =
+                                        await showModalBottomSheet<String>(
                                       context: context,
                                       builder: (_) => SafeArea(
                                         child: Column(
@@ -222,8 +240,10 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
                                                 color: Colors.green,
                                               ),
                                               title: const Text("Received"),
-                                              onTap: () =>
-                                                  Navigator.pop(context, "received"),
+                                              onTap: () => Navigator.pop(
+                                                context,
+                                                "received",
+                                              ),
                                             ),
                                             ListTile(
                                               leading: const Icon(
@@ -231,8 +251,10 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
                                                 color: Colors.orange,
                                               ),
                                               title: const Text("Pending"),
-                                              onTap: () =>
-                                                  Navigator.pop(context, "pending"),
+                                              onTap: () => Navigator.pop(
+                                                context,
+                                                "pending",
+                                              ),
                                             ),
                                           ],
                                         ),
@@ -253,4 +275,3 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
     );
   }
 }
-

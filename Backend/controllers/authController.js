@@ -392,7 +392,7 @@ exports.getProfile = async (req, res) => {
     const userId = req.user.id;
 
     const result = await pool.query(
-      `SELECT id, name, email, city, role, contact_number, profile_picture_url
+      `SELECT id, name, email, city, role, contact_number, profile_picture_url, show_contact_to_volunteers
        FROM users
        WHERE id = $1`,
       [userId]
@@ -415,6 +415,14 @@ exports.updateProfile = async (req, res) => {
   try {
     const userId = req.user?.id;
     const { name, city, contact_number, profile_picture_url } = req.body;
+    const rawShowContact = req.body?.show_contact_to_volunteers;
+    const showContactToVolunteers =
+      rawShowContact === undefined || rawShowContact === null
+        ? null
+        : rawShowContact === true ||
+          rawShowContact === "true" ||
+          rawShowContact === 1 ||
+          rawShowContact === "1";
 
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
@@ -430,11 +438,19 @@ exports.updateProfile = async (req, res) => {
       SET name = $1,
           city = $2,
           contact_number = $3,
-          profile_picture_url = $4
-      WHERE id = $5
-      RETURNING id, name, email, role, city, contact_number, profile_picture_url
+          profile_picture_url = $4,
+          show_contact_to_volunteers = COALESCE($5, show_contact_to_volunteers)
+      WHERE id = $6
+      RETURNING id, name, email, role, city, contact_number, profile_picture_url, show_contact_to_volunteers
       `,
-      [name, city ?? null, contact_number ?? null, profile_picture_url || null, userId]
+      [
+        name,
+        city ?? null,
+        contact_number ?? null,
+        profile_picture_url || null,
+        showContactToVolunteers,
+        userId,
+      ]
     );
 
     return res.status(200).json({

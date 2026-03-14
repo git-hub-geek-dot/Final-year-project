@@ -40,7 +40,7 @@ exports.uploadProfilePicture = async (req, res) => {
         UPDATE users
         SET profile_picture_url = $1
         WHERE id = $2
-        RETURNING id, name, email, role, city, contact_number, profile_picture_url
+        RETURNING id, name, email, role, city, contact_number, profile_picture_url, show_contact_to_volunteers
         `,
         [imageUrl, userId]
       );
@@ -111,7 +111,7 @@ exports.deleteProfilePicture = async (req, res) => {
       UPDATE users
       SET profile_picture_url = NULL
       WHERE id = $1
-      RETURNING id, name, email, role, city, contact_number, profile_picture_url
+      RETURNING id, name, email, role, city, contact_number, profile_picture_url, show_contact_to_volunteers
       `,
       [userId]
     );
@@ -159,7 +159,7 @@ exports.updateProfilePicture = async (req, res) => {
       UPDATE users
       SET profile_picture_url = $1
       WHERE id = $2
-      RETURNING id, name, email, role, city, contact_number, profile_picture_url
+      RETURNING id, name, email, role, city, contact_number, profile_picture_url, show_contact_to_volunteers
       `,
       [profilePictureUrl, userId]
     );

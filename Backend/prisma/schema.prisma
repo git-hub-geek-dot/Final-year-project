@@ -376,6 +376,7 @@ model User {
   role        UserRole?
   status      UserStatus  @default(active)
   contact     String?     @map("contact_number")
+  showContactToVolunteers Boolean @default(false) @map("show_contact_to_volunteers")
   city        String?
   govtId      String?     @map("government_id")
   isVerified  Boolean     @default(false) // ✅ added (safe)

@@ -18,8 +18,8 @@ router.put("/users/:id", authMiddleware, updateUser);
 // DELETE user by ID
 router.delete("/users/:id", authMiddleware, deleteUser);
 
-// GET organiser profile (public – for volunteers)
-router.get("/organisers/:id", getOrganiserPublicProfile);
+// GET organiser profile (auth)
+router.get("/organisers/:id", authMiddleware, getOrganiserPublicProfile);
 
 // GET volunteer dashboard (auth)
 router.get("/volunteer/dashboard", authMiddleware, getVolunteerDashboard);

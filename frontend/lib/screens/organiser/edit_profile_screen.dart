@@ -22,6 +22,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _govIdController = TextEditingController();
 
   bool loading = false;
+  bool _showContactToVolunteers = false;
   String? _profilePictureUrl;
   final ImagePicker _picker = ImagePicker();
   XFile? _selectedImage;
@@ -52,8 +53,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         _cityController.text = data["city"] ?? "";
         _contactController.text = data["contact_number"] ?? "";
         _govIdController.text = data["government_id"] ?? "";
+        _showContactToVolunteers =
+            data["show_contact_to_volunteers"] == true;
         _profilePictureUrl =
             _normalizeProfileImageUrl(data["profile_picture_url"]?.toString());
+        if (mounted) {
+          setState(() {});
+        }
       }
     } catch (_) {}
   }
@@ -134,6 +140,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           "city": _cityController.text.trim(),
           "contact_number": _contactController.text.trim(),
           "government_id": _govIdController.text.trim(),
+          "show_contact_to_volunteers": _showContactToVolunteers,
           "profile_picture_url": uploadedUrl,
         }),
       );
@@ -216,6 +223,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             _input(_emailController, "Email", Icons.email),
             _input(_cityController, "City", Icons.location_on),
             _input(_contactController, "Contact Number", Icons.phone),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: const Text("Show contact number to volunteers"),
+              subtitle: const Text(
+                "Only volunteers viewing your organiser profile can see it.",
+              ),
+              value: _showContactToVolunteers,
+              onChanged: (value) {
+                setState(() => _showContactToVolunteers = value);
+              },
+            ),
+            const SizedBox(height: 8),
             _input(_govIdController, "Government ID (Optional)", Icons.badge),
 
             const SizedBox(height: 30),

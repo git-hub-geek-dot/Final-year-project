@@ -101,6 +101,25 @@ exports.getOrCreateThread = async (req, res) => {
       return res.status(403).json({ error: "Not your event" });
     }
 
+    const participantCheck = await pool.query(
+      `
+      SELECT a.id, a.status
+      FROM applications a
+      JOIN users u ON u.id = a.volunteer_id
+      WHERE a.event_id = $1
+        AND a.volunteer_id = $2
+        AND u.role = 'volunteer'
+      LIMIT 1
+      `,
+      [eventId, resolvedVolunteerId]
+    );
+
+    if (participantCheck.rowCount === 0) {
+      return res.status(400).json({
+        error: "Volunteer is not associated with this event",
+      });
+    }
+
     const existing = await pool.query(
       `
       SELECT *

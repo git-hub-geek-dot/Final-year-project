@@ -121,8 +121,15 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
     if (organiserId == null) return;
 
     try {
+      final token = await TokenService.getToken();
+      if (token == null || token.isEmpty) return;
+
       final response = await http.get(
         Uri.parse("${ApiConfig.baseUrl}/organisers/$organiserId"),
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
       );
 
       if (!mounted) return;
@@ -130,7 +137,7 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         final photo = _normalizeImageUrl(
-          data["profile_picture_url"]?.toString(),
+          ((data["organiser"] as Map?)?["profile_picture_url"])?.toString(),
         );
 
         if (photo != null) {

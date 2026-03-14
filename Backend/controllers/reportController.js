@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const { notifyUser } = require("../services/notificationService");
 
 const VALID_TARGET_TYPES = new Set(["user", "event", "chat_message"]);
 const MAX_REASON_LENGTH = 255;
@@ -53,14 +54,17 @@ exports.createReport = async (req, res) => {
       }
     }
 
+    let targetEvent = null;
+
     if (targetType === "event") {
       const eventRes = await pool.query(
-        "SELECT id FROM events WHERE id = $1",
+        "SELECT id, organiser_id, title FROM events WHERE id = $1",
         [targetId]
       );
       if (eventRes.rowCount === 0) {
         return res.status(404).json({ error: "Event not found" });
       }
+      targetEvent = eventRes.rows[0];
     }
 
     if (targetType === "chat_message") {
@@ -88,6 +92,26 @@ exports.createReport = async (req, res) => {
       }
     }
 
+    const existingPendingReport = await pool.query(
+      `
+      SELECT id
+      FROM reports
+      WHERE reporter_id = $1
+        AND target_type = $2
+        AND target_id = $3
+        AND LOWER(reason) = LOWER($4)
+        AND status = 'pending'
+      LIMIT 1
+      `,
+      [reporterId, targetType, targetId, reason]
+    );
+
+    if (existingPendingReport.rowCount > 0) {
+      return res.status(409).json({
+        error: "A similar pending report already exists for this issue",
+      });
+    }
+
     const insertRes = await pool.query(
       `
       INSERT INTO reports (reporter_id, target_type, target_id, reason, details)
@@ -97,7 +121,30 @@ exports.createReport = async (req, res) => {
       [reporterId, targetType, targetId, reason, details || null]
     );
 
-    return res.status(201).json(insertRes.rows[0]);
+    const createdReport = insertRes.rows[0];
+
+    if (
+      targetType === "event" &&
+      reason.toLowerCase() === "unpaid compensation" &&
+      targetEvent?.organiser_id &&
+      targetEvent.organiser_id !== reporterId
+    ) {
+      try {
+        await notifyUser(targetEvent.organiser_id, {
+          title: "Payment issue reported",
+          body: `A volunteer reported unpaid compensation for ${targetEvent.title}.`,
+          data: {
+            type: "payment_issue_reported",
+            reportId: String(createdReport.id),
+            eventId: String(targetId),
+          },
+        });
+      } catch (notifyErr) {
+        console.error("PAYMENT ISSUE REPORT NOTIFY ERROR:", notifyErr);
+      }
+    }
+
+    return res.status(201).json(createdReport);
   } catch (err) {
     console.error("CREATE REPORT ERROR:", err);
     return res.status(500).json({ error: "Failed to submit report" });

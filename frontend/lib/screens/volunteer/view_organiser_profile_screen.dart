@@ -37,8 +37,22 @@ class _ViewOrganiserProfileScreenState extends State<ViewOrganiserProfileScreen>
 
   Future<void> _fetchProfile() async {
     try {
+      final token = await TokenService.getToken();
+      if (token == null || token.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          errorMessage = "Please login again to view organiser details.";
+          isLoading = false;
+        });
+        return;
+      }
+
       final response = await http.get(
         Uri.parse("${ApiConfig.baseUrl}/organisers/${widget.organiserId}"),
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
       );
 
       if (!mounted) return;
@@ -127,7 +141,9 @@ class _ViewOrganiserProfileScreenState extends State<ViewOrganiserProfileScreen>
     final name = organiser?["name"] ?? "Organiser";
     final city = organiser?["city"] ?? "-";
     final email = organiser?["email"] ?? "-";
-    final contact = organiser?["contact_number"] ?? "-";
+    final contact = (organiser?["contact_number"] ?? "").toString().trim();
+    final showContact =
+        organiser?["show_contact_to_volunteers"] == true && contact.isNotEmpty;
     final eventsCount = stats?["events"]?.toString() ?? "0";
     final volunteersEngaged = stats?["volunteers"]?.toString() ?? "0";
     final photoUrl =
@@ -170,7 +186,7 @@ class _ViewOrganiserProfileScreenState extends State<ViewOrganiserProfileScreen>
             const SizedBox(height: 16),
             _reviews(),
             const SizedBox(height: 16),
-            _connectCard(email, contact),
+            _connectCard(email, contact, showContact: showContact),
             ],
             
           ],
@@ -283,7 +299,7 @@ class _ViewOrganiserProfileScreenState extends State<ViewOrganiserProfileScreen>
     );
   }
 
-  Widget _connectCard(String email, String contact) {
+  Widget _connectCard(String email, String contact, {required bool showContact}) {
   return _card(
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -328,16 +344,22 @@ class _ViewOrganiserProfileScreenState extends State<ViewOrganiserProfileScreen>
           ],
         ),
         const SizedBox(height: 8),
-        Row(
-          children: [
-            const Icon(Icons.phone, size: 18, color: Colors.grey),
-            const SizedBox(width: 8),
-            Text(
-              contact,
-              style: const TextStyle(fontSize: 14),
-            ),
-          ],
-        ),
+        if (showContact)
+          Row(
+            children: [
+              const Icon(Icons.phone, size: 18, color: Colors.grey),
+              const SizedBox(width: 8),
+              Text(
+                contact,
+                style: const TextStyle(fontSize: 14),
+              ),
+            ],
+          )
+        else
+          const Text(
+            "Phone number is available only to approved volunteers when the organiser enables sharing.",
+            style: TextStyle(fontSize: 13, color: Colors.grey),
+          ),
       ],
     ),
   );

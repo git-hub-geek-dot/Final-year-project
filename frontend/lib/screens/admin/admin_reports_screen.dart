@@ -123,12 +123,29 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
     return action.replaceAll("_", " ");
   }
 
+  String _formatReason(dynamic raw) {
+    final reason = (raw ?? "").toString().trim();
+    if (reason.isEmpty) return "-";
+    if (reason.toLowerCase() == "unpaid compensation") {
+      return "Unpaid compensation";
+    }
+    return reason;
+  }
+
+  bool _isUnpaidCompensationReport(Map report) {
+    final reason = (report["reason"] ?? "").toString().trim().toLowerCase();
+    return reason == "unpaid compensation";
+  }
+
   String _targetTitle(Map report) {
     final type = report["target_type"]?.toString() ?? "unknown";
     if (type == "user") {
       return "User: ${report["target_user_name"] ?? "Unknown"}";
     }
     if (type == "event") {
+      if (_isUnpaidCompensationReport(report)) {
+        return "Payment issue: ${report["target_event_title"] ?? "Unknown"}";
+      }
       return "Event: ${report["target_event_title"] ?? "Unknown"}";
     }
     if (type == "chat_message") {
@@ -144,6 +161,9 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
     }
     if (type == "event") {
       final organiser = report["organiser_name"]?.toString() ?? "-";
+      if (_isUnpaidCompensationReport(report)) {
+        return "Organiser: $organiser  |  Volunteer reported unpaid payment";
+      }
       return "Organiser: $organiser";
     }
     if (type == "chat_message") {
@@ -350,7 +370,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
               Text("Reported by: ${report["reporter_name"] ?? "-"}"),
               Text("Reporter email: ${report["reporter_email"] ?? "-"}"),
               const Divider(height: 18),
-              Text("Reason: ${report["reason"] ?? "-"}"),
+              Text("Reason: ${_formatReason(report["reason"])}"),
               if ((report["details"] ?? "").toString().isNotEmpty) ...[
                 const SizedBox(height: 6),
                 Text("Details: ${report["details"]}"),
@@ -599,7 +619,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                                           Text(_targetSubtitle(report)),
                                           const SizedBox(height: 4),
                                           Text(
-                                            "Reason: ${report["reason"] ?? "-"}",
+                                            "Reason: ${_formatReason(report["reason"])}",
                                           ),
                                           Text(
                                             "Reported by: ${report["reporter_name"] ?? "-"}",

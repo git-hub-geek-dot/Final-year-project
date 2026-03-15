@@ -24,6 +24,7 @@ const notifyCompletedEventsForVolunteer = async (volunteerId) => {
     JOIN events e ON e.id = a.event_id
     WHERE a.volunteer_id = $1
       AND a.status IN ('approved', 'accepted', 'completed')
+      AND COALESCE(a.attendance_status, 'unmarked') <> 'absent'
       AND e.status NOT IN ('draft', 'deleted')
       AND (
         e.status = 'completed'

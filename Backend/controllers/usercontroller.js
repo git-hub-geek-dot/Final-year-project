@@ -348,6 +348,7 @@ const getMyBadges = async (req, res) => {
         JOIN events e ON e.id = a.event_id
         WHERE a.volunteer_id = $1
           AND a.status IN ('approved', 'accepted', 'completed')
+          AND COALESCE(a.attendance_status, 'unmarked') <> 'absent'
           AND e.status != 'deleted'
           AND (
             e.status = 'completed'

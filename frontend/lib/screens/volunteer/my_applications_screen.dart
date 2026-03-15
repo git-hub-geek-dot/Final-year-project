@@ -175,6 +175,14 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
     return _normalizedStatus(status) == "approved";
   }
 
+  String _normalizedAttendanceStatus(String status) {
+    final normalized = status.toLowerCase().trim();
+    if (normalized == "present" || normalized == "absent") {
+      return normalized;
+    }
+    return "unmarked";
+  }
+
   DateTime? _parseEventStartDateTime(Map app) {
     final eventDateRaw = app["event_date"]?.toString();
     if (eventDateRaw == null || eventDateRaw.isEmpty) return null;
@@ -293,10 +301,22 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
 
   String? _statusDescription(Map app) {
     final status = _normalizedStatus((app["status"] ?? "pending").toString());
+    final attendanceStatus = _normalizedAttendanceStatus(
+      (app["attendance_status"] ?? "unmarked").toString(),
+    );
     final adminCancelReason =
         (app["admin_cancel_reason"] ?? "").toString().trim();
     final volunteerCancelReason =
         (app["volunteer_cancel_reason"] ?? "").toString().trim();
+
+    if (_isEventCompleted(app)) {
+      if (attendanceStatus == "present") {
+        return "Your attendance was marked present for this event.";
+      }
+      if (attendanceStatus == "absent") {
+        return "You were marked absent for this event.";
+      }
+    }
 
     switch (status) {
       case "pending":
@@ -365,11 +385,19 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
     final chips = <Widget>[];
     final strikeIssued = app["strike_issued"] == true;
     final warningIssued = app["warning_issued"] == true;
+    final attendanceStatus = _normalizedAttendanceStatus(
+      (app["attendance_status"] ?? "unmarked").toString(),
+    );
     final appealStatus = (app["strike_appeal_status"] ?? "none").toString();
     final appealLabel = _appealStatusLabel(appealStatus);
 
     if (_isEventCompleted(app)) {
       chips.add(_infoChip("Event completed", Colors.blueGrey));
+    }
+    if (attendanceStatus == "present") {
+      chips.add(_infoChip("Attendance present", Colors.green));
+    } else if (attendanceStatus == "absent") {
+      chips.add(_infoChip("Attendance absent", Colors.deepOrange));
     }
     if (warningIssued) {
       chips.add(_infoChip("Warning issued", Colors.deepOrange));

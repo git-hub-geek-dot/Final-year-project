@@ -317,6 +317,12 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
     return text == "true" || text == "1" || text == "t" || text == "yes";
   }
 
+  String _normalizedAttendanceStatus(dynamic value) {
+    final text = (value ?? "").toString().trim().toLowerCase();
+    if (text == "present" || text == "absent") return text;
+    return "unmarked";
+  }
+
   DateTime? _parseDate(dynamic value) {
     if (value == null) return null;
     return IstDateTime.tryParse(value);
@@ -377,9 +383,13 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
     final canReviewApplication = _isReviewActionable(normalizedStatus);
     final approveBlockedByCapacity =
         canReviewApplication && _isApproveBlockedByCapacity();
+    final attendanceStatus =
+        _normalizedAttendanceStatus(app?["attendance_status"]);
     final showRatingAction =
         normalizedStatus == "approved" || normalizedStatus == "completed";
-    final canRateVolunteer = showRatingAction && _isEventCompleted(app);
+    final canRateVolunteer = showRatingAction &&
+        _isEventCompleted(app) &&
+        attendanceStatus != "absent";
 
     final eventsCount = _asInt(
       app?["events_count"] ?? app?["committed_events"] ?? 1,
@@ -464,6 +474,14 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                         infoRow("Location", city.toString(), compact: compact),
                         infoRow("Contact", contact.toString(),
                             compact: compact),
+                        if (attendanceStatus != "unmarked")
+                          infoRow(
+                            "Attendance",
+                            attendanceStatus == "present"
+                                ? "Present"
+                                : "Absent",
+                            compact: compact,
+                          ),
                         SizedBox(height: compact ? 10 : 18),
                         Container(
                           width: double.infinity,
@@ -559,7 +577,9 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                                     label: Text(
                                       canRateVolunteer
                                           ? "Rate Volunteer"
-                                          : "Rate After Completion",
+                                          : attendanceStatus == "absent"
+                                              ? "Absent volunteer"
+                                              : "Rate After Completion",
                                       style: TextStyle(
                                           fontSize: compact ? 16 : 18),
                                     ),

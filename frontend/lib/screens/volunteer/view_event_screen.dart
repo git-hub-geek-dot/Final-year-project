@@ -44,6 +44,7 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
 
   /// null | pending | approved | rejected
   String? applicationStatus;
+  String? attendanceStatus;
 
   @override
   void initState() {
@@ -195,6 +196,10 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
             : null;
         setState(() {
           applicationStatus = data["applied"] == true ? data["status"] : null;
+          attendanceStatus = data["applied"] == true
+              ? (data["attendanceStatus"] ?? data["attendance_status"])
+                  ?.toString()
+              : null;
           applicationId = resolvedApplicationId;
           isLoadingStatus = false;
         });
@@ -250,6 +255,7 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
         if (resolvedId != null && mounted) {
           setState(() {
             applicationId = resolvedId;
+            attendanceStatus = match["attendance_status"]?.toString();
           });
         }
       }
@@ -282,6 +288,7 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
             (data["status"]?.toString().toLowerCase() ?? "pending");
         setState(() {
           applicationStatus = nextStatus;
+          attendanceStatus = "unmarked";
           applicationId = data["application_id"] as int?;
           isApplying = false;
         });
@@ -462,7 +469,8 @@ Join on VolunteerX
             ),
           if ((widget.event["computed_status"] == "completed") &&
               (_normalizedStatus(applicationStatus ?? "") == "approved" ||
-                  _normalizedStatus(applicationStatus ?? "") == "completed")) ...[
+                  _normalizedStatus(applicationStatus ?? "") == "completed") &&
+              _normalizedAttendanceStatus(attendanceStatus ?? "") != "absent") ...[
             const SizedBox(height: 12),
             if (isLoadingRating)
               const Center(child: CircularProgressIndicator())
@@ -724,15 +732,22 @@ Join on VolunteerX
     }
 
     final currentStatus = _normalizedStatus(applicationStatus!);
+    final currentAttendance = _normalizedAttendanceStatus(attendanceStatus ?? "");
     final canCancel = _isCancelableStatus(currentStatus) && !_hasEventStarted();
     final isApprovedState = _isApprovedStatus(currentStatus);
+    final statusText = currentAttendance == "absent"
+        ? "Attendance Absent"
+        : _statusText(currentStatus);
+    final statusColor = currentAttendance == "absent"
+        ? Colors.deepOrange
+        : _statusColor(currentStatus);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         _statusPill(
-          _statusText(currentStatus),
-          _statusColor(currentStatus),
+          statusText,
+          statusColor,
         ),
         if (isApprovedState && !isCompleted) ...[
           const SizedBox(height: 10),
@@ -1398,6 +1413,14 @@ Join on VolunteerX
   String _normalizedStatus(String status) {
     final normalized = status.toLowerCase();
     return normalized == "accepted" ? "approved" : normalized;
+  }
+
+  String _normalizedAttendanceStatus(String status) {
+    final normalized = status.toLowerCase().trim();
+    if (normalized == "present" || normalized == "absent") {
+      return normalized;
+    }
+    return "unmarked";
   }
 
   Color _statusColor(String status) {

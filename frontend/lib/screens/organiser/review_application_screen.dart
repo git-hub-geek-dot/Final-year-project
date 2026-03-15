@@ -18,7 +18,7 @@ class ReviewApplicationsScreen extends StatefulWidget {
 
 class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
   String selectedStatus =
-      "pending"; // pending | approved | waitlisted | rejected | cancelled | no_show | completed
+      "pending"; // pending | approved | waitlisted | rejected | cancelled | absent | completed
   String selectedSort = "newest"; // newest | oldest | name
   bool loading = true;
   String? loadError;
@@ -73,10 +73,21 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
     return normalizeApplicationStatus(application["status"]);
   }
 
+  String _normalizedAttendanceStatus(Map application) {
+    final status =
+        (application["attendance_status"] ?? "").toString().trim().toLowerCase();
+    if (status == "present" || status == "absent") return status;
+    if (_normalizedStatus(application) == "no_show") return "absent";
+    return "unmarked";
+  }
+
   List get filtered {
-    return applications
-        .where((a) => _normalizedStatus(a) == selectedStatus)
-        .toList();
+    return applications.where((a) {
+      if (selectedStatus == "absent") {
+        return _normalizedAttendanceStatus(a) == "absent";
+      }
+      return _normalizedStatus(a) == selectedStatus;
+    }).toList();
   }
 
   DateTime _appliedAt(Map application) {
@@ -144,8 +155,8 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
         return "No rejected applications yet";
       case "cancelled":
         return "No cancelled applications yet";
-      case "no_show":
-        return "No no-show applications yet";
+      case "absent":
+        return "No absent volunteers marked yet";
       case "completed":
         return "No completed applications yet";
       case "pending":
@@ -160,7 +171,7 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
     var rejected = 0;
     var waitlisted = 0;
     var cancelled = 0;
-    var noShow = 0;
+    var absent = 0;
     var completed = 0;
 
     for (final application in applications) {
@@ -175,8 +186,8 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
         rejected++;
       } else if (status == "cancelled") {
         cancelled++;
-      } else if (status == "no_show") {
-        noShow++;
+      } else if (_normalizedAttendanceStatus(application) == "absent") {
+        absent++;
       } else if (status == "completed") {
         completed++;
       }
@@ -188,7 +199,7 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
       "waitlisted": waitlisted,
       "rejected": rejected,
       "cancelled": cancelled,
-      "no_show": noShow,
+      "absent": absent,
       "completed": completed,
     };
   }
@@ -291,10 +302,10 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
                         ),
                         const SizedBox(width: 10),
                         toggleButton(
-                          "No-show (${counts["no_show"]})",
-                          selectedStatus == "no_show",
+                          "Absent (${counts["absent"]})",
+                          selectedStatus == "absent",
                           () {
-                            setState(() => selectedStatus = "no_show");
+                            setState(() => selectedStatus = "absent");
                           },
                         ),
                         const SizedBox(width: 10),
@@ -373,6 +384,7 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
                                 name: a["name"] ?? "Unknown",
                                 location: a["city"] ?? "-",
                                 status: _normalizedStatus(a),
+                                attendanceStatus: _normalizedAttendanceStatus(a),
                                 appliedAt: a["applied_at"],
                                 applicationId: a["id"],
                                 slotsFull: isSlotsFull,
@@ -419,6 +431,7 @@ class ApplicationCard extends StatelessWidget {
   final String name;
   final String location;
   final String status;
+  final String attendanceStatus;
   final dynamic appliedAt;
   final int applicationId;
   final bool slotsFull;
@@ -431,6 +444,7 @@ class ApplicationCard extends StatelessWidget {
     required this.name,
     required this.location,
     required this.status,
+    required this.attendanceStatus,
     required this.appliedAt,
     required this.applicationId,
     required this.slotsFull,
@@ -440,10 +454,16 @@ class ApplicationCard extends StatelessWidget {
   });
 
   String get statusLabel {
+    if (attendanceStatus == "absent") {
+      return "ABSENT";
+    }
     return applicationStatusLabel(status).toUpperCase();
   }
 
   Color get statusColor {
+    if (attendanceStatus == "absent") {
+      return Colors.deepOrange;
+    }
     return applicationStatusColor(status);
   }
 

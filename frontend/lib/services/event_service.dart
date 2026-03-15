@@ -407,10 +407,10 @@ class EventService {
     throw Exception(errorMessage);
   }
 
-  /// ================= ATTENDANCE FEEDBACK =================
+  /// ================= ATTENDANCE =================
   static Future<Map<String, dynamic>> submitAttendanceFeedback({
     required int eventId,
-    required List<int> absentVolunteerIds,
+    required List<Map<String, dynamic>> attendance,
     String? summary,
   }) async {
     final token = await TokenService.getToken();
@@ -423,7 +423,7 @@ class EventService {
         "Authorization": "Bearer $token",
       },
       body: jsonEncode({
-        "absentVolunteerIds": absentVolunteerIds,
+        "attendance": attendance,
         "summary": (summary ?? "").trim(),
       }),
     );

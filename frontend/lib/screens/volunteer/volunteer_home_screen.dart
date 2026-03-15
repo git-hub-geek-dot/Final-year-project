@@ -541,6 +541,12 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     return text == "true" || text == "1" || text == "t" || text == "yes";
   }
 
+  String _normalizedAttendanceStatus(dynamic value) {
+    final text = (value ?? "").toString().trim().toLowerCase();
+    if (text == "present" || text == "absent") return text;
+    return "unmarked";
+  }
+
   bool _isEventCompletedForRating(Map<String, dynamic> app) {
     if (_asBool(app["event_completed"])) return true;
 
@@ -567,6 +573,10 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
       final isEligibleStatus =
           status == "approved" || status == "accepted" || status == "completed";
       if (!isEligibleStatus) return false;
+
+      if (_normalizedAttendanceStatus(app["attendance_status"]) == "absent") {
+        return false;
+      }
 
       if (_asBool(app["has_rated"])) return false;
 

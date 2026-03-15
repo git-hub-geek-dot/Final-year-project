@@ -59,6 +59,7 @@ const giveRating = async (req, res) => {
         FROM applications
         WHERE event_id = $1 AND volunteer_id = $2
           AND status IN ('approved', 'accepted', 'completed')
+          AND COALESCE(attendance_status, 'unmarked') <> 'absent'
         `,
         [event_id, raterId]
       );
@@ -76,6 +77,7 @@ const giveRating = async (req, res) => {
         FROM applications
         WHERE event_id = $1 AND volunteer_id = $2
           AND status IN ('approved', 'accepted', 'completed')
+          AND COALESCE(attendance_status, 'unmarked') <> 'absent'
         `,
         [event_id, ratee_id]
       );

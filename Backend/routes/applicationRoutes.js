@@ -59,6 +59,13 @@ router.put(
   applicationController.updateApplicationStatus
 );
 
+// ✅ NEW: Toggle application shortlist (Organiser only)
+router.put(
+  "/applications/:id/shortlist",
+  authenticateToken,
+  applicationController.updateApplicationShortlist
+);
+
 // ✅ NEW: Volunteer updates compensation status
 router.put(
   "/applications/:id/compensation",
@@ -71,13 +78,6 @@ router.put(
   "/applications/:id/cancel",
   authenticateToken,
   applicationController.cancelMyApplication
-);
-
-// ✅ NEW: Organiser no-show marker (direct strike)
-router.put(
-  "/applications/:id/no-show",
-  authenticateToken,
-  applicationController.markVolunteerNoShow
 );
 
 // ✅ NEW: Volunteer appeal for cancellation/no-show strike

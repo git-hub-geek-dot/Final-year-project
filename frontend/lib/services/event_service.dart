@@ -187,6 +187,41 @@ class EventService {
     }
   }
 
+  /// ================= SHORTLIST APPLICATION =================
+  static Future<void> updateShortlistStatus({
+    required int applicationId,
+    required bool shortlisted,
+  }) async {
+    final token = await TokenService.getToken();
+    if (token == null) throw Exception("No token");
+
+    final response = await http.put(
+      Uri.parse("${ApiConfig.baseUrl}/applications/$applicationId/shortlist"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
+      body: jsonEncode({
+        "shortlisted": shortlisted,
+      }),
+    );
+
+    if (response.statusCode == 200) return;
+
+    String message = "Failed to update shortlist";
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map) {
+        final parsed = decoded["error"] ?? decoded["message"];
+        if (parsed != null && parsed.toString().trim().isNotEmpty) {
+          message = parsed.toString();
+        }
+      }
+    } catch (_) {}
+
+    throw Exception(message);
+  }
+
   /// ================= VOLUNTEER CANCEL APPLICATION =================
   static Future<Map<String, dynamic>> cancelMyApplication({
     required int applicationId,

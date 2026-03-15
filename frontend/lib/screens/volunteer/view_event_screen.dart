@@ -265,11 +265,23 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
   }
 
   // ================= APPLY =================
-  Future<void> _applyToEvent() async {
+  Future<void> _applyToEvent({
+    String? priorExperience,
+    String? availabilityStatus,
+  }) async {
     setState(() => isApplying = true);
 
     try {
       final token = await TokenService.getToken();
+      final experience = priorExperience?.trim();
+      final availability = availabilityStatus?.trim().toLowerCase();
+      final payload = <String, dynamic>{};
+      if (experience != null && experience.isNotEmpty) {
+        payload["priorExperience"] = experience;
+      }
+      if (availability != null && availability.isNotEmpty) {
+        payload["availabilityStatus"] = availability;
+      }
 
       final response = await http.post(
         Uri.parse(
@@ -279,6 +291,7 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
           "Authorization": "Bearer $token",
           "Content-Type": "application/json",
         },
+        body: jsonEncode(payload),
       );
       if (!mounted) return;
 
@@ -1412,7 +1425,8 @@ Join on VolunteerX
 
   String _normalizedStatus(String status) {
     final normalized = status.toLowerCase();
-    return normalized == "accepted" ? "approved" : normalized;
+    if (normalized == "accepted") return "approved";
+    return normalized;
   }
 
   String _normalizedAttendanceStatus(String status) {
@@ -1437,8 +1451,6 @@ Join on VolunteerX
         return Colors.amber;
       case "completed":
         return Colors.blueGrey;
-      case "no_show":
-        return Colors.deepOrange;
       default:
         return Colors.grey;
     }
@@ -1458,8 +1470,6 @@ Join on VolunteerX
         return "Application Waitlisted";
       case "completed":
         return "Event Completed";
-      case "no_show":
-        return "No-show Recorded";
       default:
         return "Application Status Updated";
     }
@@ -1496,6 +1506,8 @@ Join on VolunteerX
       ),
       builder: (_) {
         bool agreed = false;
+        String priorExperience = "";
+        String availabilityStatus = "available";
 
         return StatefulBuilder(
           builder: (context, setState) {
@@ -1535,6 +1547,61 @@ Join on VolunteerX
                     style: TextStyle(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 16),
+                  Text(
+                    "Event dates: ${_formatDateRange()}",
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    "Time: ${_formatTime(widget.event["start_time"])}-${_formatTime(widget.event["end_time"])}",
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    "Availability for this event",
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      ChoiceChip(
+                        label: const Text("Available"),
+                        selected: availabilityStatus == "available",
+                        onSelected: (_) =>
+                            setState(() => availabilityStatus = "available"),
+                      ),
+                      ChoiceChip(
+                        label: const Text("Partially available"),
+                        selected: availabilityStatus == "partial",
+                        onSelected: (_) =>
+                            setState(() => availabilityStatus = "partial"),
+                      ),
+                      ChoiceChip(
+                        label: const Text("Not sure"),
+                        selected: availabilityStatus == "unsure",
+                        onSelected: (_) =>
+                            setState(() => availabilityStatus = "unsure"),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    "Prior Experience (optional)",
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    maxLines: 3,
+                    textInputAction: TextInputAction.newline,
+                    decoration: const InputDecoration(
+                      hintText: "Briefly describe any relevant experience",
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (value) =>
+                        setState(() => priorExperience = value),
+                  ),
+                  const SizedBox(height: 12),
                   CheckboxListTile(
                     contentPadding: EdgeInsets.zero,
                     value: agreed,
@@ -1548,7 +1615,10 @@ Join on VolunteerX
                       onPressed: agreed
                           ? () {
                               Navigator.pop(context);
-                              _applyToEvent();
+                              _applyToEvent(
+                                priorExperience: priorExperience,
+                                availabilityStatus: availabilityStatus,
+                              );
                             }
                           : null,
                       child: const Text("Confirm & Apply"),

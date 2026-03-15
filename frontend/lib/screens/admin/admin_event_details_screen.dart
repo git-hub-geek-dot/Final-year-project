@@ -23,7 +23,7 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
   int waitlisted = 0;
   int rejected = 0;
   int cancelled = 0;
-  int noShow = 0;
+  int completed = 0;
   String? statsError;
 
   @override
@@ -69,7 +69,7 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
           waitlisted = _toInt(summary["waitlisted"]) ?? 0;
           rejected = _toInt(summary["rejected"]) ?? 0;
           cancelled = _toInt(summary["cancelled"]) ?? 0;
-          noShow = _toInt(summary["no_show"] ?? summary["noShow"]) ?? 0;
+          completed = _toInt(summary["completed"]) ?? 0;
           loadingStats = false;
           statsError = null;
         });
@@ -391,10 +391,10 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
                                 SizedBox(
                                   width: itemWidth,
                                   child: _StatBox(
-                                    "No-show",
-                                    noShow.toString(),
-                                    Icons.person_off_outlined,
-                                    color: Colors.deepOrange,
+                                    "Completed",
+                                    completed.toString(),
+                                    Icons.task_alt,
+                                    color: Colors.blueGrey,
                                   ),
                                 ),
                               ],

@@ -19,8 +19,6 @@ String applicationStatusLabel(dynamic raw) {
       return "Cancelled";
     case "completed":
       return "Completed";
-    case "no_show":
-      return "No-show";
     case "pending":
       return "Pending";
     default:
@@ -40,8 +38,6 @@ Color applicationStatusColor(dynamic raw) {
       return Colors.red;
     case "completed":
       return Colors.blueGrey;
-    case "no_show":
-      return Colors.deepOrange;
     case "pending":
       return Colors.orange;
     default:
@@ -61,8 +57,6 @@ IconData applicationStatusIcon(dynamic raw) {
       return Icons.cancel;
     case "completed":
       return Icons.task_alt;
-    case "no_show":
-      return Icons.person_off;
     case "pending":
       return Icons.hourglass_top;
     default:

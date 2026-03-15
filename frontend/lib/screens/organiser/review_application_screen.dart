@@ -20,6 +20,8 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
   String selectedStatus =
       "pending"; // pending | approved | waitlisted | rejected | cancelled | absent | completed
   String selectedSort = "newest"; // newest | oldest | name
+  String selectedAvailability = "all"; // all | available | partial | unsure
+  String selectedShortlist = "all"; // all | shortlisted | not_shortlisted
   bool loading = true;
   String? loadError;
   List applications = [];
@@ -77,16 +79,47 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
     final status =
         (application["attendance_status"] ?? "").toString().trim().toLowerCase();
     if (status == "present" || status == "absent") return status;
-    if (_normalizedStatus(application) == "no_show") return "absent";
     return "unmarked";
+  }
+
+  String _normalizedAvailabilityStatus(Map application) {
+    final status = (application["availability_status"] ?? "")
+        .toString()
+        .trim()
+        .toLowerCase();
+    if (status == "partial" || status == "partially_available") return "partial";
+    if (status == "unsure" || status == "not_sure") return "unsure";
+    return "available";
+  }
+
+  bool _asBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value == null) return false;
+    return value.toString().toLowerCase() == "true";
   }
 
   List get filtered {
     return applications.where((a) {
-      if (selectedStatus == "absent") {
-        return _normalizedAttendanceStatus(a) == "absent";
+      final statusMatches = selectedStatus == "absent"
+          ? _normalizedAttendanceStatus(a) == "absent"
+          : _normalizedStatus(a) == selectedStatus;
+
+      if (!statusMatches) return false;
+
+      if (selectedAvailability != "all") {
+        return _normalizedAvailabilityStatus(a) == selectedAvailability;
       }
-      return _normalizedStatus(a) == selectedStatus;
+
+      final isShortlisted = _asBool(a["is_shortlisted"]);
+      if (selectedShortlist == "shortlisted" && !isShortlisted) {
+        return false;
+      }
+      if (selectedShortlist == "not_shortlisted" && isShortlisted) {
+        return false;
+      }
+
+      return true;
     }).toList();
   }
 
@@ -142,6 +175,32 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
       case "newest":
       default:
         return "Newest";
+    }
+  }
+
+  String get selectedAvailabilityLabel {
+    switch (selectedAvailability) {
+      case "available":
+        return "Available";
+      case "partial":
+        return "Partially available";
+      case "unsure":
+        return "Not sure";
+      case "all":
+      default:
+        return "All";
+    }
+  }
+
+  String get selectedShortlistLabel {
+    switch (selectedShortlist) {
+      case "shortlisted":
+        return "Shortlisted";
+      case "not_shortlisted":
+        return "Not shortlisted";
+      case "all":
+      default:
+        return "All";
     }
   }
 
@@ -349,7 +408,91 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                const Text(
+                  "Availability:",
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(width: 8),
+                PopupMenuButton<String>(
+                  initialValue: selectedAvailability,
+                  onSelected: (value) => setState(() {
+                    selectedAvailability = value;
+                  }),
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: "all",
+                      child: Text("All"),
+                    ),
+                    PopupMenuItem(
+                      value: "available",
+                      child: Text("Available"),
+                    ),
+                    PopupMenuItem(
+                      value: "partial",
+                      child: Text("Partially available"),
+                    ),
+                    PopupMenuItem(
+                      value: "unsure",
+                      child: Text("Not sure"),
+                    ),
+                  ],
+                  child: Row(
+                    children: [
+                      Text(selectedAvailabilityLabel),
+                      const Icon(Icons.arrow_drop_down),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                const Text(
+                  "Shortlist:",
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(width: 8),
+                PopupMenuButton<String>(
+                  initialValue: selectedShortlist,
+                  onSelected: (value) => setState(() {
+                    selectedShortlist = value;
+                  }),
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: "all",
+                      child: Text("All"),
+                    ),
+                    PopupMenuItem(
+                      value: "shortlisted",
+                      child: Text("Shortlisted"),
+                    ),
+                    PopupMenuItem(
+                      value: "not_shortlisted",
+                      child: Text("Not shortlisted"),
+                    ),
+                  ],
+                  child: Row(
+                    children: [
+                      Text(selectedShortlistLabel),
+                      const Icon(Icons.arrow_drop_down),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 12),
 
           // 📋 Applications List
           Expanded(
@@ -385,6 +528,9 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
                                 location: a["city"] ?? "-",
                                 status: _normalizedStatus(a),
                                 attendanceStatus: _normalizedAttendanceStatus(a),
+                                availabilityStatus:
+                                    _normalizedAvailabilityStatus(a),
+                                isShortlisted: _asBool(a["is_shortlisted"]),
                                 appliedAt: a["applied_at"],
                                 applicationId: a["id"],
                                 slotsFull: isSlotsFull,
@@ -432,6 +578,8 @@ class ApplicationCard extends StatelessWidget {
   final String location;
   final String status;
   final String attendanceStatus;
+  final String availabilityStatus;
+  final bool isShortlisted;
   final dynamic appliedAt;
   final int applicationId;
   final bool slotsFull;
@@ -445,6 +593,8 @@ class ApplicationCard extends StatelessWidget {
     required this.location,
     required this.status,
     required this.attendanceStatus,
+    required this.availabilityStatus,
+    required this.isShortlisted,
     required this.appliedAt,
     required this.applicationId,
     required this.slotsFull,
@@ -465,6 +615,30 @@ class ApplicationCard extends StatelessWidget {
       return Colors.deepOrange;
     }
     return applicationStatusColor(status);
+  }
+
+  String get availabilityLabel {
+    switch (availabilityStatus) {
+      case "partial":
+        return "PARTIAL";
+      case "unsure":
+        return "NOT SURE";
+      case "available":
+      default:
+        return "AVAILABLE";
+    }
+  }
+
+  Color get availabilityColor {
+    switch (availabilityStatus) {
+      case "partial":
+        return Colors.orange;
+      case "unsure":
+        return Colors.blueGrey;
+      case "available":
+      default:
+        return Colors.green;
+    }
   }
 
   String get appliedDateText {
@@ -532,6 +706,27 @@ class ApplicationCard extends StatelessWidget {
                         ),
                       ),
                     ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: availabilityColor.withOpacity(0.16),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: availabilityColor.withOpacity(0.45),
+                        ),
+                      ),
+                      child: Text(
+                        availabilityLabel,
+                        style: TextStyle(
+                          color: availabilityColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                     Text(
                       appliedDateText,
                       style: const TextStyle(
@@ -569,29 +764,69 @@ class ApplicationCard extends StatelessWidget {
               ],
             ),
           ),
-          InkWell(
-            onTap: () async {
-              final updated = await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ViewApplicationScreen(
-                    applicationId: applicationId,
-                    slotsFull: slotsFull,
-                    approvedCount: approvedCount,
-                    volunteersRequired: volunteersRequired,
-                  ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              InkWell(
+                onTap: () async {
+                  final nextValue = !isShortlisted;
+                  try {
+                    await EventService.updateShortlistStatus(
+                      applicationId: applicationId,
+                      shortlisted: nextValue,
+                    );
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            nextValue
+                                ? "Added to shortlist"
+                                : "Removed from shortlist",
+                          ),
+                        ),
+                      );
+                    }
+                    onRefresh();
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Shortlist update failed: $e")),
+                      );
+                    }
+                  }
+                },
+                child: Icon(
+                  isShortlisted ? Icons.star : Icons.star_border,
+                  color: isShortlisted ? const Color(0xFFF59E0B) : Colors.white,
+                  size: 22,
                 ),
-              );
+              ),
+              const SizedBox(height: 8),
+              InkWell(
+                onTap: () async {
+                  final updated = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ViewApplicationScreen(
+                        applicationId: applicationId,
+                        slotsFull: slotsFull,
+                        approvedCount: approvedCount,
+                        volunteersRequired: volunteersRequired,
+                      ),
+                    ),
+                  );
 
-              if (updated == true) {
-                onRefresh(); // 🔄 reload after approve/reject
-              }
-            },
-            child: actionButton(
-              text: "View Application",
-              color: Colors.white,
-              textColor: Colors.green,
-            ),
+                  if (updated == true) {
+                    onRefresh(); // 🔄 reload after approve/reject
+                  }
+                },
+                child: actionButton(
+                  text: "View Application",
+                  color: Colors.white,
+                  textColor: Colors.green,
+                ),
+              ),
+            ],
           ),
         ],
       ),

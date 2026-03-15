@@ -126,7 +126,8 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
 
   String _normalizedStatus(String status) {
     final normalized = status.toLowerCase();
-    return normalized == "accepted" ? "approved" : normalized;
+    if (normalized == "accepted") return "approved";
+    return normalized;
   }
 
   Color statusColor(String status) {
@@ -141,8 +142,6 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
         return Colors.amber.shade700;
       case "completed":
         return Colors.blueGrey;
-      case "no_show":
-        return Colors.deepOrange;
       case "pending":
         return Colors.orange;
       default:
@@ -162,8 +161,6 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
         return "Waitlisted";
       case "completed":
         return "Completed";
-      case "no_show":
-        return "No-show";
       case "pending":
         return "Pending";
       default:
@@ -340,8 +337,6 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
         return "This application was cancelled.";
       case "completed":
         return "Your participation for this event is completed.";
-      case "no_show":
-        return "You were marked as no-show for this event.";
       default:
         return null;
     }
@@ -843,6 +838,9 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                          final status = _normalizedStatus(
                            (app["status"] ?? "pending").toString(),
                          );
+                         final attendanceStatus = _normalizedAttendanceStatus(
+                           (app["attendance_status"] ?? "unmarked").toString(),
+                         );
                          final appIdRaw = app["id"];
                          final appId = appIdRaw is int
                              ? appIdRaw
@@ -862,6 +860,12 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                                  appealStatus == "none");
                          final infoChips = _buildInfoChips(app);
                          final statusDescription = _statusDescription(app);
+                         final chipLabel = attendanceStatus == "absent"
+                             ? "ATTENDANCE ABSENT"
+                             : statusLabel(status).toUpperCase();
+                         final chipColor = attendanceStatus == "absent"
+                             ? Colors.deepOrange
+                             : statusColor(status);
 
                          return Card(
                            margin: const EdgeInsets.only(bottom: 12),
@@ -918,16 +922,16 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                                        const SizedBox(width: 12),
                                        Chip(
                                          label: Text(
-                                           statusLabel(status).toUpperCase(),
+                                          chipLabel,
                                          ),
                                          backgroundColor:
-                                             statusColor(status).withOpacity(0.15),
+                                             chipColor.withOpacity(0.15),
                                          labelStyle: TextStyle(
-                                           color: statusColor(status),
+                                          color: chipColor,
                                          ),
                                          side: BorderSide(
                                            color:
-                                               statusColor(status).withOpacity(0.25),
+                                               chipColor.withOpacity(0.25),
                                          ),
                                        ),
                                      ],

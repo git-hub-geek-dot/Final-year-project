@@ -174,6 +174,7 @@ exports.getApplicationStatus = async (req, res) => {
     const result = await pool.query(
       `
       SELECT id, status
+        , COALESCE(attendance_status, 'unmarked') AS attendance_status
       FROM applications
       WHERE event_id = $1 AND volunteer_id = $2
       `,
@@ -191,6 +192,7 @@ exports.getApplicationStatus = async (req, res) => {
       applied: true,
       status,
       applicationId: result.rows[0].id,
+      attendanceStatus: result.rows[0].attendance_status,
     });
   } catch (err) {
     console.error("STATUS ERROR:", err);
@@ -229,6 +231,7 @@ exports.getEventApplications = async (req, res) => {
           WHEN a.status = 'accepted' THEN 'approved'
           ELSE a.status
         END AS status,
+        COALESCE(a.attendance_status, 'unmarked') AS attendance_status,
         a.applied_at,
         u.id AS volunteer_id,
         u.name,
@@ -276,6 +279,8 @@ exports.getMyApplications = async (req, res) => {
         a.volunteer_cancelled_at,
         a.strike_appeal_status,
         a.strike_appeal_submitted_at,
+        COALESCE(a.attendance_status, 'unmarked') AS attendance_status,
+        a.attendance_marked_at,
         a.applied_at,
         COALESCE(
           CASE WHEN e.event_type = 'unpaid' THEN 'not_applicable' END,
@@ -321,7 +326,7 @@ exports.getMyApplications = async (req, res) => {
       WHERE a.volunteer_id = $1
       GROUP BY a.id, a.status, a.admin_cancel_reason, a.volunteer_cancel_reason, a.cancellation_supporting_document_url,
            a.cancellation_window, a.strike_issued, a.warning_issued, a.volunteer_cancelled_at,
-           a.strike_appeal_status, a.strike_appeal_submitted_at,
+           a.strike_appeal_status, a.strike_appeal_submitted_at, a.attendance_status, a.attendance_marked_at,
             a.applied_at, a.compensation_status, e.id, e.organiser_id, e.title, e.location,
                 e.event_date, e.start_time, e.end_date, e.end_time, e.status, e.event_type, e.payment_amount, e.payment_rate_type
        ORDER BY a.applied_at DESC
@@ -785,6 +790,8 @@ exports.getApplicationById = async (req, res) => {
           WHEN a.status = 'accepted' THEN 'approved'
           ELSE a.status
         END AS status,
+        COALESCE(a.attendance_status, 'unmarked') AS attendance_status,
+        a.attendance_marked_at,
         a.applied_at,
         a.event_id,
         a.volunteer_id,

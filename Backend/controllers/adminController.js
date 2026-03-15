@@ -914,6 +914,7 @@ const getVolunteerLeaderboard = async (req, res) => {
       JOIN events e ON e.id = a.event_id
       WHERE u.role = 'volunteer'
         AND a.status IN ('approved', 'accepted', 'completed')
+        AND COALESCE(a.attendance_status, 'unmarked') <> 'absent'
         AND e.status != 'deleted'
         AND (
           e.status = 'completed'
@@ -978,6 +979,7 @@ const getOrganiserLeaderboard = async (req, res) => {
           JOIN events e ON e.id = a.event_id
           WHERE u.role = 'volunteer'
             AND a.status IN ('approved', 'accepted', 'completed')
+            AND COALESCE(a.attendance_status, 'unmarked') <> 'absent'
             AND e.status != 'deleted'
             AND (
               e.status = 'completed'
@@ -1838,7 +1840,8 @@ const sendEventNotification = async (req, res) => {
       `SELECT DISTINCT volunteer_id
        FROM applications
        WHERE event_id = $1
-         AND status IN ('approved', 'accepted', 'completed')`,
+         AND status IN ('approved', 'accepted', 'completed')
+         AND COALESCE(attendance_status, 'unmarked') <> 'absent'`,
       [eventIdInt]
     );
     const volunteerIds = volunteerRes.rows

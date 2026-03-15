@@ -20,7 +20,7 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
 
   Map<String, dynamic>? event;
   List<Map<String, dynamic>> approvedVolunteers = [];
-  final Set<int> absentVolunteerIds = <int>{};
+  final Map<int, String> attendanceByVolunteerId = <int, String>{};
   final TextEditingController summaryController = TextEditingController();
 
   @override
@@ -45,6 +45,10 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
     return (value ?? "").toString().toLowerCase().trim();
   }
 
+  bool _isAttendanceMarked(String status) {
+    return status == "present" || status == "absent";
+  }
+
   Future<void> _loadData() async {
     setState(() {
       loading = true;
@@ -59,11 +63,11 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
           .whereType<Map>()
           .map((row) => Map<String, dynamic>.from(row))
           .where((row) {
-        final status = _normalizedStatus(row["status"]);
-        return status == "approved" ||
-            status == "accepted" ||
-            status == "completed";
-      }).toList();
+            final status = _normalizedStatus(row["status"]);
+            return status == "approved" ||
+                status == "accepted" ||
+                status == "completed";
+          }).toList();
 
       approved.sort((a, b) {
         final aName = (a["name"] ?? "").toString().toLowerCase();
@@ -71,10 +75,22 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
         return aName.compareTo(bName);
       });
 
+      final initialAttendance = <int, String>{};
+      for (final volunteer in approved) {
+        final volunteerId = _asInt(volunteer["volunteer_id"] ?? volunteer["id"]);
+        if (volunteerId <= 0) continue;
+        final attendanceStatus = _normalizedStatus(volunteer["attendance_status"]);
+        initialAttendance[volunteerId] =
+            _isAttendanceMarked(attendanceStatus) ? attendanceStatus : "unmarked";
+      }
+
       if (!mounted) return;
       setState(() {
         event = fetchedEvent;
         approvedVolunteers = approved;
+        attendanceByVolunteerId
+          ..clear()
+          ..addAll(initialAttendance);
         loading = false;
       });
     } catch (e) {
@@ -89,17 +105,42 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
   Future<void> _submitFeedback() async {
     if (submitting) return;
 
+    final unmarkedCount = approvedVolunteers.where((row) {
+      final volunteerId = _asInt(row["volunteer_id"] ?? row["id"]);
+      final status = attendanceByVolunteerId[volunteerId] ?? "unmarked";
+      return !_isAttendanceMarked(status);
+    }).length;
+
+    if (unmarkedCount > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "Mark attendance for all volunteers before saving ($unmarkedCount remaining).",
+          ),
+        ),
+      );
+      return;
+    }
+
     setState(() => submitting = true);
     try {
+      final attendancePayload = approvedVolunteers.map((row) {
+        final volunteerId = _asInt(row["volunteer_id"] ?? row["id"]);
+        return {
+          "volunteerId": volunteerId,
+          "status": attendanceByVolunteerId[volunteerId] ?? "unmarked",
+        };
+      }).toList();
+
       final response = await EventService.submitAttendanceFeedback(
         eventId: widget.eventId,
-        absentVolunteerIds: absentVolunteerIds.toList(),
+        attendance: attendancePayload,
         summary: summaryController.text,
       );
 
       if (!mounted) return;
-      final message = (response["message"] ?? "Attendance feedback submitted")
-          .toString();
+      final message =
+          (response["message"] ?? "Attendance saved").toString();
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
@@ -120,13 +161,18 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
   @override
   Widget build(BuildContext context) {
     final title = (event?["title"] ?? "Event").toString();
-    final approvedCount = approvedVolunteers.length;
-    final absentCount = absentVolunteerIds.length;
-    final presentCount = (approvedCount - absentCount).clamp(0, approvedCount);
+    final totalCount = approvedVolunteers.length;
+    final presentCount = attendanceByVolunteerId.values
+        .where((status) => status == "present")
+        .length;
+    final absentCount = attendanceByVolunteerId.values
+        .where((status) => status == "absent")
+        .length;
+    final unmarkedCount = totalCount - presentCount - absentCount;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Attendance Feedback"),
+        title: const Text("Attendance"),
       ),
       body: loading
           ? const Center(child: CircularProgressIndicator())
@@ -174,11 +220,18 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
                               ),
                             ),
                             const SizedBox(height: 8),
-                            Text("Present: $presentCount"),
-                            Text("Absent: $absentCount"),
+                            Wrap(
+                              spacing: 10,
+                              runSpacing: 8,
+                              children: [
+                                Text("Present: $presentCount"),
+                                Text("Absent: $absentCount"),
+                                Text("Unmarked: $unmarkedCount"),
+                              ],
+                            ),
                             const SizedBox(height: 6),
                             Text(
-                              "Select volunteers who were absent. This will create admin reports for strike review.",
+                              "Mark every approved volunteer as present or absent. Absent volunteers receive a strike only after the event is completed.",
                               style: TextStyle(
                                 color: Colors.grey.shade700,
                                 fontSize: 12,
@@ -205,34 +258,62 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
                       Expanded(
                         child: ListView.separated(
                           itemCount: approvedVolunteers.length,
-                          separatorBuilder: (_, __) =>
-                              const Divider(height: 1, indent: 16, endIndent: 16),
+                          separatorBuilder: (_, __) => const Divider(
+                            height: 1,
+                            indent: 16,
+                            endIndent: 16,
+                          ),
                           itemBuilder: (context, index) {
                             final row = approvedVolunteers[index];
                             final volunteerId =
                                 _asInt(row["volunteer_id"] ?? row["id"]);
                             final name = (row["name"] ?? "Volunteer").toString();
                             final city = (row["city"] ?? "-").toString();
-                            final isAbsent =
-                                absentVolunteerIds.contains(volunteerId);
+                            final selectedStatus =
+                                attendanceByVolunteerId[volunteerId] ?? "unmarked";
 
-                            return CheckboxListTile(
-                              value: isAbsent,
-                              onChanged: volunteerId <= 0
-                                  ? null
-                                  : (checked) {
-                                      setState(() {
-                                        if (checked == true) {
-                                          absentVolunteerIds.add(volunteerId);
-                                        } else {
-                                          absentVolunteerIds.remove(volunteerId);
-                                        }
-                                      });
-                                    },
+                            return ListTile(
+                              leading: const CircleAvatar(
+                                child: Icon(Icons.person_outline),
+                              ),
                               title: Text(name),
-                              subtitle: Text("Location: $city"),
-                              secondary: const Icon(Icons.person_outline),
-                              controlAffinity: ListTileControlAffinity.trailing,
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text("Location: $city"),
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: [
+                                      ChoiceChip(
+                                        label: const Text("Present"),
+                                        selected: selectedStatus == "present",
+                                        onSelected: volunteerId <= 0
+                                            ? null
+                                            : (_) {
+                                                setState(() {
+                                                  attendanceByVolunteerId[
+                                                      volunteerId] = "present";
+                                                });
+                                              },
+                                      ),
+                                      ChoiceChip(
+                                        label: const Text("Absent"),
+                                        selected: selectedStatus == "absent",
+                                        onSelected: volunteerId <= 0
+                                            ? null
+                                            : (_) {
+                                                setState(() {
+                                                  attendanceByVolunteerId[
+                                                      volunteerId] = "absent";
+                                                });
+                                              },
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             );
                           },
                         ),
@@ -246,9 +327,9 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
                             maxLines: 3,
                             maxLength: 1000,
                             decoration: const InputDecoration(
-                              labelText: "Optional note for admin",
+                              labelText: "Optional note",
                               hintText:
-                                  "Example: volunteer informed late / unreachable / no-show",
+                                  "Example: volunteer informed late / unreachable / left early",
                               border: OutlineInputBorder(),
                             ),
                           ),
@@ -267,13 +348,11 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
                                         color: Colors.white,
                                       ),
                                     )
-                                  : const Icon(Icons.send),
+                                  : const Icon(Icons.save_outlined),
                               label: Text(
                                 submitting
-                                    ? "Submitting..."
-                                    : absentCount == 0
-                                        ? "Submit: All Attended"
-                                        : "Report $absentCount Absent to Admin",
+                                    ? "Saving..."
+                                    : "Save Attendance",
                               ),
                             ),
                           ),
@@ -289,4 +368,3 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
     );
   }
 }
-

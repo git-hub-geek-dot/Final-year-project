@@ -71,6 +71,8 @@ model Application {
   eventId      Int?      @map("event_id")
   volunteerId  Int?      @map("volunteer_id")
   status       String?   @default("pending") @db.VarChar(20)
+  attendanceStatus String? @default("unmarked") @map("attendance_status") @db.VarChar(20)
+  attendanceMarkedAt DateTime? @map("attendance_marked_at") @db.Timestamp(6)
   adminCancelReason String? @map("admin_cancel_reason")
   volunteerCancelReason String? @map("volunteer_cancel_reason")
   cancellationSupportingDocumentUrl String? @map("cancellation_supporting_document_url")

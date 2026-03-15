@@ -6,8 +6,12 @@ const {
 const {
   notifyOngoingAttendanceUpdatesForOrganiser,
 } = require("../services/eventAttendanceNotificationService");
+const {
+  applyAttendanceCompletionEffects,
+} = require("../services/eventStatusService");
 
 const VALID_PAYMENT_RATE_TYPES = new Set(["per_day", "per_hour", "fixed"]);
+const VALID_ATTENDANCE_STATUSES = new Set(["unmarked", "present", "absent"]);
 
 function normalizeDateOnly(value) {
   if (value === undefined || value === null) {
@@ -47,6 +51,11 @@ function isDateOnOrAfter(leftDate, rightDate) {
   }
 
   return new Date(`${left}T00:00:00Z`).getTime() >= new Date(`${right}T00:00:00Z`).getTime();
+}
+
+function normalizeAttendanceStatus(value) {
+  const normalized = (value ?? "").toString().trim().toLowerCase();
+  return VALID_ATTENDANCE_STATUSES.has(normalized) ? normalized : "unmarked";
 }
 
 /*
@@ -585,6 +594,7 @@ exports.getVolunteerLeaderboard = async (req, res) => {
       JOIN events e ON e.id = a.event_id
       WHERE u.role = 'volunteer'
         AND a.status IN ('approved', 'accepted', 'completed')
+        AND COALESCE(a.attendance_status, 'unmarked') <> 'absent'
         AND e.status != 'deleted'
         AND (
           e.status = 'completed'
@@ -1222,9 +1232,10 @@ exports.announceEvent = async (req, res) => {
 };
 
 // =======================================================
-// SUBMIT ATTENDANCE FEEDBACK (ORGANISER -> ADMIN REVIEW)
+// SUBMIT ATTENDANCE (ORGANISER)
 // =======================================================
 exports.submitAttendanceFeedback = async (req, res) => {
+  const client = await pool.connect();
   try {
     if (req.user?.role !== "organiser") {
       return res.status(403).json({
@@ -1234,6 +1245,7 @@ exports.submitAttendanceFeedback = async (req, res) => {
 
     const organiserId = req.user.id;
     const eventId = Number.parseInt(req.params.id, 10);
+    const attendanceRaw = req.body?.attendance;
     const absentVolunteerIdsRaw = req.body?.absentVolunteerIds;
     const summary = (req.body?.summary || "").toString().trim();
 
@@ -1241,10 +1253,8 @@ exports.submitAttendanceFeedback = async (req, res) => {
       return res.status(400).json({ error: "Invalid event id" });
     }
 
-    if (!Array.isArray(absentVolunteerIdsRaw)) {
-      return res.status(400).json({
-        error: "absentVolunteerIds must be an array",
-      });
+    if (attendanceRaw != null && !Array.isArray(attendanceRaw)) {
+      return res.status(400).json({ error: "attendance must be an array" });
     }
 
     if (summary.length > 1000) {
@@ -1275,166 +1285,215 @@ exports.submitAttendanceFeedback = async (req, res) => {
     const event = eventResult.rows[0];
     if (event.status === "draft") {
       return res.status(400).json({
-        error: "Attendance feedback is not available for draft events",
+        error: "Attendance is not available for draft events",
       });
     }
     if (event.status === "deleted") {
       return res.status(400).json({
-        error: "Attendance feedback is not available for deleted events",
+        error: "Attendance is not available for deleted events",
       });
     }
     if (event.status === "closed") {
       return res.status(400).json({
-        error: "Attendance feedback is not available for cancelled events",
+        error: "Attendance is not available for cancelled events",
       });
     }
     if (event.has_started !== true) {
       return res.status(400).json({
-        error: "Attendance feedback is available after event starts",
+        error: "Attendance is available after event starts",
       });
     }
-
-    const uniqueAbsentIds = [
-      ...new Set(
-        absentVolunteerIdsRaw
-          .map((id) => Number.parseInt(id, 10))
-          .filter((id) => Number.isInteger(id) && id > 0)
-      ),
-    ];
 
     const approvedVolunteersResult = await pool.query(
       `
       SELECT
         a.volunteer_id,
-        u.name
+        u.name,
+        COALESCE(a.attendance_status, 'unmarked') AS attendance_status,
+        a.attendance_marked_at
       FROM applications a
       JOIN users u ON u.id = a.volunteer_id
       WHERE a.event_id = $1
         AND a.status IN ('approved', 'accepted', 'completed')
+      ORDER BY u.name ASC
       `,
       [eventId]
     );
 
-    const approvedIdSet = new Set(
-      approvedVolunteersResult.rows.map((row) => row.volunteer_id)
-    );
-
-    const invalidAbsentIds = uniqueAbsentIds.filter(
-      (id) => !approvedIdSet.has(id)
-    );
-    if (invalidAbsentIds.length > 0) {
-      return res.status(400).json({
-        error:
-          "All absent volunteers must be part of the approved volunteer list",
-      });
-    }
-
-    if (uniqueAbsentIds.length === 0) {
+    const approvedRows = approvedVolunteersResult.rows;
+    if (approvedRows.length === 0) {
       return res.json({
-        message: "Attendance feedback submitted. All volunteers marked present.",
-        reports_created: 0,
+        message: "No approved volunteers found for this event.",
         absent_count: 0,
+        present_count: 0,
+        updated: 0,
       });
     }
 
-    const approvedNameMap = new Map(
-      approvedVolunteersResult.rows.map((row) => [row.volunteer_id, row.name])
-    );
-    const detailsPrefix = `Event #${eventId}:`;
+    const approvedIds = approvedRows.map((row) => Number(row.volunteer_id));
+    const approvedIdSet = new Set(approvedIds);
+    const attendanceMap = new Map();
 
-    let reportsCreated = 0;
-    const flaggedVolunteers = [];
+    if (Array.isArray(attendanceRaw) && attendanceRaw.length > 0) {
+      for (const item of attendanceRaw) {
+        const volunteerId = Number.parseInt(
+          item?.volunteerId ?? item?.volunteer_id,
+          10
+        );
+        const status = normalizeAttendanceStatus(item?.status);
 
-    for (const volunteerId of uniqueAbsentIds) {
-      const existingReport = await pool.query(
-        `
-        SELECT id
-        FROM reports
-        WHERE reporter_id = $1
-          AND target_type = 'user'
-          AND target_id = $2
-          AND status = 'pending'
-          AND details LIKE $3
-        LIMIT 1
-        `,
-        [organiserId, volunteerId, `${detailsPrefix}%`]
-      );
+        if (!Number.isInteger(volunteerId) || volunteerId <= 0) {
+          return res.status(400).json({
+            error: "Each attendance row must include a valid volunteerId",
+          });
+        }
 
-      if (existingReport.rowCount > 0) {
-        continue;
+        if (!approvedIdSet.has(volunteerId)) {
+          return res.status(400).json({
+            error: "Attendance can only be submitted for approved volunteers",
+          });
+        }
+
+        if (!["present", "absent"].includes(status)) {
+          return res.status(400).json({
+            error: "Attendance status must be either present or absent",
+          });
+        }
+
+        attendanceMap.set(volunteerId, status);
       }
 
-      const details = [
-        `${detailsPrefix} ${event.title}`,
-        "Volunteer was marked absent by organiser attendance feedback.",
-        summary ? `Organiser note: ${summary}` : null,
-      ]
-        .filter(Boolean)
-        .join("\n");
-
-      await pool.query(
-        `
-        INSERT INTO reports (
-          reporter_id,
-          target_type,
-          target_id,
-          reason,
-          details,
-          status,
-          created_at,
-          updated_at
-        )
-        VALUES ($1, 'user', $2, $3, $4, 'pending', NOW(), NOW())
-        `,
-        [
-          organiserId,
-          volunteerId,
-          "Attendance no-show report",
-          details,
-        ]
+      const missingVolunteerIds = approvedIds.filter(
+        (volunteerId) => !attendanceMap.has(volunteerId)
       );
 
-      reportsCreated += 1;
-      const volunteerName = approvedNameMap.get(volunteerId);
-      if (volunteerName) flaggedVolunteers.push(volunteerName);
-    }
-
-    if (reportsCreated > 0) {
-      const adminResult = await pool.query(
-        `
-        SELECT id
-        FROM users
-        WHERE role = 'admin' AND status = 'active'
-        `
-      );
-      const adminIds = adminResult.rows.map((row) => row.id);
-
-      if (adminIds.length > 0) {
-        await notifyUsers(adminIds, {
-          title: "Attendance issue reported",
-          body: `${reportsCreated} absent volunteer report(s) submitted for ${event.title}.`,
-          data: {
-            type: "attendance_issue_reported",
-            eventId: String(eventId),
-            reportsCreated: String(reportsCreated),
-            absentCount: String(uniqueAbsentIds.length),
-          },
+      if (missingVolunteerIds.length > 0) {
+        return res.status(400).json({
+          error: "Attendance must be marked for every approved volunteer",
         });
       }
+    } else if (Array.isArray(absentVolunteerIdsRaw)) {
+      const uniqueAbsentIds = [
+        ...new Set(
+          absentVolunteerIdsRaw
+            .map((id) => Number.parseInt(id, 10))
+            .filter((id) => Number.isInteger(id) && id > 0)
+        ),
+      ];
+
+      const invalidAbsentIds = uniqueAbsentIds.filter(
+        (id) => !approvedIdSet.has(id)
+      );
+      if (invalidAbsentIds.length > 0) {
+        return res.status(400).json({
+          error:
+            "All absent volunteers must be part of the approved volunteer list",
+        });
+      }
+
+      for (const volunteerId of approvedIds) {
+        attendanceMap.set(
+          volunteerId,
+          uniqueAbsentIds.includes(volunteerId) ? "absent" : "present"
+        );
+      }
+    } else {
+      return res.status(400).json({
+        error: "Attendance data is required",
+      });
     }
+
+    await client.query("BEGIN");
+
+    const caseStatusParts = [];
+    const caseParams = [eventId];
+    let parameterIndex = 2;
+
+    for (const volunteerId of approvedIds) {
+      const status = attendanceMap.get(volunteerId);
+      caseStatusParts.push(
+        `WHEN volunteer_id = $${parameterIndex} THEN $${parameterIndex + 1}`
+      );
+      caseParams.push(volunteerId, status);
+      parameterIndex += 2;
+    }
+
+    await client.query(
+      `
+      UPDATE applications
+      SET attendance_status = CASE
+            ${caseStatusParts.join("\n            ")}
+            ELSE COALESCE(attendance_status, 'unmarked')
+          END,
+          attendance_marked_at = NOW()
+      WHERE event_id = $1
+        AND volunteer_id = ANY($${parameterIndex}::int[])
+        AND status IN ('approved', 'accepted', 'completed')
+      `,
+      [...caseParams, approvedIds]
+    );
+
+    let absentNotifications = [];
+    if (event.status === "completed") {
+      absentNotifications = await applyAttendanceCompletionEffects(client, {
+        id: event.id,
+        title: event.title,
+        organiser_id: organiserId,
+      });
+    }
+
+    if (
+      event.status === "completed" &&
+      approvedRows.some((row) => row.attendance_marked_at != null)
+    ) {
+      return res.status(400).json({
+        error: "Attendance is locked once it has been finalised for a completed event",
+      });
+    }
+
+    await client.query("COMMIT");
+
+    for (const item of absentNotifications) {
+      try {
+        await notifyUsers([item.userId], {
+          title: "Absent attendance recorded",
+          body: `You were marked absent for ${item.eventTitle}. A strike was applied after the event was completed. You can submit an appeal with supporting documents.`,
+          data: {
+            type: "attendance_absent_strike",
+            eventId: String(item.eventId),
+            applicationId: String(item.applicationId),
+            strikeCount: String(item.strikeCount ?? ""),
+          },
+        });
+      } catch (notifyErr) {
+        console.error("ATTENDANCE ABSENT NOTIFY ERROR:", notifyErr);
+      }
+    }
+
+    const absentCount = approvedIds.filter(
+      (volunteerId) => attendanceMap.get(volunteerId) === "absent"
+    ).length;
+    const presentCount = approvedIds.length - absentCount;
 
     res.json({
       message:
-        reportsCreated > 0
-          ? "Attendance feedback submitted and sent to admin."
-          : "Attendance feedback already submitted for selected volunteers.",
-      reports_created: reportsCreated,
-      absent_count: uniqueAbsentIds.length,
-      flagged_volunteers: flaggedVolunteers,
+        absentCount > 0 && event.status === "completed"
+          ? "Attendance saved. Absent volunteers were penalized because the event is already completed."
+          : absentCount > 0
+          ? "Attendance saved. Absent volunteers will receive a strike if the event completes with this attendance."
+          : "Attendance saved. All volunteers marked present.",
+      absent_count: absentCount,
+      present_count: presentCount,
+      updated: approvedIds.length,
     });
   } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (_) {}
     console.error("SUBMIT ATTENDANCE FEEDBACK ERROR:", err);
     res.status(500).json({ error: "Failed to submit attendance feedback" });
+  } finally {
+    client.release();
   }
 };
 

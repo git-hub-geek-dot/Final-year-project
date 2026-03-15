@@ -66,6 +66,17 @@ exports.applyToEvent = async (req, res) => {
   try {
     const eventId = req.params.id;
     const volunteerId = req.user.id;
+    const rawExperience = (req.body?.priorExperience ?? req.body?.prior_experience ?? "")
+      .toString()
+      .trim();
+    const priorExperience = rawExperience.length > 0 ? rawExperience : null;
+    const rawAvailability = (req.body?.availabilityStatus ?? req.body?.availability_status ?? "")
+      .toString()
+      .trim()
+      .toLowerCase();
+    const availabilityStatus = ["available", "partial", "unsure"].includes(rawAvailability)
+      ? rawAvailability
+      : "available";
 
     // Check if user is verified
     const userCheck = await pool.query(
@@ -145,11 +156,17 @@ exports.applyToEvent = async (req, res) => {
     // Apply (pending by default, waitlisted if event is already full)
     const result = await pool.query(
       `
-      INSERT INTO applications (event_id, volunteer_id, status)
-      VALUES ($1, $2, $3)
+      INSERT INTO applications (
+        event_id,
+        volunteer_id,
+        status,
+        prior_experience,
+        availability_status
+      )
+      VALUES ($1, $2, $3, $4, $5)
       RETURNING id, status, applied_at
       `,
-      [eventId, volunteerId, nextStatus]
+      [eventId, volunteerId, nextStatus, priorExperience, availabilityStatus]
     );
 
     res.status(201).json({
@@ -232,6 +249,8 @@ exports.getEventApplications = async (req, res) => {
           ELSE a.status
         END AS status,
         COALESCE(a.attendance_status, 'unmarked') AS attendance_status,
+        COALESCE(a.is_shortlisted, false) AS is_shortlisted,
+        COALESCE(a.availability_status, 'available') AS availability_status,
         a.applied_at,
         u.id AS volunteer_id,
         u.name,
@@ -281,6 +300,7 @@ exports.getMyApplications = async (req, res) => {
         a.strike_appeal_submitted_at,
         COALESCE(a.attendance_status, 'unmarked') AS attendance_status,
         a.attendance_marked_at,
+        a.prior_experience,
         a.applied_at,
         COALESCE(
           CASE WHEN e.event_type = 'unpaid' THEN 'not_applicable' END,
@@ -395,7 +415,7 @@ exports.cancelMyApplication = async (req, res) => {
 
     const app = appRes.rows[0];
     const currentStatus = (app.status || "").toString().toLowerCase();
-    if (["cancelled", "rejected", "completed", "no_show"].includes(currentStatus)) {
+    if (["cancelled", "rejected", "completed"].includes(currentStatus)) {
       await client.query("ROLLBACK");
       return res.status(400).json({ error: "Application can no longer be cancelled" });
     }
@@ -564,116 +584,6 @@ exports.cancelMyApplication = async (req, res) => {
   }
 };
 
-// ================= ORGANISER MARK NO-SHOW =================
-exports.markVolunteerNoShow = async (req, res) => {
-  const client = await pool.connect();
-  try {
-    const applicationId = parseInt(req.params.id, 10);
-    const organiserId = req.user?.id;
-
-    if (req.user?.role !== "organiser") {
-      return res.status(403).json({ error: "Only organisers can mark no-show" });
-    }
-
-    if (!Number.isInteger(applicationId) || applicationId <= 0) {
-      return res.status(400).json({ error: "Invalid application ID" });
-    }
-
-    await client.query("BEGIN");
-
-    const appRes = await client.query(
-      `
-      SELECT a.id, a.status, a.event_id, a.volunteer_id, e.organiser_id, e.title
-      FROM applications a
-      JOIN events e ON e.id = a.event_id
-      WHERE a.id = $1
-        AND e.organiser_id = $2
-      FOR UPDATE
-      `,
-      [applicationId, organiserId]
-    );
-
-    if (appRes.rowCount === 0) {
-      await client.query("ROLLBACK");
-      return res.status(404).json({ error: "Application not found" });
-    }
-
-    const app = appRes.rows[0];
-    const status = (app.status || "").toString().toLowerCase();
-    if (!["approved", "accepted"].includes(status)) {
-      await client.query("ROLLBACK");
-      return res.status(400).json({ error: "Only approved volunteers can be marked no-show" });
-    }
-
-    await client.query(
-      `
-      UPDATE applications
-      SET status = 'no_show',
-          strike_issued = TRUE,
-          strike_appeal_status = 'eligible',
-          volunteer_cancel_reason = COALESCE(volunteer_cancel_reason, 'No show'),
-          volunteer_cancelled_at = COALESCE(volunteer_cancelled_at, NOW())
-      WHERE id = $1
-      `,
-      [applicationId]
-    );
-
-    const strikeResult = await applyStrike(client, {
-      userId: app.volunteer_id,
-      adminId: organiserId,
-      reason: `No-show after approval for event: ${app.title}`,
-    });
-
-    const promoted = await promoteWaitlistedVolunteer({
-      client,
-      eventId: app.event_id,
-    });
-
-    await client.query("COMMIT");
-
-    res.json({
-      success: true,
-      strikeIssued: true,
-      strikeCount: strikeResult.strikeCount,
-      strikeAction: strikeResult.action,
-      waitlistPromoted: Boolean(promoted),
-    });
-
-    try {
-      await notifyUser(app.volunteer_id, {
-        title: "No-show recorded",
-        body: `You were marked as no-show for ${app.title}. A strike was applied. You can submit an appeal with supporting documents.`,
-        data: {
-          type: "no_show_strike",
-          applicationId: String(applicationId),
-          strikeCount: strikeResult.strikeCount,
-        },
-      });
-
-      if (promoted?.volunteer_id) {
-        await notifyUser(promoted.volunteer_id, {
-          title: "Spot available",
-          body: `You were moved from waiting list to approved for ${app.title}.`,
-          data: {
-            type: "waitlist_promoted",
-            eventId: String(app.event_id),
-          },
-        });
-      }
-    } catch (notifyErr) {
-      console.error("NO SHOW NOTIFY ERROR:", notifyErr);
-    }
-  } catch (err) {
-    try {
-      await client.query("ROLLBACK");
-    } catch (_) {}
-    console.error("MARK NO SHOW ERROR:", err);
-    res.status(500).json({ error: "Failed to mark no-show" });
-  } finally {
-    client.release();
-  }
-};
-
 // ================= VOLUNTEER STRIKE APPEAL =================
 exports.submitStrikeAppeal = async (req, res) => {
   try {
@@ -791,7 +701,10 @@ exports.getApplicationById = async (req, res) => {
           ELSE a.status
         END AS status,
         COALESCE(a.attendance_status, 'unmarked') AS attendance_status,
+        COALESCE(a.is_shortlisted, false) AS is_shortlisted,
+        COALESCE(a.availability_status, 'available') AS availability_status,
         a.attendance_marked_at,
+        a.prior_experience,
         a.applied_at,
         a.event_id,
         a.volunteer_id,
@@ -811,10 +724,15 @@ exports.getApplicationById = async (req, res) => {
         u.name,
         u.email,
         u.city,
-        u.contact_number
+        u.contact_number,
+        u.profile_picture_url,
+        u."isVerified" AS "isVerified",
+        COALESCE(vp.skills, '{}') AS skills,
+        COALESCE(vp.interests, '{}') AS interests
       FROM applications a
       JOIN users u ON u.id = a.volunteer_id
       JOIN events e ON e.id = a.event_id
+      LEFT JOIN volunteer_preferences vp ON vp.user_id = u.id
       WHERE a.id = $1
         AND e.organiser_id = $2
       `,
@@ -825,8 +743,95 @@ exports.getApplicationById = async (req, res) => {
       return res.status(404).json({ error: "Application not found" });
     }
 
+    const app = result.rows[0];
+    const volunteerId = app.volunteer_id;
+
+    if (!volunteerId) {
+      return res.status(200).json({ application: app });
+    }
+
+    const [
+      badgesRes,
+      categoriesRes,
+      recentRes,
+    ] = await Promise.all([
+      pool.query(
+        `
+        SELECT b.id, b.name, b.description, b.threshold
+        FROM user_badges ub
+        JOIN badges b ON b.id = ub.badge_id
+        WHERE ub.user_id = $1
+          AND b.role = 'volunteer'
+        ORDER BY b.threshold ASC
+        `,
+        [volunteerId]
+      ),
+      pool.query(
+        `
+        SELECT c.name, COUNT(*)::int AS count
+        FROM applications a
+        JOIN events e ON e.id = a.event_id
+        JOIN event_categories ec ON ec.event_id = e.id
+        JOIN categories c ON c.id = ec.category_id
+        WHERE a.volunteer_id = $1
+          AND e.status != 'deleted'
+          AND a.status NOT IN ('rejected', 'cancelled')
+          AND (
+            e.status = 'completed'
+            OR NOW() >= (
+              COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')
+            )
+          )
+          AND COALESCE(a.attendance_status, 'unmarked') <> 'absent'
+        GROUP BY c.name
+        ORDER BY count DESC, c.name ASC
+        LIMIT 6
+        `,
+        [volunteerId]
+      ),
+      pool.query(
+        `
+        SELECT
+          e.title,
+          e.event_date,
+          e.end_date,
+          e.end_time,
+          e.status AS event_status,
+          a.status AS application_status,
+          COALESCE(a.attendance_status, 'unmarked') AS attendance_status
+        FROM applications a
+        JOIN events e ON e.id = a.event_id
+        WHERE a.volunteer_id = $1
+          AND a.id <> $2
+          AND e.status != 'deleted'
+          AND a.status NOT IN ('rejected', 'cancelled')
+          AND (
+            e.status = 'completed'
+            OR NOW() >= (
+              COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')
+            )
+          )
+        ORDER BY COALESCE(e.end_date, e.event_date) DESC,
+                 COALESCE(e.end_time, TIME '23:59:59') DESC
+        LIMIT 3
+        `,
+        [volunteerId, app.id]
+      ),
+    ]);
+
+    const badges = badgesRes.rows || [];
+    const topBadge = badges.length > 0 ? badges[badges.length - 1] : null;
+
     // return in a stable format
-    res.status(200).json({ application: result.rows[0] });
+    res.status(200).json({
+      application: {
+        ...app,
+        badges,
+        top_badge: topBadge,
+        category_summary: categoriesRes.rows || [],
+        recent_participation: recentRes.rows || [],
+      },
+    });
   } catch (err) {
     console.error("GET APPLICATION BY ID ERROR:", err);
     res.status(500).json({ error: "Failed to fetch application" });
@@ -982,6 +987,53 @@ exports.updateApplicationStatus = async (req, res) => {
     res.status(500).json({ error: "Failed to update status" });
   } finally {
     client.release();
+  }
+};
+
+// ================= UPDATE SHORTLIST STATUS =================
+// Organiser can shortlist or unshortlist applications
+exports.updateApplicationShortlist = async (req, res) => {
+  try {
+    const applicationId = parseInt(req.params.id, 10);
+    const organiserId = req.user?.id;
+    const shortlisted = req.body?.shortlisted ?? req.body?.is_shortlisted;
+
+    if (req.user?.role !== "organiser") {
+      return res.status(403).json({ error: "Only organisers can update shortlist" });
+    }
+
+    if (!Number.isInteger(applicationId) || applicationId <= 0) {
+      return res.status(400).json({ error: "Invalid application ID" });
+    }
+
+    if (typeof shortlisted !== "boolean") {
+      return res.status(400).json({ error: "Invalid shortlisted value" });
+    }
+
+    const result = await pool.query(
+      `
+      UPDATE applications a
+      SET is_shortlisted = $1
+      FROM events e
+      WHERE a.id = $2
+        AND e.id = a.event_id
+        AND e.organiser_id = $3
+      RETURNING a.id, a.is_shortlisted, a.event_id
+      `,
+      [shortlisted, applicationId, organiserId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Application not found" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      application: result.rows[0],
+    });
+  } catch (err) {
+    console.error("UPDATE SHORTLIST ERROR:", err);
+    return res.status(500).json({ error: "Failed to update shortlist" });
   }
 };
 

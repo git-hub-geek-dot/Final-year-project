@@ -127,7 +127,8 @@ const getApplications = async (req, res) => {
     const normalizedStatusExpr = `
       CASE
         WHEN a.status = 'waitlisted' THEN 'waitlisted'
-        WHEN a.status IN ('accepted', 'completed') THEN 'approved'
+        WHEN a.status IN ('accepted', 'approved') THEN 'approved'
+        WHEN a.status = 'completed' THEN 'completed'
         ELSE a.status
       END
     `;
@@ -163,7 +164,7 @@ const getApplications = async (req, res) => {
       waitlisted: 0,
       rejected: 0,
       cancelled: 0,
-      no_show: 0,
+      completed: 0,
     };
 
     for (const row of summaryResult.rows) {
@@ -178,8 +179,8 @@ const getApplications = async (req, res) => {
         summary.rejected += count;
       } else if (status === "cancelled") {
         summary.cancelled += count;
-      } else if (status === "no_show") {
-        summary.no_show += count;
+      } else if (status === "completed") {
+        summary.completed += count;
       } else {
         summary.pending += count;
       }

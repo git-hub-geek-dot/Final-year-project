@@ -230,8 +230,8 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
                                       child: Text("Cancelled"),
                                     ),
                                     DropdownMenuItem(
-                                      value: "no_show",
-                                      child: Text("No-show"),
+                                      value: "completed",
+                                      child: Text("Completed"),
                                     ),
                                   ],
                                   onChanged: (v) =>
@@ -334,7 +334,7 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
               const SizedBox(height: 8),
               _detailRow("Status", statusText),
               _detailRow("Applied", appliedAt),
-              if ((status == "cancelled" || status == "no_show") &&
+              if (status == "cancelled" &&
                   resolvedReason.isNotEmpty)
                 _detailRow("Reason", resolvedReason),
             ],
@@ -381,8 +381,8 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
         return "No rejected applications found";
       case "cancelled":
         return "No cancelled applications found";
-      case "no_show":
-        return "No no-show applications found";
+      case "completed":
+        return "No completed applications found";
       case "all":
       default:
         return "No applications found";
@@ -498,7 +498,6 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
     final isFinalStatus = const {
       "cancelled",
       "rejected",
-      "no_show",
       "completed",
     }.contains(status);
     final cancelReason = (app["admin_cancel_reason"] ?? "").toString().trim();
@@ -589,8 +588,8 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
                   _metaChip(Icons.schedule, appliedAgo),
                 ],
               ),
-              if ((status == "cancelled" || status == "no_show") &&
-                  resolvedReason.isNotEmpty) ...[
+    if (status == "cancelled" &&
+        resolvedReason.isNotEmpty) ...[
                 const SizedBox(height: 4),
                 Container(
                   width: double.infinity,

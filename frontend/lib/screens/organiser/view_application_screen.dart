@@ -33,6 +33,7 @@ class ViewApplicationScreen extends StatefulWidget {
 class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
   bool loading = true;
   bool actionLoading = false;
+  bool shortlistLoading = false;
   String? errorMessage;
   late int approvedCount;
   late int volunteersRequired;
@@ -280,10 +281,61 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
         return "This application has been cancelled.";
       case "completed":
         return "This participation is already completed.";
-      case "no_show":
-        return "This volunteer was marked as no-show.";
       default:
         return "This application can no longer be changed.";
+    }
+  }
+
+  Future<void> updateShortlist(bool shortlisted) async {
+    if (shortlistLoading) return;
+    try {
+      setState(() => shortlistLoading = true);
+
+      final token = await TokenService.getToken();
+      if (token == null || token.isEmpty) {
+        setState(() => shortlistLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Token not found. Please login again.")),
+        );
+        return;
+      }
+
+      final url = Uri.parse(
+        "${ApiConfig.baseUrl}/applications/${widget.applicationId}/shortlist",
+      );
+
+      final response = await http.put(
+        url,
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode({"shortlisted": shortlisted}),
+      );
+
+      setState(() => shortlistLoading = false);
+
+      if (response.statusCode == 200) {
+        setState(() {
+          application?["is_shortlisted"] = shortlisted;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              shortlisted ? "Added to shortlist" : "Removed from shortlist",
+            ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_responseErrorMessage(response.body))),
+        );
+      }
+    } catch (e) {
+      setState(() => shortlistLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
     }
   }
 
@@ -317,15 +369,116 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
     return text == "true" || text == "1" || text == "t" || text == "yes";
   }
 
+  List<String> _asStringList(dynamic value) {
+    if (value == null) return const [];
+    if (value is List) {
+      return value
+          .map((e) => e?.toString().trim() ?? "")
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+    if (value is String) {
+      return value
+          .split(",")
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+    return const [];
+  }
+
+  Map<String, dynamic>? _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return null;
+  }
+
+  List<Map<String, dynamic>> _asMapList(dynamic value) {
+    if (value is List) {
+      return value
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+    }
+    return const [];
+  }
+
   String _normalizedAttendanceStatus(dynamic value) {
     final text = (value ?? "").toString().trim().toLowerCase();
     if (text == "present" || text == "absent") return text;
     return "unmarked";
   }
 
+  String _normalizedAvailabilityStatus(dynamic value) {
+    final text = (value ?? "").toString().trim().toLowerCase();
+    if (text == "partial" || text == "partially_available") return "partial";
+    if (text == "unsure" || text == "not_sure") return "unsure";
+    return "available";
+  }
+
+  String _availabilityLabel(String status) {
+    switch (status) {
+      case "partial":
+        return "Partially available";
+      case "unsure":
+        return "Not sure";
+      case "available":
+      default:
+        return "Available";
+    }
+  }
+
   DateTime? _parseDate(dynamic value) {
     if (value == null) return null;
     return IstDateTime.tryParse(value);
+  }
+
+  String? _normalizeProfileImageUrl(String? url) {
+    if (url == null || url.trim().isEmpty) return null;
+
+    final baseUri = Uri.parse(ApiConfig.baseUrl);
+    final origin =
+        "${baseUri.scheme}://${baseUri.host}${baseUri.hasPort ? ':${baseUri.port}' : ''}";
+
+    if (url.startsWith("/uploads/")) {
+      return "$origin$url";
+    }
+
+    if (url.startsWith("uploads/")) {
+      return "$origin/$url";
+    }
+
+    final parsed = Uri.tryParse(url);
+    if (parsed != null && parsed.hasScheme) {
+      if (ApiConfig.useCloud) {
+        return url;
+      }
+
+      final host = parsed.host;
+      final isLocalLike = host == "localhost" ||
+          host == "127.0.0.1" ||
+          host.startsWith("10.") ||
+          host.startsWith("192.168.") ||
+          host.startsWith("172.");
+
+      if (isLocalLike && host != baseUri.host) {
+        final pathWithQuery = parsed.hasQuery
+            ? "${parsed.path}?${parsed.query}"
+            : parsed.path;
+        return "$origin$pathWithQuery";
+      }
+    }
+
+    if (url.contains("localhost") || url.contains("127.0.0.1")) {
+      if (parsed != null) {
+        final pathWithQuery = parsed.hasQuery
+            ? "${parsed.path}?${parsed.query}"
+            : parsed.path;
+        return "$origin$pathWithQuery";
+      }
+    }
+
+    return url;
   }
 
   DateTime _dateWithTime(DateTime date, dynamic rawTime) {
@@ -357,6 +510,310 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
     return IstDateTime.now().isAfter(endDateTime);
   }
 
+  Color _badgeBaseColor(Map<String, dynamic> badge) {
+    final name = (badge["name"] ?? "").toString().toLowerCase();
+    final threshold = _asInt(badge["threshold"]);
+
+    if (name.contains("bronze")) return const Color(0xFFCD7F32);
+    if (name.contains("silver")) return const Color(0xFFC0C0C0);
+    if (name.contains("gold")) return const Color(0xFFFFD700);
+    if (name.contains("platinum")) return const Color(0xFFE5E4E2);
+    if (name.contains("diamond")) return const Color(0xFF4FC3F7);
+
+    if (threshold >= 50) return const Color(0xFFFFD700);
+    if (threshold >= 20) return const Color(0xFFC0C0C0);
+    return const Color(0xFFCD7F32);
+  }
+
+  String _formatShortDate(DateTime? date) {
+    if (date == null) return "-";
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return "${date.year}-$month-$day";
+  }
+
+  Widget _tagSection(
+    String title,
+    List<String> items, {
+    required bool compact,
+    String? emptyLabel,
+  }) {
+    final displayItems = items
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: compact ? 14 : 16,
+          ),
+        ),
+        const SizedBox(height: 6),
+        if (displayItems.isEmpty)
+          Text(
+            emptyLabel ?? "Not provided",
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: compact ? 12 : 13,
+            ),
+          )
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: displayItems
+                .map(
+                  (item) => Chip(
+                    label: Text(
+                      item,
+                      style: TextStyle(fontSize: compact ? 12 : 13),
+                    ),
+                    backgroundColor: const Color(0xFFF1F5F9),
+                  ),
+                )
+                .toList(),
+          ),
+      ],
+    );
+  }
+
+  Widget _textSection(
+    String title,
+    String value, {
+    required bool compact,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: compact ? 14 : 16,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          value,
+          style: TextStyle(
+            color: Colors.grey.shade700,
+            fontSize: compact ? 12 : 13,
+            height: 1.4,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _badgeSection(
+    List<Map<String, dynamic>> badges, {
+    required bool compact,
+    Map<String, dynamic>? topBadge,
+  }) {
+    final items = badges
+        .map((b) => b["name"]?.toString().trim() ?? "")
+        .where((name) => name.isNotEmpty)
+        .toList();
+    final topBadgeName = topBadge?["name"]?.toString().trim();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Badges",
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: compact ? 14 : 16,
+          ),
+        ),
+        if (topBadgeName != null && topBadgeName.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            "Top badge: $topBadgeName",
+            style: TextStyle(
+              color: Colors.grey.shade700,
+              fontSize: compact ? 12 : 13,
+            ),
+          ),
+        ],
+        const SizedBox(height: 8),
+        if (items.isEmpty)
+          Text(
+            "No badges yet",
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: compact ? 12 : 13,
+            ),
+          )
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: badges.map((badge) {
+              final name = (badge["name"] ?? "Badge").toString();
+              final baseColor = _badgeBaseColor(badge);
+              return Chip(
+                label: Text(
+                  name,
+                  style: TextStyle(fontSize: compact ? 12 : 13),
+                ),
+                backgroundColor: baseColor.withValues(alpha: 0.18),
+                shape: StadiumBorder(
+                  side: BorderSide(color: baseColor.withValues(alpha: 0.5)),
+                ),
+                labelStyle: TextStyle(color: baseColor),
+              );
+            }).toList(),
+          ),
+      ],
+    );
+  }
+
+  Widget _categorySection(
+    List<Map<String, dynamic>> categories, {
+    required bool compact,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Past Event Categories",
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: compact ? 14 : 16,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: categories.map((row) {
+            final name = (row["name"] ?? "Category").toString();
+            final count = _asInt(row["count"]);
+            return Chip(
+              label: Text(
+                "$name ($count)",
+                style: TextStyle(fontSize: compact ? 12 : 13),
+              ),
+              backgroundColor: const Color(0xFFF1F5F9),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _recentParticipationSection(
+    List<Map<String, dynamic>> rows, {
+    required bool compact,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Recent Participation",
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: compact ? 14 : 16,
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (rows.isEmpty)
+          Text(
+            "No recent participation yet.",
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: compact ? 12 : 13,
+            ),
+          )
+        else
+          Column(
+            children: rows.map((row) {
+              final title = (row["title"] ?? "Event").toString();
+              final eventDate = _parseDate(row["end_date"]) ??
+                  _parseDate(row["event_date"]);
+              final statusRaw = row["application_status"];
+              final status = normalizeApplicationStatus(statusRaw);
+              final attendance = _normalizedAttendanceStatus(
+                row["attendance_status"],
+              );
+
+              String statusLabelText = applicationStatusLabel(status);
+              if (attendance == "absent") {
+                statusLabelText = "Absent";
+              }
+
+              Color statusColor = applicationStatusColor(status);
+              if (attendance == "absent") {
+                statusColor = Colors.deepOrange;
+              }
+
+              return Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: compact ? 13 : 14,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            "Date: ${_formatShortDate(eventDate)}",
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: compact ? 12 : 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: statusColor.withOpacity(0.4)),
+                      ),
+                      child: Text(
+                        statusLabelText.toUpperCase(),
+                        style: TextStyle(
+                          color: statusColor,
+                          fontSize: compact ? 10 : 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
@@ -378,6 +835,23 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
     final contact = app?["contact_number"]?.toString() ??
         app?["contact"]?.toString() ??
         "-";
+    final profileUrl =
+        _normalizeProfileImageUrl(app?["profile_picture_url"]?.toString());
+    final isVerified = _asBool(app?["isVerified"]);
+    final isShortlisted = _asBool(app?["is_shortlisted"]);
+    final priorExperience =
+        (app?["prior_experience"] ?? app?["priorExperience"] ?? "")
+            .toString()
+            .trim();
+    final availabilityStatus = _normalizedAvailabilityStatus(
+      app?["availability_status"] ?? app?["availabilityStatus"],
+    );
+    final skills = _asStringList(app?["skills"]);
+    final interests = _asStringList(app?["interests"]);
+    final badges = _asMapList(app?["badges"]);
+    final topBadge = _asMap(app?["top_badge"]);
+    final categorySummary = _asMapList(app?["category_summary"]);
+    final recentParticipation = _asMapList(app?["recent_participation"]);
     final status = app?["status"]?.toString() ?? "pending";
     final normalizedStatus = normalizeApplicationStatus(status);
     final canReviewApplication = _isReviewActionable(normalizedStatus);
@@ -437,15 +911,52 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                       children: [
                         CircleAvatar(
                           radius: avatarRadius,
-                          backgroundColor: Color(0xFFE9E4FF),
+                          backgroundColor: const Color(0xFFE9E4FF),
+                          backgroundImage:
+                              profileUrl != null ? NetworkImage(profileUrl) : null,
+                          child: profileUrl == null
+                              ? Icon(
+                                  Icons.person,
+                                  size: avatarRadius,
+                                  color: Colors.grey.shade600,
+                                )
+                              : null,
                         ),
                         SizedBox(height: compact ? 8 : 12),
-                        Text(
-                          volunteerName.toString(),
-                          style: TextStyle(
-                            fontSize: titleSize,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              volunteerName.toString(),
+                              style: TextStyle(
+                                fontSize: titleSize,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            if (isVerified) ...[
+                              const SizedBox(width: 6),
+                              const Icon(
+                                Icons.verified,
+                                color: Color(0xFF2563EB),
+                                size: 20,
+                              ),
+                            ],
+                            const SizedBox(width: 6),
+                            InkWell(
+                              onTap: shortlistLoading
+                                  ? null
+                                  : () => updateShortlist(!isShortlisted),
+                              child: Icon(
+                                isShortlisted
+                                    ? Icons.star
+                                    : Icons.star_border,
+                                color: isShortlisted
+                                    ? const Color(0xFFF59E0B)
+                                    : Colors.grey.shade600,
+                                size: 22,
+                              ),
+                            ),
+                          ],
                         ),
                         SizedBox(height: compact ? 6 : 8),
                         Container(
@@ -474,6 +985,11 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                         infoRow("Location", city.toString(), compact: compact),
                         infoRow("Contact", contact.toString(),
                             compact: compact),
+                        infoRow(
+                          "Availability",
+                          _availabilityLabel(availabilityStatus),
+                          compact: compact,
+                        ),
                         if (attendanceStatus != "unmarked")
                           infoRow(
                             "Attendance",
@@ -482,6 +998,45 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                                 : "Absent",
                             compact: compact,
                           ),
+                        if (priorExperience.isNotEmpty) ...[
+                          SizedBox(height: compact ? 8 : 12),
+                          _textSection(
+                            "Prior Experience",
+                            priorExperience,
+                            compact: compact,
+                          ),
+                        ],
+                        if (skills.isNotEmpty || interests.isNotEmpty) ...[
+                          SizedBox(height: compact ? 8 : 12),
+                          _tagSection(
+                            "Skills",
+                            skills,
+                            compact: compact,
+                            emptyLabel: "Not provided",
+                          ),
+                          SizedBox(height: compact ? 6 : 8),
+                          _tagSection(
+                            "Interests",
+                            interests,
+                            compact: compact,
+                            emptyLabel: "Not provided",
+                          ),
+                        ],
+                        if (badges.isNotEmpty || topBadge != null) ...[
+                          SizedBox(height: compact ? 8 : 12),
+                          _badgeSection(
+                            badges,
+                            topBadge: topBadge,
+                            compact: compact,
+                          ),
+                        ],
+                        if (categorySummary.isNotEmpty) ...[
+                          SizedBox(height: compact ? 8 : 12),
+                          _categorySection(
+                            categorySummary,
+                            compact: compact,
+                          ),
+                        ],
                         SizedBox(height: compact ? 10 : 18),
                         Container(
                           width: double.infinity,
@@ -522,6 +1077,11 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                               ),
                             ],
                           ),
+                        ),
+                        SizedBox(height: compact ? 10 : 14),
+                        _recentParticipationSection(
+                          recentParticipation,
+                          compact: compact,
                         ),
                         SizedBox(height: compact ? 10 : 14),
                         Container(

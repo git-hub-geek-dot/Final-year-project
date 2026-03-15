@@ -49,7 +49,7 @@ exports.getOrganiserPublicProfile = async (req, res) => {
         JOIN events e ON e.id = a.event_id
         WHERE e.organiser_id = $1
           AND a.volunteer_id = $2
-          AND a.status IN ('approved', 'accepted', 'completed', 'no_show')
+          AND a.status IN ('approved', 'accepted', 'completed')
         LIMIT 1
         `,
         [organiserId, viewerId]

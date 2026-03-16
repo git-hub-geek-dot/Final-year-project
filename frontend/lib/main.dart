@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 
+import 'localization/app_localizations.dart';
+import 'localization/locale_controller.dart';
+
 // 🔐 AUTH
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/role_selection_screen.dart';
@@ -34,6 +37,7 @@ Future<void> main() async {
       debugPrintStack(stackTrace: s);
     }
   }
+  await LocaleController.load();
   runApp(const MyApp());
 }
 
@@ -42,34 +46,40 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
+    return ValueListenableBuilder<Locale?>(
+      valueListenable: LocaleController.locale,
+      builder: (context, locale, _) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          locale: locale,
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          home: const SessionListener(
+            child: AuthGate(),
+          ),
+          routes: {
+            // 🔐 AUTH
+            '/register': (context) => const RoleSelectionScreen(),
+            '/register-volunteer': (context) =>
+                const RegisterVolunteerScreen(),
+            '/register-organiser': (context) =>
+                const RegisterOrganiserScreen(),
+            '/forgot-password': (context) =>
+              const ForgotPasswordScreen(),
 
-      home: const SessionListener(
-        child: AuthGate(),
-      ),
+            // 🏠 ROLE HOMES
+            '/volunteer-home': (context) =>
+                const VolunteerHomeScreen(),
+            '/organiser-home': (context) =>
+                const OrganiserHomeScreen(),
+            '/admin-home': (context) =>
+                const AdminHomeScreen(),
 
-      routes: {
-        // 🔐 AUTH
-        '/register': (context) => const RoleSelectionScreen(),
-        '/register-volunteer': (context) =>
-            const RegisterVolunteerScreen(),
-        '/register-organiser': (context) =>
-            const RegisterOrganiserScreen(),
-        '/forgot-password': (context) =>
-          const ForgotPasswordScreen(),
-
-        // 🏠 ROLE HOMES
-        '/volunteer-home': (context) =>
-            const VolunteerHomeScreen(),
-        '/organiser-home': (context) =>
-            const OrganiserHomeScreen(),
-        '/admin-home': (context) =>
-            const AdminHomeScreen(),
-
-        // 👤 ORGANISER PROFILE
-        '/organiser-profile': (context) =>
-            const OrganiserProfileScreen(),
+            // 👤 ORGANISER PROFILE
+            '/organiser-profile': (context) =>
+                const OrganiserProfileScreen(),
+          },
+        );
       },
     );
   }

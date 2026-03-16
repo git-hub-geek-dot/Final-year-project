@@ -957,14 +957,18 @@ String _formatDateRange(Map event) {
 
   if (startDateRaw == null || startDateRaw.isEmpty) return 'N/A';
 
-  final startDate = startDateRaw.split('T')[0];
+  final startParsed = IstDateTime.tryParse(startDateRaw);
+  if (startParsed == null) return 'N/A';
+  final startDate = IstDateTime.formatDate(startParsed);
 
   // If no end date, show single date
   if (endDateRaw == null || endDateRaw.isEmpty) {
     return startDate;
   }
 
-  final endDate = endDateRaw.split('T')[0];
+  final endParsed = IstDateTime.tryParse(endDateRaw);
+  if (endParsed == null) return startDate;
+  final endDate = IstDateTime.formatDate(endParsed);
 
   // If dates are the same, show single date
   if (startDate == endDate) {

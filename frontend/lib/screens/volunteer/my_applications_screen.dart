@@ -251,7 +251,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
 
     final parsed = IstDateTime.tryParse(rawDate);
     if (parsed == null) {
-      return rawDate.split("T")[0];
+      return rawDate;
     }
 
     final day = parsed.day.toString().padLeft(2, "0");

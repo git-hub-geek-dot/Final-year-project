@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/saved_events_service.dart';
+import '../../utils/ist_date_time.dart';
 import 'view_event_screen.dart';
 
 class SavedEventsScreen extends StatefulWidget {
@@ -82,11 +83,9 @@ class _SavedEventsScreenState extends State<SavedEventsScreen> {
                         final event = savedEvents[index];
                         final title = event["title"] ?? "Unknown Event";
                         final location = event["location"] ?? "";
-                        final date = event["event_date"]
-                                ?.toString()
-                                .split("T")
-                                .first ??
-                            "";
+                        final formatted =
+                            IstDateTime.formatDate(event["event_date"]);
+                        final date = formatted == "-" ? "" : formatted;
 
                         return Card(
                           margin: const EdgeInsets.only(bottom: 12),

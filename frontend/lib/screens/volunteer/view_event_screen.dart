@@ -353,7 +353,7 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
               final text = """
 ${widget.event["title"]}
 Location: ${widget.event["location"]}
-Date: ${widget.event["event_date"].toString().split("T")[0]}
+Date: ${IstDateTime.formatDate(widget.event["event_date"])}
 
 
 Join on VolunteerX
@@ -681,14 +681,32 @@ Join on VolunteerX
       return const Center(child: CircularProgressIndicator());
     }
 
-    final computedStatus = widget.event["computed_status"]?.toString();
-    final status = widget.event["status"]?.toString();
-    final isCompleted = computedStatus == "completed" || _isPastEvent();
-    final isClosed = status != null && status != "open";
+    final rawComputed =
+        widget.event["computed_status"]?.toString().toLowerCase();
+    final rawStatus = widget.event["status"]?.toString().toLowerCase();
+    var eventStatus = (rawComputed ?? "").trim();
+    if (eventStatus.isEmpty) {
+      eventStatus = (rawStatus ?? "").trim();
+    }
+    if (eventStatus == "closed") eventStatus = "cancelled";
+    if (eventStatus == "deleted" || eventStatus == "deleted_by_admin") {
+      eventStatus = "removed";
+    }
 
-    if (applicationStatus == null && (isCompleted || isClosed)) {
-      final closedLabel =
-          isCompleted ? "Event completed" : "Applications closed";
+    final isCompleted = eventStatus == "completed" || _isPastEvent();
+    final isCancelled = eventStatus == "cancelled";
+    final isRemoved = eventStatus == "removed";
+    final isClosed = rawStatus != null && rawStatus != "open";
+
+    if (applicationStatus == null &&
+        (isCompleted || isCancelled || isRemoved || isClosed)) {
+      final closedLabel = isCompleted
+          ? "Event completed"
+          : isCancelled
+              ? "Event cancelled"
+              : isRemoved
+                  ? "Event removed"
+                  : "Applications closed";
       return SizedBox(
         height: 54,
         width: double.infinity,
@@ -1020,7 +1038,7 @@ Join on VolunteerX
                                           documentError = null;
                                         });
                                       } catch (e) {
-                                        if (!mounted) return;
+                                        if (!context.mounted) return;
                                         ScaffoldMessenger.of(context)
                                             .showSnackBar(
                                           SnackBar(
@@ -1144,7 +1162,8 @@ Join on VolunteerX
         // Multi-day: show day, date, and time on one line
         int dayNumber = 1;
         return dailySchedules.map<Widget>((schedule) {
-          final dateStr = schedule["date"]?.toString().split("T")[0] ?? "";
+          final rawDate = IstDateTime.formatDate(schedule["date"]);
+          final dateStr = rawDate == "-" ? "" : rawDate;
           final formattedDate = _formatDateToDDMMYYYY(dateStr);
           final startTime = _formatTime(schedule["start_time"]);
           final endTime = _formatTime(schedule["end_time"]);
@@ -1180,15 +1199,11 @@ Join on VolunteerX
 
   String _formatDateToDDMMYYYY(String dateStr) {
     if (dateStr.isEmpty) return "N/A";
-    try {
-      final parts = dateStr.split("-");
-      if (parts.length == 3) {
-        return "${parts[2]}/${parts[1]}/${parts[0]}"; // dd/mm/yyyy
-      }
-      return dateStr;
-    } catch (_) {
-      return dateStr;
-    }
+    final parsed = IstDateTime.tryParse(dateStr);
+    if (parsed == null) return dateStr;
+    final day = parsed.day.toString().padLeft(2, "0");
+    final month = parsed.month.toString().padLeft(2, "0");
+    return "$day/$month/${parsed.year}";
   }
 
   String _formatDateRange() {
@@ -1197,14 +1212,18 @@ Join on VolunteerX
 
     if (startDateRaw == null || startDateRaw.isEmpty) return "N/A";
 
-    final startDate = startDateRaw.split("T")[0];
+    final startParsed = IstDateTime.tryParse(startDateRaw);
+    if (startParsed == null) return "N/A";
+    final startDate = IstDateTime.formatDate(startParsed);
 
     // If no end date or same as start date, show single date
     if (endDateRaw == null || endDateRaw.isEmpty) {
       return startDate;
     }
 
-    final endDate = endDateRaw.split("T")[0];
+    final endParsed = IstDateTime.tryParse(endDateRaw);
+    if (endParsed == null) return startDate;
+    final endDate = IstDateTime.formatDate(endParsed);
 
     // If dates are the same, show single date
     if (startDate == endDate) {
@@ -1311,7 +1330,7 @@ Join on VolunteerX
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 18,
             offset: const Offset(0, 8),
           ),
@@ -1329,7 +1348,7 @@ Join on VolunteerX
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.12),
+              color: Colors.green.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, size: 16, color: Colors.green),
@@ -1366,8 +1385,8 @@ Join on VolunteerX
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            color.withOpacity(0.15),
-            color.withOpacity(0.25),
+            color.withValues(alpha: 0.15),
+            color.withValues(alpha: 0.25),
           ],
         ),
         borderRadius: BorderRadius.circular(30),
@@ -1399,8 +1418,8 @@ Join on VolunteerX
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              color.withOpacity(0.12),
-              color.withOpacity(0.22),
+              color.withValues(alpha: 0.12),
+              color.withValues(alpha: 0.22),
             ],
           ),
           borderRadius: BorderRadius.circular(30),
@@ -1485,7 +1504,7 @@ Join on VolunteerX
       await _loadVerificationStatus();
     }
 
-    if (!mounted) return;
+    if (!context.mounted) return;
 
     if (verificationStatus == null) {
       _snack("Couldn't verify your account status. Please try again.");

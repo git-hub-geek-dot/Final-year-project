@@ -10,6 +10,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.20.2
   image_picker: ^1.0.7
   share_plus: ^10.0.0
   fl_chart: ^0.66.2

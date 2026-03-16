@@ -266,12 +266,13 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: _getStatusColor(event["status"]),
+                          color: _eventStatusColor(
+                            _normalizedEventStatus(event),
+                          ),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          (event["status"] ?? "active")
-                              .toString()
+                          _eventStatusLabel(_normalizedEventStatus(event))
                               .toUpperCase(),
                           style: const TextStyle(
                             color: Colors.white,
@@ -511,20 +512,54 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
     );
   }
 
-  Color _getStatusColor(dynamic status) {
-    final s = status?.toString().toLowerCase() ?? "active";
-    switch (s) {
-      case "active":
+  String _normalizedEventStatus(Map event) {
+    final raw = (event["computed_status"] ?? event["status"] ?? "")
+        .toString()
+        .toLowerCase();
+    if (raw == "closed") return "cancelled";
+    if (raw == "deleted" || raw == "deleted_by_admin") {
+      return "deleted_by_admin";
+    }
+    return raw.isEmpty ? "open" : raw;
+  }
+
+  String _eventStatusLabel(String status) {
+    switch (status) {
+      case "upcoming":
+        return "Upcoming";
+      case "ongoing":
+        return "Ongoing";
+      case "completed":
+        return "Completed";
+      case "cancelled":
+        return "Cancelled";
+      case "deleted_by_admin":
+        return "Removed";
+      case "draft":
+        return "Draft";
+      case "open":
+      default:
+        return "Open";
+    }
+  }
+
+  Color _eventStatusColor(String status) {
+    switch (status) {
+      case "upcoming":
+        return Colors.blue;
+      case "ongoing":
       case "open":
         return Colors.green;
       case "completed":
-        return Colors.blue;
+        return Colors.grey;
       case "cancelled":
         return Colors.red;
-      case "deleted":
+      case "deleted_by_admin":
         return Colors.grey;
-      default:
+      case "draft":
         return Colors.orange;
+      default:
+        return Colors.blueGrey;
     }
   }
 

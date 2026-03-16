@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/event_service.dart';
+import '../../utils/ist_date_time.dart';
 import 'event_details_screen.dart';
 
 class MyEventsScreen extends StatefulWidget {
@@ -271,9 +272,9 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                                         ),
                                         const SizedBox(height: 8),
                                         Text(
-                                          event["event_date"]
-                                              .toString()
-                                              .split("T")[0],
+                                          IstDateTime.formatDate(
+                                            event["event_date"],
+                                          ),
                                           style: TextStyle(
                                             fontSize: 11,
                                             color: Colors.grey.shade600,

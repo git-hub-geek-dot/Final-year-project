@@ -82,11 +82,24 @@ const getEvents = async (req, res) => {
     const totalPages = Math.max(Math.ceil(total / limit), 1);
 
     const events = await pool.query(
-      `SELECT e.*, u.name AS organiser_name
-       FROM events e
-       JOIN users u ON e.organiser_id = u.id
-       ORDER BY e.id DESC
-       LIMIT $1 OFFSET $2`,
+      `
+      SELECT
+        e.*,
+        u.name AS organiser_name,
+        CASE
+          WHEN e.status = 'draft' THEN 'draft'
+          WHEN e.status = 'deleted' THEN 'deleted_by_admin'
+          WHEN e.status = 'closed' THEN 'cancelled'
+          WHEN NOW() < (e.event_date + COALESCE(e.start_time, TIME '00:00:00')) THEN 'upcoming'
+          WHEN NOW() BETWEEN (e.event_date + COALESCE(e.start_time, TIME '00:00:00'))
+                          AND (COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')) THEN 'ongoing'
+          ELSE 'completed'
+        END AS computed_status
+      FROM events e
+      JOIN users u ON e.organiser_id = u.id
+      ORDER BY e.id DESC
+      LIMIT $1 OFFSET $2
+      `,
       [limit, offset]
     );
 

@@ -287,7 +287,7 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -468,10 +468,10 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
       final relevantDate = endDate ?? startDate;
 
       final dateOnly = IstDateTime.startOfDay(relevantDate);
-      final isCompleted = event["computed_status"]?.toString() == "completed";
-      final isPast = dateOnly.isBefore(today) || isCompleted;
-      final isOngoing = dateOnly.isAtSameMomentAs(today) && !isCompleted;
-      final isUpcoming = dateOnly.isAfter(today) && !isCompleted;
+      final eventStatus = _normalizedEventStatus(event, dateOnly: dateOnly);
+      final isPast = _isPastStatus(eventStatus) || dateOnly.isBefore(today);
+      final isOngoing = eventStatus == "ongoing";
+      final isUpcoming = eventStatus == "upcoming";
 
       final appStatus = _applicationStatusForEvent(event) ??
           (event["application_status"] ??
@@ -483,11 +483,13 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
       final isApproved = appStatus == "approved" ||
           appStatus == "accepted" ||
           appStatus == "completed";
+      final isHistoryEligible =
+          isApproved || appStatus == "cancelled";
 
       final matchesTab = selectedTab == "all"
-          ? !isCompleted && appStatus != "rejected"
+          ? !_isPastStatus(eventStatus) && appStatus != "rejected"
           : selectedTab == "past"
-              ? isPast && isApproved
+              ? isPast && isHistoryEligible
               : selectedTab == "ongoing"
                   ? isOngoing && appStatus != "rejected"
                   : isUpcoming && appStatus != "rejected";
@@ -553,6 +555,76 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
     }
 
     return _SplitEvents(open: open, applied: applied);
+  }
+
+  String _normalizedEventStatus(Map<String, dynamic> event,
+      {DateTime? dateOnly}) {
+    final raw = (event["computed_status"] ?? event["status"] ?? "")
+        .toString()
+        .toLowerCase();
+    if (raw == "closed") return "cancelled";
+    if (raw == "deleted" || raw == "deleted_by_admin") {
+      return "deleted_by_admin";
+    }
+    if (raw.isEmpty || raw == "open" || raw == "draft") {
+      final fallbackDate = dateOnly ??
+          IstDateTime.startOfDay(
+            IstDateTime.tryParse(event["end_date"]?.toString() ?? "") ??
+                IstDateTime.tryParse(event["event_date"]?.toString() ?? "") ??
+                IstDateTime.now(),
+          );
+      final today = IstDateTime.startOfDay(IstDateTime.now());
+      if (fallbackDate.isBefore(today)) return "completed";
+      if (fallbackDate.isAtSameMomentAs(today)) return "ongoing";
+      return "upcoming";
+    }
+    return raw;
+  }
+
+  bool _isPastStatus(String status) {
+    return status == "completed" ||
+        status == "cancelled" ||
+        status == "deleted_by_admin";
+  }
+
+  String _eventStatusLabel(String status) {
+    switch (status) {
+      case "upcoming":
+        return "Upcoming";
+      case "ongoing":
+        return "Ongoing";
+      case "completed":
+        return "Completed";
+      case "cancelled":
+        return "Cancelled";
+      case "deleted_by_admin":
+        return "Removed";
+      case "draft":
+        return "Draft";
+      case "open":
+      default:
+        return "Open";
+    }
+  }
+
+  Color _eventStatusColor(String status) {
+    switch (status) {
+      case "upcoming":
+        return Colors.blue;
+      case "ongoing":
+      case "open":
+        return Colors.green;
+      case "completed":
+        return Colors.grey;
+      case "cancelled":
+        return Colors.red;
+      case "deleted_by_admin":
+        return Colors.grey;
+      case "draft":
+        return Colors.orange;
+      default:
+        return Colors.blueGrey;
+    }
   }
 
   Widget _sectionHeader(String title) {
@@ -633,10 +705,9 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
     final time =
         "${_formatTime(event["start_time"])} - ${_formatTime(event["end_time"])}";
     final progressLabel = _progressLabel(event);
-    final statusText = event["computed_status"]?.toString() == "completed"
-        ? "Completed"
-        : "Open";
-    final statusColor = statusText == "Open" ? Colors.green : Colors.grey;
+    final eventStatus = _normalizedEventStatus(event);
+    final statusText = _eventStatusLabel(eventStatus);
+    final statusColor = _eventStatusColor(eventStatus);
     final rawApplicationStatus = _applicationStatusForEvent(event) ??
         (event["application_status"] ??
                 event["applicationStatus"] ??
@@ -646,7 +717,7 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
             .toLowerCase();
 
     final isPastTab = selectedTab == "past";
-    final isClosed = statusText == "Completed";
+    final isClosed = _isPastStatus(eventStatus);
     final actionState = _actionState(rawApplicationStatus, isPastTab, isClosed);
 
     return GestureDetector(
@@ -667,7 +738,7 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 10,
               offset: const Offset(0, 6),
             ),
@@ -699,7 +770,7 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: statusColor.withOpacity(0.15),
+                          color: statusColor.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Row(
@@ -843,7 +914,7 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Text(

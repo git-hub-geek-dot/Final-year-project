@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import '../../services/event_service.dart';
+import '../../utils/ist_date_time.dart';
 
 class OrganiserActivityScreen extends StatefulWidget {
   const OrganiserActivityScreen({super.key});
@@ -83,10 +84,9 @@ class _OrganiserActivityScreenState extends State<OrganiserActivityScreen>
   }
 
   String _dateText(dynamic value) {
-    if (value == null) return "Date not set";
-    final text = value.toString();
-    if (text.isEmpty) return "Date not set";
-    return text.split("T")[0];
+    final formatted = IstDateTime.formatDate(value);
+    if (formatted == "-" || formatted.isEmpty) return "Date not set";
+    return formatted;
   }
 
   @override

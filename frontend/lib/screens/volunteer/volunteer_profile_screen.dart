@@ -8,6 +8,8 @@ import '../../services/token_service.dart';
 import '../../services/verification_service.dart';
 import '../../services/rating_service.dart';
 import '../auth/login_screen.dart';
+import '../../localization/locale_controller.dart';
+import '../../localization/localization_extensions.dart';
 
 import 'edit_profile_screen.dart';
 import 'my_applications_screen.dart';
@@ -513,8 +515,7 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
     _handlingUnauthorized = true;
 
     await TokenService.clearToken();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    await LocaleController.clearAllPreserveLocale();
 
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(
@@ -527,8 +528,7 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
   /// ================= LOGOUT =================
   Future<void> logout() async {
     await TokenService.clearToken();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    await LocaleController.clearAllPreserveLocale();
 
     if (!mounted) return;
 
@@ -754,8 +754,8 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
       Navigator.pop(context);
 
       if (response.statusCode == 200) {
-        await prefs.clear();
         await TokenService.clearToken();
+        await LocaleController.clearAllPreserveLocale();
 
         if (!context.mounted) return;
 
@@ -1085,6 +1085,7 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
                                 );
                               },
                             ),
+                            _languageTile(),
                             _tile(
                               Icons.help_outline,
                               "Help & Support",
@@ -1132,6 +1133,44 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
         leading: Icon(icon, color: color),
         title: Text(title),
         onTap: onTap,
+      ),
+    );
+  }
+
+  Widget _languageTile() {
+    final currentLang =
+        LocaleController.locale.value?.languageCode ??
+        Localizations.localeOf(context).languageCode;
+    final selected = currentLang == 'hi' ? 'hi' : 'en';
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ListTile(
+        leading: const Icon(Icons.language),
+        title: Text(context.tr("App Language")),
+        subtitle: Text(
+          selected == 'hi'
+              ? context.tr("Hindi")
+              : context.tr("English"),
+        ),
+        trailing: DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            value: selected,
+            items: [
+              DropdownMenuItem(
+                value: 'en',
+                child: Text(context.tr("English")),
+              ),
+              DropdownMenuItem(
+                value: 'hi',
+                child: Text(context.tr("Hindi")),
+              ),
+            ],
+            onChanged: (value) {
+              if (value == null) return;
+              LocaleController.setLocale(Locale(value));
+            },
+          ),
+        ),
       ),
     );
   }

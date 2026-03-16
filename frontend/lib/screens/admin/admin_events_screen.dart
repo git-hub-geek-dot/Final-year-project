@@ -19,8 +19,7 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
   bool loading = true;
   String? errorMessage;
   String search = "";
-  String sortField = "event_date"; // title | status | event_date
-  bool sortAsc = true;
+  String statusFilter = "all"; // all | upcoming | ongoing | completed | cancelled | removed | draft
 
   @override
   void initState() {
@@ -163,12 +162,17 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
                 : Builder(
                     builder: (context) {
                       final filtered = events.where((e) {
-                        return e["title"]
-                            .toString()
-                            .toLowerCase()
-                            .contains(search.toLowerCase());
-                      }).toList()
-                        ..sort((a, b) => _compareEvents(a, b));
+                        final title = e["title"].toString().toLowerCase();
+                        final matchesSearch = title.contains(search.toLowerCase());
+                        if (!matchesSearch) return false;
+
+                        if (statusFilter == "all") return true;
+                        final eventStatus = _normalizedEventStatus(e);
+                        if (statusFilter == "removed") {
+                          return eventStatus == "deleted_by_admin";
+                        }
+                        return eventStatus == statusFilter;
+                      }).toList();
 
                       return Column(
                         children: [
@@ -184,32 +188,19 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
                           ),
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 8),
-                            child: Row(
-                              children: [
-                                DropdownButton<String>(
-                                  value: sortField,
-                                  items: const [
-                                    DropdownMenuItem(
-                                        value: "event_date",
-                                        child: Text("Event Date")),
-                                    DropdownMenuItem(
-                                        value: "title", child: Text("Title")),
-                                    DropdownMenuItem(
-                                        value: "status", child: Text("Status")),
-                                  ],
-                                  onChanged: (v) =>
-                                      setState(() => sortField = v!),
-                                ),
-                                IconButton(
-                                  icon: Icon(
-                                    sortAsc
-                                        ? Icons.arrow_upward
-                                        : Icons.arrow_downward,
-                                  ),
-                                  onPressed: () =>
-                                      setState(() => sortAsc = !sortAsc),
-                                ),
-                              ],
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [
+                                  _statusChip("All", "all"),
+                                  _statusChip("Upcoming", "upcoming"),
+                                  _statusChip("Ongoing", "ongoing"),
+                                  _statusChip("Completed", "completed"),
+                                  _statusChip("Cancelled", "cancelled"),
+                                  _statusChip("Removed", "removed"),
+                                  _statusChip("Draft", "draft"),
+                                ],
+                              ),
                             ),
                           ),
                           Expanded(
@@ -219,8 +210,14 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
                                     itemCount: filtered.length,
                                     itemBuilder: (context, i) {
                                       final event = filtered[i];
+                                      final eventStatus =
+                                          _normalizedEventStatus(event);
+                                      final statusLabel =
+                                          _eventStatusLabel(eventStatus);
+                                      final statusColor =
+                                          _eventStatusColor(eventStatus);
                                       final isDeleted =
-                                          event["status"] == "deleted";
+                                          eventStatus == "deleted_by_admin";
 
                                       return Opacity(
                                         opacity: isDeleted ? 0.4 : 1.0,
@@ -269,34 +266,33 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
                                                           ),
                                                         ),
                                                       ),
-                                                      if (isDeleted)
-                                                        Container(
-                                                          padding:
-                                                              const EdgeInsets
-                                                                  .symmetric(
-                                                                  horizontal: 8,
-                                                                  vertical: 4),
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: Colors
-                                                                .red.shade100,
-                                                            borderRadius:
-                                                                BorderRadius
-                                                                    .circular(
-                                                                        12),
-                                                          ),
-                                                          child: Text(
-                                                            "DELETED",
-                                                            style: TextStyle(
-                                                              fontSize: 10,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .bold,
-                                                              color: Colors
-                                                                  .red.shade700,
-                                                            ),
+                                                      Container(
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                                horizontal: 8,
+                                                                vertical: 4),
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color: statusColor
+                                                              .withValues(
+                                                                  alpha: 0.15),
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(
+                                                                      12),
+                                                        ),
+                                                        child: Text(
+                                                          statusLabel
+                                                              .toUpperCase(),
+                                                          style: TextStyle(
+                                                            fontSize: 10,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            color: statusColor,
                                                           ),
                                                         ),
+                                                      ),
                                                     ],
                                                   ),
                                                   const SizedBox(height: 8),
@@ -402,28 +398,78 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
     }
   }
 
-  int _compareEvents(Map a, Map b) {
-    int result;
-    switch (sortField) {
-      case "title":
-        result = (a["title"] ?? "")
-            .toString()
-            .toLowerCase()
-            .compareTo((b["title"] ?? "").toString().toLowerCase());
-        break;
-      case "status":
-        result = (a["status"] ?? "")
-            .toString()
-            .compareTo((b["status"] ?? "").toString());
-        break;
-      case "event_date":
-      default:
-        final aDate = IstDateTime.tryParse((a["event_date"] ?? "").toString());
-        final bDate = IstDateTime.tryParse((b["event_date"] ?? "").toString());
-        result = (aDate ?? DateTime(1970)).compareTo(bDate ?? DateTime(1970));
-        break;
+  String _normalizedEventStatus(Map event) {
+    final raw = (event["computed_status"] ?? event["status"] ?? "")
+        .toString()
+        .toLowerCase();
+    if (raw == "closed") return "cancelled";
+    if (raw == "deleted" || raw == "deleted_by_admin") {
+      return "deleted_by_admin";
     }
+    return raw.isEmpty ? "open" : raw;
+  }
 
-    return sortAsc ? result : -result;
+  Widget _statusChip(String label, String value) {
+    final selected = statusFilter == value;
+    final displayValue = value == "removed" ? "deleted_by_admin" : value;
+    final color = _eventStatusColor(displayValue);
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8, bottom: 6),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: selected,
+        selectedColor: color.withValues(alpha: 0.18),
+        backgroundColor: Colors.white,
+        labelStyle: TextStyle(
+          color: selected ? color : Colors.black87,
+          fontWeight: FontWeight.w600,
+        ),
+        side: BorderSide(
+          color: selected ? color : Colors.black12,
+        ),
+        onSelected: (_) => setState(() => statusFilter = value),
+      ),
+    );
+  }
+
+  String _eventStatusLabel(String status) {
+    switch (status) {
+      case "upcoming":
+        return "Upcoming";
+      case "ongoing":
+        return "Ongoing";
+      case "completed":
+        return "Completed";
+      case "cancelled":
+        return "Cancelled";
+      case "deleted_by_admin":
+        return "Removed";
+      case "draft":
+        return "Draft";
+      case "open":
+      default:
+        return "Open";
+    }
+  }
+
+  Color _eventStatusColor(String status) {
+    switch (status) {
+      case "upcoming":
+        return Colors.blue;
+      case "ongoing":
+      case "open":
+        return Colors.green;
+      case "completed":
+        return Colors.grey;
+      case "cancelled":
+        return Colors.red;
+      case "deleted_by_admin":
+        return Colors.grey;
+      case "draft":
+        return Colors.orange;
+      default:
+        return Colors.blueGrey;
+    }
   }
 }

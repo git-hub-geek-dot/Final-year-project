@@ -13,6 +13,7 @@ import '../../services/token_service.dart';
 import '../../services/notification_api_service.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/ist_date_time.dart';
+import '../../localization/localization_extensions.dart';
 import '../chat/chat_inbox_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../../widgets/robust_image.dart';
@@ -308,16 +309,21 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                "Hi, ${(userName ?? "Volunteer").trim()}!",
+                context.tr(
+                  "Hi, {name}!",
+                  args: {
+                    "name": (userName ?? context.tr("Volunteer")).trim(),
+                  },
+                ),
                 style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 4),
-              const Text(
-                "Find your next volunteer event",
-                style: TextStyle(color: Colors.black54),
+              Text(
+                context.tr("Find your next volunteer event"),
+                style: const TextStyle(color: Colors.black54),
               ),
             ],
           ),
@@ -335,7 +341,9 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      isOngoing ? "My Ongoing Events" : "My Upcoming Events",
+                      isOngoing
+                          ? context.tr("My Ongoing Events")
+                          : context.tr("My Upcoming Events"),
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -350,18 +358,18 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: AppColors.primaryBlue.withOpacity(0.15),
+                      color: AppColors.primaryBlue.withValues(alpha: 0.15),
                     ),
                   ),
                   child: Row(
                     children: [
                       _timelineSegment(
-                        label: "Upcoming",
+                        label: context.tr("Upcoming"),
                         value: "upcoming",
                         count: upcomingAccepted.length,
                       ),
                       _timelineSegment(
-                        label: "Ongoing",
+                        label: context.tr("Ongoing"),
                         value: "ongoing",
                         count: ongoingAccepted.length,
                       ),
@@ -377,8 +385,8 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
               null,
               key: _upcomingCardKey,
               emptyLabel: isOngoing
-                  ? "No ongoing events yet"
-                  : "No upcoming events yet",
+                  ? context.tr("No ongoing events yet")
+                  : context.tr("No upcoming events yet"),
             ),
           ...primaryPreview.asMap().entries.map(
                 (entry) => _upcomingEventCard(
@@ -394,7 +402,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                   eventsTab = isOngoing ? "ongoing" : "upcoming";
                   selectedIndex = 1;
                 }),
-                child: const Text("View All"),
+                child: Text(context.tr("View All")),
               ),
             ),
           const SizedBox(height: 16),
@@ -403,15 +411,19 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  "Recommended for You",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                Text(
+                  context.tr("Recommended for You"),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 8),
-          if (recommended.isEmpty) const Text("No recommendations available"),
+          if (recommended.isEmpty)
+            Text(context.tr("No recommendations available")),
           ...recommendedPreview.asMap().entries.map(
                 (entry) => _recommendedCard(
                   entry.value,
@@ -421,11 +433,11 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
           if (showRecommendedViewAll)
             Align(
               alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () => setState(() => selectedIndex = 1),
-                child: const Text("View All"),
+                child: TextButton(
+                  onPressed: () => setState(() => selectedIndex = 1),
+                  child: Text(context.tr("View All")),
+                ),
               ),
-            ),
         ],
       ),
     );
@@ -606,7 +618,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     if (eventId == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Event details not available")),
+        SnackBar(content: Text(context.tr("Event details not available"))),
       );
       return;
     }
@@ -637,22 +649,29 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Failed to open event details")),
+        SnackBar(content: Text(context.tr("Failed to open event details"))),
       );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Failed to open event details")),
+        SnackBar(content: Text(context.tr("Failed to open event details"))),
       );
     }
   }
 
   Widget _pendingRatingReminderCard(List<Map<String, dynamic>> pendingRatings) {
     final count = pendingRatings.length;
-    final firstTitle = (pendingRatings.first["title"] ?? "event").toString();
+    final firstTitle =
+        (pendingRatings.first["title"] ?? context.tr("event")).toString();
     final subtitle = count == 1
-        ? "Share your feedback for $firstTitle."
-        : "$count completed events are waiting for your rating.";
+        ? context.tr(
+            "Share your feedback for {event}.",
+            args: {"event": firstTitle},
+          )
+        : context.tr(
+            "{count} completed events are waiting for your rating.",
+            args: {"count": count.toString()},
+          );
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -669,9 +688,9 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  "Pending Rating Reminder",
-                  style: TextStyle(
+                Text(
+                  context.tr("Pending Rating Reminder"),
+                  style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF7C2D12),
                   ),
@@ -689,7 +708,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
           ),
           TextButton(
             onPressed: () => _openPendingRatingEvent(pendingRatings.first),
-            child: const Text("Rate now"),
+            child: Text(context.tr("Rate now")),
           ),
         ],
       ),
@@ -823,9 +842,11 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
   Widget _upcomingEventCard(
     Map<String, dynamic>? event, {
     Key? key,
-    String emptyLabel = "No upcoming events yet",
+    String? emptyLabel,
   }) {
     if (event == null) {
+      final resolvedLabel =
+          emptyLabel ?? context.tr("No upcoming events yet");
       return Container(
         key: key,
         padding: const EdgeInsets.all(16),
@@ -834,13 +855,13 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 12,
               offset: const Offset(0, 6),
             ),
           ],
         ),
-        child: Text(emptyLabel),
+        child: Text(resolvedLabel),
       );
     }
 
@@ -872,7 +893,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
+              color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 12,
               offset: const Offset(0, 8),
             ),
@@ -935,7 +956,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                 _eventImage(event["banner_url"]?.toString()),
                 const SizedBox(height: 12),
                 _gradientButton(
-                  label: "View Details",
+                  label: context.tr("View Details"),
                   onTap: () async {
                     await Navigator.push(
                       context,
@@ -1005,7 +1026,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 10,
               offset: const Offset(0, 6),
             ),
@@ -1141,7 +1162,13 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
       "volunteers_filled",
     ]);
     if (filled != null) {
-      return "$filled/$required approved";
+      return context.tr(
+        "{filled}/{required} approved",
+        args: {
+          "filled": filled.toString(),
+          "required": required.toString(),
+        },
+      );
     }
 
     final applied = _readIntFromKeys(event, [
@@ -1151,32 +1178,42 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
       "total_applications",
     ]);
     final fallback = applied ?? 0;
-    return "$fallback/$required approved";
+    return context.tr(
+      "{filled}/{required} approved",
+      args: {
+        "filled": fallback.toString(),
+        "required": required.toString(),
+      },
+    );
   }
 
   _ActionState _actionState(String? status) {
     final normalized = status?.toLowerCase() ?? "";
     if (normalized == "pending") {
-      return _ActionState("Pending", false, Colors.orange);
+      return _ActionState(context.tr("Pending"), false, Colors.orange);
     }
     if (normalized == "accepted" || normalized == "approved") {
-      return _ActionState("Approved", false, Colors.green);
+      return _ActionState(context.tr("Approved"), false, Colors.green);
     }
     if (normalized == "rejected") {
-      return _ActionState("Rejected", false, Colors.red);
+      return _ActionState(context.tr("Rejected"), false, Colors.red);
     }
     if (normalized == "cancelled") {
-      return _ActionState("Cancelled", false, Colors.red);
+      return _ActionState(context.tr("Cancelled"), false, Colors.red);
     }
 
-    return _ActionState("Apply", true, const Color(0xFF2ECC71));
+    return _ActionState(
+      context.tr("Apply"),
+      true,
+      const Color(0xFF2ECC71),
+    );
   }
 
   Widget _statusPill(String label, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Text(
@@ -1259,8 +1296,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     final startParsed = IstDateTime.tryParse(startDateRaw);
     if (startParsed == null) return "";
 
-    final startFormatted =
-        "${startParsed.day.toString().padLeft(2, "0")} ${_monthName(startParsed.month)} ${startParsed.year}";
+    final startFormatted = IstDateTime.formatDate(startParsed);
 
     // If no end date, show single date
     if (endDateRaw == null || endDateRaw.isEmpty) {
@@ -1281,8 +1317,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     }
 
     // Show date range for multi-day events
-    final endFormatted =
-        "${endParsed.day.toString().padLeft(2, "0")} ${_monthName(endParsed.month)} ${endParsed.year}";
+    final endFormatted = IstDateTime.formatDate(endParsed);
     return "$startFormatted - $endFormatted";
   }
 
@@ -1290,24 +1325,6 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     final text = rawTime?.toString() ?? "";
     if (text.isEmpty) return "";
     return text.substring(0, 5);
-  }
-
-  String _monthName(int month) {
-    const months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
-    return months[month - 1];
   }
 
   Widget _timelineSegment({
@@ -1347,8 +1364,8 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: selected
-                      ? Colors.white.withOpacity(0.2)
-                      : AppColors.primaryBlue.withOpacity(0.12),
+                      ? Colors.white.withValues(alpha: 0.2)
+                      : AppColors.primaryBlue.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -1477,14 +1494,23 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
               unselectedItemColor: Colors.white70,
               selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700),
               onTap: (i) => setState(() => selectedIndex = i),
-              items: const [
-                BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
+              items: [
                 BottomNavigationBarItem(
-                    icon: Icon(Icons.event), label: "Events"),
+                  icon: const Icon(Icons.home),
+                  label: context.tr("Home"),
+                ),
                 BottomNavigationBarItem(
-                    icon: Icon(Icons.leaderboard), label: "Leaderboard"),
+                  icon: const Icon(Icons.event),
+                  label: context.tr("Events"),
+                ),
                 BottomNavigationBarItem(
-                    icon: Icon(Icons.person), label: "Profile"),
+                  icon: const Icon(Icons.leaderboard),
+                  label: context.tr("Leaderboard"),
+                ),
+                BottomNavigationBarItem(
+                  icon: const Icon(Icons.person),
+                  label: context.tr("Profile"),
+                ),
               ],
             ),
           ),

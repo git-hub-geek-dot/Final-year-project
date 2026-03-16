@@ -8,6 +8,8 @@ import '../../services/token_service.dart';
 import '../../services/verification_service.dart';
 import '../../services/rating_service.dart';
 import '../../widgets/organiser_bottom_nav.dart';
+import '../../localization/locale_controller.dart';
+import '../../localization/localization_extensions.dart';
 import 'account_settings_screen.dart';
 import 'about_volunteerx_screen.dart';
 import 'edit_profile_screen.dart';
@@ -462,8 +464,8 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
       Navigator.pop(context);
 
       if (response.statusCode == 200) {
-        await prefs.clear();
         await TokenService.clearToken();
+        await LocaleController.clearAllPreserveLocale();
 
         if (!context.mounted) return;
 
@@ -746,18 +748,19 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
                               },
                             ),
                             _profileOption(
-  context: context,
-  icon: Icons.dashboard,
-  text: "Organisation Activity",
-  onTap: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const OrganiserActivityScreen(),
-      ),
-    );
-  },
-),
+                              context: context,
+                              icon: Icons.dashboard,
+                              text: "Organisation Activity",
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const OrganiserActivityScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                            _languageOption(context),
 
                             _profileOption(
                               context: context,
@@ -826,8 +829,7 @@ Widget _profileOption({
     onTap: () async {
       if (isLogout) {
         await TokenService.clearToken();
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.clear();
+        await LocaleController.clearAllPreserveLocale();
 
         Navigator.pushNamedAndRemoveUntil(
           context,
@@ -872,6 +874,70 @@ Widget _profileOption({
           const Icon(Icons.arrow_forward_ios, size: 14),
         ],
       ),
+    ),
+  );
+}
+
+Widget _languageOption(BuildContext context) {
+  final currentLang = LocaleController.locale.value?.languageCode ??
+      Localizations.localeOf(context).languageCode;
+  final selected = currentLang == 'hi' ? 'hi' : 'en';
+
+  return Container(
+    margin: const EdgeInsets.only(bottom: 12),
+    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.grey.shade200,
+          blurRadius: 6,
+        ),
+      ],
+    ),
+    child: Row(
+      children: [
+        const Icon(Icons.language, color: Colors.grey),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                context.tr("App Language"),
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                selected == 'hi'
+                    ? context.tr("Hindi")
+                    : context.tr("English"),
+                style: const TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+        DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            value: selected,
+            items: [
+              DropdownMenuItem(
+                value: 'en',
+                child: Text(context.tr("English")),
+              ),
+              DropdownMenuItem(
+                value: 'hi',
+                child: Text(context.tr("Hindi")),
+              ),
+            ],
+            onChanged: (value) {
+              if (value == null) return;
+              LocaleController.setLocale(Locale(value));
+            },
+          ),
+        ),
+      ],
     ),
   );
 }

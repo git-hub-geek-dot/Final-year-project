@@ -110,8 +110,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
     if (schedules is List && schedules.isNotEmpty) {
       for (int i = 0; i < schedules.length; i++) {
         final schedule = schedules[i];
+        final formattedDate = IstDateTime.formatDate(schedule["date"]);
         dailySchedules.add({
-          'date': schedule["date"]?.toString().split("T")[0] ?? "",
+          'date': formattedDate == "-" ? "" : formattedDate,
           'start_time': schedule["start_time"]?.toString() ?? "09:00:00",
           'end_time': schedule["end_time"]?.toString() ?? "17:00:00",
           'dayNumber': i + 1,

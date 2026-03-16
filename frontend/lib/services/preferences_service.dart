@@ -1,4 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import '../localization/locale_controller.dart';
 
 class PreferencesService {
   static const _newApplicationsKey = 'pref_new_applications';
@@ -40,7 +41,6 @@ class PreferencesService {
 
   // 🔥 CLEAR ALL DATA (USED FOR DELETE ACCOUNT / LOGOUT)
   static Future<void> clearAll() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    await LocaleController.clearAllPreserveLocale();
   }
 }

@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:frontend/services/user_service.dart';
+import '../../localization/localization_extensions.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -273,8 +274,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         if (!_isAllowedProfileImage(pickedFile)) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Only JPG, JPEG, PNG, and WEBP images are allowed"),
+            SnackBar(
+              content: Text(
+                context.tr(
+                  "Only JPG, JPEG, PNG, and WEBP images are allowed",
+                ),
+              ),
             ),
           );
           return;
@@ -283,8 +288,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         if (bytes.length > _maxProfileImageBytes) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Image must be 5 MB or smaller"),
+            SnackBar(
+              content: Text(context.tr("Image must be 5 MB or smaller")),
             ),
           );
           return;
@@ -310,7 +315,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error picking image: $e")),
+        SnackBar(
+          content: Text(
+            context.tr(
+              "Error picking image: {error}",
+              args: {"error": e.toString()},
+            ),
+          ),
+        ),
       );
     }
   }
@@ -338,7 +350,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           previousUrl: previousUrl,
         );
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Token not found. Please login again.")),
+          SnackBar(
+            content: Text(context.tr("Token not found. Please login again.")),
+          ),
         );
         return;
       }
@@ -356,7 +370,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Profile picture updated successfully")),
+          SnackBar(
+            content: Text(
+              context.tr("Profile picture updated successfully"),
+            ),
+          ),
         );
       } else {
         _restoreProfileImagePreview(
@@ -365,7 +383,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           previousUrl: previousUrl,
         );
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Failed to upload image")),
+          SnackBar(content: Text(context.tr("Failed to upload image"))),
         );
       }
     } catch (e) {
@@ -376,7 +394,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         previousUrl: previousUrl,
       );
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
+        SnackBar(
+          content: Text(
+            context.tr(
+              "Error: {error}",
+              args: {"error": e.toString()},
+            ),
+          ),
+        ),
       );
     }
   }
@@ -386,16 +411,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Remove Profile Picture"),
-        content: const Text("Are you sure you want to remove your profile picture?"),
+        title: Text(context.tr("Remove Profile Picture")),
+        content: Text(
+          context.tr(
+            "Are you sure you want to remove your profile picture?",
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
+            child: Text(context.tr("Cancel")),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text("Remove", style: TextStyle(color: Colors.red)),
+            child: Text(
+              context.tr("Remove"),
+              style: const TextStyle(color: Colors.red),
+            ),
           ),
         ],
       ),
@@ -414,7 +446,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (token == null || token.isEmpty) {
         setState(() => isUploadingImage = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Token not found. Please login again.")),
+          SnackBar(
+            content: Text(context.tr("Token not found. Please login again.")),
+          ),
         );
         return;
       }
@@ -434,19 +468,30 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Profile picture removed successfully")),
+          SnackBar(
+            content: Text(
+              context.tr("Profile picture removed successfully"),
+            ),
+          ),
         );
       } else {
         setState(() => isUploadingImage = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Failed to remove picture")),
+          SnackBar(content: Text(context.tr("Failed to remove picture"))),
         );
       }
     } catch (e) {
       if (!mounted) return;
       setState(() => isUploadingImage = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
+        SnackBar(
+          content: Text(
+            context.tr(
+              "Error: {error}",
+              args: {"error": e.toString()},
+            ),
+          ),
+        ),
       );
     }
   }
@@ -502,7 +547,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Name cannot be empty")),
+        SnackBar(content: Text(context.tr("Name cannot be empty"))),
       );
       return;
     }
@@ -518,7 +563,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (token == null || token.isEmpty) {
         setState(() => isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Token not found. Please login again.")),
+          SnackBar(
+            content: Text(context.tr("Token not found. Please login again.")),
+          ),
         );
         return;
       }
@@ -550,13 +597,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
         if (!preferencesSaved) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Profile updated, but preferences failed")),
+            SnackBar(
+              content: Text(
+                context.tr("Profile updated, but preferences failed"),
+              ),
+            ),
           );
           return;
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Profile updated successfully")),
+          SnackBar(content: Text(context.tr("Profile updated successfully"))),
         );
 
         Navigator.pop(context, true);
@@ -564,14 +615,28 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         if (!mounted) return;
         setState(() => isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Update failed: ${response.body}")),
+          SnackBar(
+            content: Text(
+              context.tr(
+                "Update failed: {message}",
+                args: {"message": response.body},
+              ),
+            ),
+          ),
         );
       }
     } catch (e) {
       if (!mounted) return;
       setState(() => isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
+        SnackBar(
+          content: Text(
+            context.tr(
+              "Error: {error}",
+              args: {"error": e.toString()},
+            ),
+          ),
+        ),
       );
     }
   }
@@ -601,9 +666,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       appBar: AppBar(
         elevation: 0,
         backgroundColor: const Color(0xFF2E6BE6),
-        title: const Text(
-          "Edit Profile",
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          context.tr("Edit Profile"),
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -663,7 +728,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       GestureDetector(
                         onTap: isUploadingImage ? null : _pickImageFromGallery,
                         child: Text(
-                          "Change Profile Picture",
+                          context.tr("Change Profile Picture"),
                           style: TextStyle(
                             color: isUploadingImage ? Colors.grey : const Color(0xFF2E6BE6),
                             fontWeight: FontWeight.w600,
@@ -676,7 +741,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         GestureDetector(
                           onTap: isUploadingImage ? null : _removeProfilePicture,
                           child: Text(
-                            "Remove",
+                            context.tr("Remove"),
                             style: TextStyle(
                               color: isUploadingImage ? Colors.grey : Colors.red,
                               fontWeight: FontWeight.w600,
@@ -689,47 +754,47 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   const SizedBox(height: 30),
 
                   _inputField(
-                    label: "Full Name",
+                    label: context.tr("Full Name"),
                     icon: Icons.person,
                     controller: nameController,
                   ),
 
                   _inputField(
-                    label: "Email",
+                    label: context.tr("Email"),
                     icon: Icons.email,
                     controller: emailController,
                     enabled: false,
                   ),
 
                   _inputField(
-                    label: "City (Optional)",
+                    label: context.tr("City (Optional)"),
                     icon: Icons.location_on,
                     controller: cityController,
                   ),
 
                   _inputField(
-                    label: "Contact Number (Optional)",
+                    label: context.tr("Contact Number (Optional)"),
                     icon: Icons.phone,
                     controller: contactController,
                     keyboardType: TextInputType.phone,
                   ),
 
                   _chipInputField(
-                    label: "Skills",
+                    label: context.tr("Skills"),
                     icon: Icons.auto_awesome,
                     controller: skillsController,
                     items: _skills,
-                    hintText: "Add skill",
+                    hintText: context.tr("Add skill"),
                     onAdd: () => _addItem(skillsController, _skills),
                     onRemove: (value) => _removeItem(_skills, value),
                   ),
 
                   _chipInputField(
-                    label: "Interests",
+                    label: context.tr("Interests"),
                     icon: Icons.favorite_border,
                     controller: interestsController,
                     items: _interests,
-                    hintText: "Add interest",
+                    hintText: context.tr("Add interest"),
                     onAdd: () => _addItem(interestsController, _interests),
                     onRemove: (value) => _removeItem(_interests, value),
                   ),
@@ -749,7 +814,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                       child: Center(
                         child: Text(
-                          isLoading ? "Saving..." : "Save Changes",
+                          isLoading
+                              ? context.tr("Saving...")
+                              : context.tr("Save Changes"),
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
@@ -845,9 +912,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           ),
           const SizedBox(height: 10),
           if (items.isEmpty)
-            const Text(
-              "No items added",
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+            Text(
+              context.tr("No items added"),
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
             )
           else
             Wrap(

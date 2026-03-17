@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/event_service.dart';
 import '../../utils/ist_date_time.dart';
 import 'event_details_screen.dart';
+import '../../localization/localization_extensions.dart';
 
 class MyEventsScreen extends StatefulWidget {
   const MyEventsScreen({super.key});
@@ -34,7 +35,7 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
     } catch (e) {
       setState(() => loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Failed to load events")),
+        SnackBar(content: Text(context.tr("Failed to load events"))),
       );
     }
   }
@@ -53,19 +54,19 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
   String _statusLabel(String status) {
     switch (status) {
       case "upcoming":
-        return "UPCOMING";
+        return "Upcoming";
       case "ongoing":
-        return "ONGOING";
+        return "Ongoing";
       case "draft":
-        return "DRAFT";
+        return "Draft";
       case "cancelled":
-        return "CANCELLED";
+        return "Cancelled";
       case "completed":
-        return "COMPLETED";
+        return "Completed";
       case "deleted_by_admin":
-        return "REMOVED";
+        return "Removed";
       default:
-        return status.toUpperCase();
+        return status;
     }
   }
 
@@ -115,7 +116,7 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("My Events"),
+        title: Text(context.tr("My Events")),
         backgroundColor: const Color(0xFF3B82F6),
         elevation: 0,
       ),
@@ -141,12 +142,24 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          _statCard("${stats['total']}", "Total"),
-                          _statCard("${stats['draft']}", "Draft"),
-                          _statCard("${stats['cancelled']}", "Cancelled"),
-                          _statCard("${stats['upcoming']}", "Upcoming"),
-                          _statCard("${stats['ongoing']}", "Ongoing"),
-                          _statCard("${stats['completed']}", "Completed"),
+                          _statCard("${stats['total']}", context.tr("Total")),
+                          _statCard("${stats['draft']}", context.tr("Draft")),
+                          _statCard(
+                            "${stats['cancelled']}",
+                            context.tr("Cancelled"),
+                          ),
+                          _statCard(
+                            "${stats['upcoming']}",
+                            context.tr("Upcoming"),
+                          ),
+                          _statCard(
+                            "${stats['ongoing']}",
+                            context.tr("Ongoing"),
+                          ),
+                          _statCard(
+                            "${stats['completed']}",
+                            context.tr("Completed"),
+                          ),
                         ],
                       ),
                     ),
@@ -161,7 +174,7 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                         onChanged: (value) =>
                             setState(() => _searchQuery = value.toLowerCase()),
                         decoration: InputDecoration(
-                          hintText: "Search events...",
+                          hintText: context.tr("Search events..."),
                           prefixIcon: const Icon(Icons.search),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -179,17 +192,17 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                         scrollDirection: Axis.horizontal,
                         child: Row(
                           children: [
-                            _filterTab("All", 0),
+                            _filterTab(context.tr("All"), 0),
                             const SizedBox(width: 8),
-                            _filterTab("Draft", 1),
+                            _filterTab(context.tr("Draft"), 1),
                             const SizedBox(width: 8),
-                            _filterTab("Cancelled", 2),
+                            _filterTab(context.tr("Cancelled"), 2),
                             const SizedBox(width: 8),
-                            _filterTab("Upcoming", 3),
+                            _filterTab(context.tr("Upcoming"), 3),
                             const SizedBox(width: 8),
-                            _filterTab("Ongoing", 4),
+                            _filterTab(context.tr("Ongoing"), 4),
                             const SizedBox(width: 8),
-                            _filterTab("Completed", 5),
+                            _filterTab(context.tr("Completed"), 5),
                           ],
                         ),
                       ),
@@ -203,7 +216,7 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 40),
                           child: Text(
-                            "No events found",
+                            context.tr("No events found"),
                             style: TextStyle(color: Colors.grey.shade600),
                           ),
                         ),
@@ -262,7 +275,7 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                                                 BorderRadius.circular(6),
                                           ),
                                           child: Text(
-                                            _statusLabel(status),
+                                            context.tr(_statusLabel(status)),
                                             style: TextStyle(
                                               fontSize: 10,
                                               fontWeight: FontWeight.bold,
@@ -271,10 +284,10 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                                           ),
                                         ),
                                         const SizedBox(height: 8),
-                                        Text(
-                                          IstDateTime.formatDate(
-                                            event["event_date"],
-                                          ),
+                                          Text(
+                                            IstDateTime.formatDate(
+                                              event["event_date"],
+                                            ),
                                           style: TextStyle(
                                             fontSize: 11,
                                             color: Colors.grey.shade600,
@@ -289,7 +302,8 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                                             CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            event["title"] ?? "Untitled",
+                                            event["title"] ??
+                                                context.tr("Untitled"),
                                             style: const TextStyle(
                                               fontSize: 14,
                                               fontWeight: FontWeight.bold,
@@ -299,7 +313,7 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                                           ),
                                           const SizedBox(height: 4),
                                           Text(
-                                            "📍 ${event["location"] ?? "N/A"}",
+                                            "📍 ${event["location"] ?? context.tr("N/A")}",
                                             style: TextStyle(
                                               fontSize: 12,
                                               color: Colors.grey.shade600,

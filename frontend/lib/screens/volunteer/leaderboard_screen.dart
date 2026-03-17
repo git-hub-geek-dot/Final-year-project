@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../services/event_service.dart';
 import '../../theme/app_colors.dart';
+import '../../localization/localization_extensions.dart';
 
 class LeaderboardScreen extends StatefulWidget {
   const LeaderboardScreen({super.key});
@@ -44,7 +45,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
-        title: const Text("Leaderboard"),
+        title: Text(context.tr("Leaderboard")),
         backgroundColor: Colors.transparent,
         elevation: 0,
         flexibleSpace: Container(
@@ -80,16 +81,18 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                       const SizedBox(height: 10),
                       ElevatedButton(
                         onPressed: _loadLeaderboard,
-                        child: const Text("Retry"),
+                        child: Text(context.tr("Retry")),
                       ),
                     ],
                   ),
                 ),
               )
             else if (data.isEmpty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.symmetric(vertical: 120),
-                child: Center(child: Text("No leaderboard data available")),
+                child: Center(
+                  child: Text(context.tr("No leaderboard data available")),
+                ),
               )
             else ...[
               _topThree(data),
@@ -132,7 +135,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       final parsed = <Map<String, dynamic>>[];
       for (var i = 0; i < raw.length; i++) {
         final item = raw[i] as Map;
-        final name = item["name"]?.toString() ?? "Unknown";
+        final name = item["name"]?.toString() ?? context.tr("Unknown");
         final events = int.tryParse(item["completed_events"].toString()) ?? 0;
         parsed.add({
           "rank": i + 1,
@@ -150,7 +153,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = "Failed to load leaderboard";
+        _error = context.tr("Failed to load leaderboard");
       });
     }
   }
@@ -165,12 +168,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       ),
       child: Row(
         children: [
-          _roleToggleButton("Organisers", _selectedTab == 0, () {
+          _roleToggleButton(context.tr("Organisers"), _selectedTab == 0, () {
             if (_selectedTab == 0) return;
             setState(() => _selectedTab = 0);
             _loadLeaderboard();
           }),
-          _roleToggleButton("Volunteers", _selectedTab == 1, () {
+          _roleToggleButton(context.tr("Volunteers"), _selectedTab == 1, () {
             if (_selectedTab == 1) return;
             setState(() => _selectedTab = 1);
             _loadLeaderboard();
@@ -213,12 +216,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       ),
       child: Row(
         children: [
-          _toggleButton("Weekly", isWeekly, () {
+          _toggleButton(context.tr("Weekly"), isWeekly, () {
             if (isWeekly) return;
             setState(() => isWeekly = true);
             _loadLeaderboard();
           }),
-          _toggleButton("Monthly", !isWeekly, () {
+          _toggleButton(context.tr("Monthly"), !isWeekly, () {
             if (!isWeekly) return;
             setState(() => isWeekly = false);
             _loadLeaderboard();
@@ -296,8 +299,13 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                     textAlign: TextAlign.center,
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  Text("${user["events"]} events",
-                      style: const TextStyle(fontSize: 12)),
+                  Text(
+                    context.tr(
+                      "{count} events",
+                      args: {"count": user["events"].toString()},
+                    ),
+                    style: const TextStyle(fontSize: 12),
+                  ),
                 ],
               ),
             ),
@@ -354,7 +362,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
           ),
         ),
         title: Text(name),
-        subtitle: Text("$events events completed"),
+        subtitle: Text(
+          context.tr(
+            "{count} events completed",
+            args: {"count": events.toString()},
+          ),
+        ),
         trailing: const Icon(Icons.chevron_right),
       ),
     );

@@ -30,62 +30,73 @@ class VolunteerProfileScreen extends StatefulWidget {
 class HelpSupportScreen extends StatelessWidget {
   const HelpSupportScreen({super.key});
 
-  static const List<Map<String, String>> _faqItems = [
-    {
-      "question": "What is the strike/suspension policy?",
-      "answer":
+  List<Map<String, String>> _faqItems(BuildContext context) {
+    return [
+      {
+        "question": context.tr("What is the strike/suspension policy?"),
+        "answer": context.tr(
           "Repeated violations may lead to strikes. 2 strikes: 3-day suspension, 3 strikes: 7-day suspension, 4 strikes: account ban.",
-    },
-    {
-      "question": "How do I apply for an event?",
-      "answer":
+        ),
+      },
+      {
+        "question": context.tr("How do I apply for an event?"),
+        "answer": context.tr(
           "Open an event card and tap Apply. Fill required details and submit your application.",
-    },
-    {
-      "question": "Can I cancel my application?",
-      "answer":
+        ),
+      },
+      {
+        "question": context.tr("Can I cancel my application?"),
+        "answer": context.tr(
           "Yes. If cancellation is available for that event, you can cancel from your application details.",
-    },
-    {
-      "question": "How are badges earned?",
-      "answer":
+        ),
+      },
+      {
+        "question": context.tr("How are badges earned?"),
+        "answer": context.tr(
           "Badges are awarded based on completed events and consistent participation.",
-    },
-    {
-      "question": "How do paid event payments work?",
-      "answer":
+        ),
+      },
+      {
+        "question": context.tr("How do paid event payments work?"),
+        "answer": context.tr(
           "Payment status depends on organiser confirmation and event completion.",
-    },
-    {
-      "question": "Why are events not loading?",
-      "answer":
+        ),
+      },
+      {
+        "question": context.tr("Why are events not loading?"),
+        "answer": context.tr(
           "Check your internet connection, then refresh the page. If it persists, contact support.",
-    },
-    {
-      "question": "What if I face login issues?",
-      "answer":
+        ),
+      },
+      {
+        "question": context.tr("What if I face login issues?"),
+        "answer": context.tr(
           "Verify your credentials and try Forgot Password if needed.",
-    },
-    {
-      "question": "How can I improve my profile completion?",
-      "answer":
+        ),
+      },
+      {
+        "question": context.tr("How can I improve my profile completion?"),
+        "answer": context.tr(
           "Update your name, email, city, profile photo, and verification status in profile settings.",
-    },
-    {
-      "question": "How do I contact support?",
-      "answer":
+        ),
+      },
+      {
+        "question": context.tr("How do I contact support?"),
+        "answer": context.tr(
           "Email volunteerxteam@gmail.com with screenshots and issue details for faster support.",
-    },
-  ];
+        ),
+      },
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
-        title: const Text(
-          "Help & Support",
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          context.tr("Help & Support"),
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
@@ -98,60 +109,62 @@ class HelpSupportScreen extends StatelessWidget {
             _supportTile(
               context,
               icon: Icons.quiz,
-              title: "FAQs",
-              subtitle: "Common questions answered",
+              title: context.tr("FAQs"),
+              subtitle: context.tr("Common questions answered"),
               onTap: () => _showFaqBottomSheet(context),
             ),
             _supportTile(
               context,
               icon: Icons.build,
-              title: "App Support",
-              subtitle: "Issues with the app or login",
+              title: context.tr("App Support"),
+              subtitle: context.tr("Issues with the app or login"),
               onTap: () => _showBottomSheet(
                 context,
-                title: "App Support",
-                content: const [
-                  "- App not loading events?\n"
-                      "Check your internet connection and try again.",
-                  "- Login issues?\n"
-                      "Make sure your credentials are correct or use Forgot Password.",
-                  "- App crashes or bugs?\n"
-                      "Restart the app or update to the latest version.",
-                  "- Still facing issues?\n"
-                      "Contact our support team via email.",
+                title: context.tr("App Support"),
+                content: [
+                  "- ${context.tr("App not loading events?")}\n"
+                      "${context.tr("Check your internet connection and try again.")}",
+                  "- ${context.tr("Login issues?")}\n"
+                      "${context.tr("Make sure your credentials are correct or use Forgot Password.")}",
+                  "- ${context.tr("App crashes or bugs?")}\n"
+                      "${context.tr("Restart the app or update to the latest version.")}",
+                  "- ${context.tr("Still facing issues?")}\n"
+                      "${context.tr("Contact our support team via email.")}",
                 ],
               ),
             ),
             _supportTile(
               context,
               icon: Icons.security,
-              title: "Safety & Guidelines",
-              subtitle: "Your safety matters",
+              title: context.tr("Safety & Guidelines"),
+              subtitle: context.tr("Your safety matters"),
               onTap: () => _showBottomSheet(
                 context,
-                title: "Safety & Guidelines",
-                content: const [
-                  "- Always verify event details before attending.",
-                  "- Avoid sharing personal or financial information.",
-                  "- Report suspicious organisers or events immediately.",
-                  "- Follow community guidelines and event instructions.",
+                title: context.tr("Safety & Guidelines"),
+                content: [
+                  "- ${context.tr("Always verify event details before attending.")}",
+                  "- ${context.tr("Avoid sharing personal or financial information.")}",
+                  "- ${context.tr("Report suspicious organisers or events immediately.")}",
+                  "- ${context.tr("Follow community guidelines and event instructions.")}",
                 ],
               ),
             ),
             _supportTile(
               context,
               icon: Icons.email,
-              title: "Contact Us",
-              subtitle: "Get in touch with our team",
+              title: context.tr("Contact Us"),
+              subtitle: context.tr("Get in touch with our team"),
               onTap: () => _showBottomSheet(
                 context,
-                title: "Contact VolunteerX",
-                content: const [
-                  "Email Support",
+                title: context.tr("Contact VolunteerX"),
+                content: [
+                  context.tr("Email Support"),
                   "volunteerxteam@gmail.com",
                   "",
-                  "Our team usually responds within 24-48 hours.",
-                  "Please include screenshots or details for faster support.",
+                  context.tr("Our team usually responds within 24-48 hours."),
+                  context.tr(
+                    "Please include screenshots or details for faster support.",
+                  ),
                 ],
               ),
             ),
@@ -265,15 +278,15 @@ class HelpSupportScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                const Text(
-                  "Frequently Asked Questions",
-                  style: TextStyle(
+                Text(
+                  context.tr("Frequently Asked Questions"),
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 16),
-                ..._faqItems.map(
+                ..._faqItems(context).map(
                   (faq) => Card(
                     margin: const EdgeInsets.only(bottom: 8),
                     elevation: 0,
@@ -436,7 +449,7 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
       if (token == null || token.isEmpty) {
         setState(() {
           loading = false;
-          errorMessage = "Token not found. Please login again.";
+          errorMessage = context.tr("Token not found. Please login again.");
         });
         return;
       }
@@ -485,13 +498,22 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
       } else {
         setState(() {
           loading = false;
-          errorMessage = "Error ${response.statusCode}: ${response.body}";
+          errorMessage = context.tr(
+            "Error {statusCode}: {message}",
+            args: {
+              "statusCode": response.statusCode.toString(),
+              "message": response.body,
+            },
+          );
         });
       }
     } catch (e) {
       setState(() {
         loading = false;
-        errorMessage = "Error: $e";
+        errorMessage = context.tr(
+          "Error: {error}",
+          args: {"error": e.toString()},
+        );
       });
     }
   }
@@ -554,14 +576,14 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
 
   List<String> _missingProfileItems() {
     final missing = <String>[];
-    if ((name ?? '').trim().isEmpty) missing.add("Name");
-    if ((email ?? '').trim().isEmpty) missing.add("Email");
-    if ((city ?? '').trim().isEmpty) missing.add("City");
+    if ((name ?? '').trim().isEmpty) missing.add(context.tr("Name"));
+    if ((email ?? '').trim().isEmpty) missing.add(context.tr("Email"));
+    if ((city ?? '').trim().isEmpty) missing.add(context.tr("City"));
     if ((profilePictureUrl ?? '').trim().isEmpty) {
-      missing.add("Profile photo");
+      missing.add(context.tr("Profile photo"));
     }
     if ((verificationStatus ?? '').trim().isEmpty) {
-      missing.add("Verification status");
+      missing.add(context.tr("Verification status"));
     }
     return missing;
   }
@@ -676,18 +698,18 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Logout"),
-        content: const Text("Are you sure you want to logout?"),
+        title: Text(context.tr("Logout")),
+        content: Text(context.tr("Are you sure you want to logout?")),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
+            child: Text(context.tr("Cancel")),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              "Logout",
-              style: TextStyle(color: Colors.red),
+            child: Text(
+              context.tr("Logout"),
+              style: const TextStyle(color: Colors.red),
             ),
           ),
         ],
@@ -705,7 +727,9 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
 
     if (token == null || token.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Token not found. Please login again.")),
+        SnackBar(
+          content: Text(context.tr("Token not found. Please login again.")),
+        ),
       );
       return;
     }
@@ -713,20 +737,22 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Delete Account"),
-        content: const Text(
-          "Are you sure you want to delete your account? This action is irreversible.",
+        title: Text(context.tr("Delete Account")),
+        content: Text(
+          context.tr(
+            "Are you sure you want to delete your account? This action is irreversible.",
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
+            child: Text(context.tr("Cancel")),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              "Delete",
-              style: TextStyle(color: Colors.red),
+            child: Text(
+              context.tr("Delete"),
+              style: const TextStyle(color: Colors.red),
             ),
           ),
         ],
@@ -760,7 +786,9 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
         if (!context.mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Account deleted successfully ✅")),
+          SnackBar(
+            content: Text(context.tr("Account deleted successfully.")),
+          ),
         );
 
         Navigator.pushAndRemoveUntil(
@@ -769,7 +797,7 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
           (_) => false,
         );
       } else {
-        String msg = "Delete failed";
+        String msg = context.tr("Delete failed");
         try {
           final data = jsonDecode(response.body);
           msg = data["message"] ?? data["error"] ?? msg;
@@ -783,7 +811,14 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
       if (!mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Server error: $e")),
+        SnackBar(
+          content: Text(
+            context.tr(
+              "Server error: {error}",
+              args: {"error": e.toString()},
+            ),
+          ),
+        ),
       );
     }
   }
@@ -853,8 +888,8 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
                             const SizedBox(height: 4),
                             Text(
                               city == null || city!.isEmpty
-                                  ? "City not set"
-                                  : "$city, India",
+                                  ? context.tr("City not set")
+                                  : "${city!}, ${context.tr("India")}",
                               style: const TextStyle(color: Colors.white70),
                             ),
                             const SizedBox(height: 14),
@@ -882,9 +917,11 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(30),
                                 ),
-                                child: const Text(
-                                  "Edit Profile",
-                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                child: Text(
+                                  context.tr("Edit Profile"),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
@@ -906,9 +943,9 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  "Profile Completeness",
-                                  style: TextStyle(
+                                Text(
+                                  context.tr("Profile Completeness"),
+                                  style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -927,7 +964,13 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  "${(_profileCompletionPercent() * 100).round()}% complete",
+                                  context.tr(
+                                    "{percent}% complete",
+                                    args: {
+                                      "percent": (_profileCompletionPercent() *
+                                          100).round().toString(),
+                                    },
+                                  ),
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -935,7 +978,13 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
                                 const SizedBox(height: 6),
                                 if (_missingProfileItems().isNotEmpty)
                                   Text(
-                                    "Missing: ${_missingProfileItems().join(', ')}",
+                                    context.tr(
+                                      "Missing: {items}",
+                                      args: {
+                                        "items":
+                                            _missingProfileItems().join(', '),
+                                      },
+                                    ),
                                     style: const TextStyle(
                                       color: Colors.grey,
                                       fontSize: 12,
@@ -950,16 +999,20 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
                       const SizedBox(height: 12),
 
                       /// ================= IMPACT SUMMARY =================
-                      _sectionHeader("Impact Summary"),
+                      _sectionHeader(context.tr("Impact Summary")),
                       const SizedBox(height: 10),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Row(
                           children: [
-                            _statCard("Events", _impactEvents, Icons.event),
+                            _statCard(
+                              context.tr("Events"),
+                              _impactEvents,
+                              Icons.event,
+                            ),
                             const SizedBox(width: 10),
                             _statCard(
-                              "Rating",
+                              context.tr("Rating"),
                               "$_impactRating ($_ratingCount)",
                               Icons.star,
                             ),
@@ -976,7 +1029,7 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
                           children: [
                             _tile(
                               Icons.assignment,
-                              "My Applications",
+                              context.tr("My Applications"),
                               () {
                                 Navigator.push(
                                   context,
@@ -990,7 +1043,7 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
 
                             _tile(
                               Icons.bookmark,
-                              "Saved Events",
+                              context.tr("Saved Events"),
                               () {
                                 Navigator.push(
                                   context,
@@ -1004,7 +1057,7 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
 
                             _tile(
                               Icons.emoji_events,
-                              "My Badges",
+                              context.tr("My Badges"),
                               () {
                                 Navigator.push(
                                   context,
@@ -1019,19 +1072,21 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
                             _tile(
                               Icons.verified,
                               verificationStatus == "pending"
-                                  ? "Verification Under Review"
+                                  ? context.tr("Verification Under Review")
                                   : verificationStatus == "approved"
-                                      ? "Verified"
-                                      : "Get Verified",
+                                      ? context.tr("Verified")
+                                      : context.tr("Get Verified"),
                               () {
                                 final status =
                                     (verificationStatus ?? '').toLowerCase();
 
                                 if (status == 'approved') {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
+                                    SnackBar(
                                       content: Text(
-                                        "Your account is already verified.",
+                                        context.tr(
+                                          "Your account is already verified.",
+                                        ),
                                       ),
                                     ),
                                   );
@@ -1040,9 +1095,11 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
 
                                 if (status == 'pending') {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
+                                    SnackBar(
                                       content: Text(
-                                        "Your verification request is under review.",
+                                        context.tr(
+                                          "Your verification request is under review.",
+                                        ),
                                       ),
                                     ),
                                   );
@@ -1061,7 +1118,7 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
 
                             _tile(
                               Icons.payments,
-                              "Payment Status",
+                              context.tr("Payment Status"),
                               () {
                                 Navigator.push(
                                   context,
@@ -1074,7 +1131,7 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
                             ),
                             _tile(
                               Icons.group,
-                              "Invite Friends",
+                              context.tr("Invite Friends"),
                               () {
                                 Navigator.push(
                                   context,
@@ -1088,7 +1145,7 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
                             _languageTile(),
                             _tile(
                               Icons.help_outline,
-                              "Help & Support",
+                              context.tr("Help & Support"),
                               () {
                                 Navigator.push(
                                   context,
@@ -1101,13 +1158,13 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
                             const SizedBox(height: 20),
                             _tile(
                               Icons.logout,
-                              "Logout",
+                              context.tr("Logout"),
                               _confirmLogout,
                               color: Colors.red,
                             ),
                             _tile(
                               Icons.delete_forever,
-                              "Delete Account",
+                              context.tr("Delete Account"),
                               _deleteAccount,
                               color: Colors.red,
                             ),
@@ -1191,7 +1248,7 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
           if (onEdit != null)
             TextButton(
               onPressed: onEdit,
-              child: const Text("Edit"),
+              child: Text(context.tr("Edit")),
             ),
         ],
       ),

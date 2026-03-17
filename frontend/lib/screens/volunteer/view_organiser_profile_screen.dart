@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import '../../config/api_config.dart';
 import '../../services/rating_service.dart';
 import '../../services/token_service.dart';
+import '../../localization/localization_extensions.dart';
 
 class ViewOrganiserProfileScreen extends StatefulWidget {
   final int organiserId;
@@ -41,7 +42,9 @@ class _ViewOrganiserProfileScreenState extends State<ViewOrganiserProfileScreen>
       if (token == null || token.isEmpty) {
         if (!mounted) return;
         setState(() {
-          errorMessage = "Please login again to view organiser details.";
+          errorMessage = context.tr(
+            "Please login again to view organiser details.",
+          );
           isLoading = false;
         });
         return;
@@ -64,14 +67,14 @@ class _ViewOrganiserProfileScreenState extends State<ViewOrganiserProfileScreen>
         });
       } else {
         setState(() {
-          errorMessage = "Failed to load organiser profile";
+          errorMessage = context.tr("Failed to load organiser profile");
           isLoading = false;
         });
       }
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        errorMessage = "Network error";
+        errorMessage = context.tr("Network error");
         isLoading = false;
       });
     }
@@ -138,8 +141,8 @@ class _ViewOrganiserProfileScreenState extends State<ViewOrganiserProfileScreen>
     final organiser = profile?["organiser"];
     final stats = profile?["stats"];
     
-    final name = organiser?["name"] ?? "Organiser";
-    final city = organiser?["city"] ?? "-";
+    final name = organiser?["name"] ?? context.tr("Organiser");
+    final city = organiser?["city"] ?? "";
     final email = organiser?["email"] ?? "-";
     final contact = (organiser?["contact_number"] ?? "").toString().trim();
     final showContact =
@@ -152,7 +155,7 @@ class _ViewOrganiserProfileScreenState extends State<ViewOrganiserProfileScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
-        title: const Text("Organiser Profile"),
+        title: Text(context.tr("Organiser Profile")),
         elevation: 0,
         backgroundColor: Colors.transparent,
         flexibleSpace: Container(
@@ -180,13 +183,13 @@ class _ViewOrganiserProfileScreenState extends State<ViewOrganiserProfileScreen>
             if (!isLoading && errorMessage == null) ...[
               _header(name, photoUrl),
             const SizedBox(height: 16),
-            _about(city),
+            _about(city.toString()),
             const SizedBox(height: 16),
             _stats(volunteersEngaged, eventsCount),
             const SizedBox(height: 16),
             _reviews(),
             const SizedBox(height: 16),
-            _connectCard(email, contact, showContact: showContact),
+            _connectCard(email.toString(), contact, showContact: showContact),
             ],
             
           ],
@@ -265,19 +268,24 @@ class _ViewOrganiserProfileScreenState extends State<ViewOrganiserProfileScreen>
 
   // ================= ABOUT =================
   Widget _about(String city) {
+    final trimmedCity = city.trim();
+    final hasCity = trimmedCity.isNotEmpty && trimmedCity != "-";
     return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "About Organisation",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          Text(
+            context.tr("About Organisation"),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
-            city == "-"
-                ? "No description provided by organiser."
-                : "Based in $city.",
+            hasCity
+                ? context.tr(
+                    "Based in {city}.",
+                    args: {"city": trimmedCity},
+                  )
+                : context.tr("No description provided by organiser."),
             style: const TextStyle(height: 1.5),
           ),
         ],
@@ -291,9 +299,9 @@ class _ViewOrganiserProfileScreenState extends State<ViewOrganiserProfileScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _Stat(volunteersEngaged, "Volunteers"),
-          _Stat(eventsCount, "Events"),
-          _Stat(_ratingValue, "Rating"),
+          _Stat(volunteersEngaged, context.tr("Volunteers")),
+          _Stat(eventsCount, context.tr("Events")),
+          _Stat(_ratingValue, context.tr("Rating")),
         ],
       ),
     );
@@ -304,16 +312,16 @@ class _ViewOrganiserProfileScreenState extends State<ViewOrganiserProfileScreen>
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          "Connect with Us",
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        Text(
+          context.tr("Connect with Us"),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
 
         const SizedBox(height: 4),
 
-        const Text(
-          "Follow or visit to learn more about their work",
-          style: TextStyle(fontSize: 13, color: Colors.grey),
+        Text(
+          context.tr("Follow or visit to learn more about their work"),
+          style: const TextStyle(fontSize: 13, color: Colors.grey),
         ),
 
         const SizedBox(height: 16),
@@ -321,10 +329,10 @@ class _ViewOrganiserProfileScreenState extends State<ViewOrganiserProfileScreen>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _socialIcon(Icons.language, "Website"),
-            _socialIcon(Icons.camera_alt, "Instagram"),
-            _socialIcon(Icons.facebook, "Facebook"),
-            _socialIcon(Icons.link, "LinkedIn"),
+            _socialIcon(Icons.language, context.tr("Website")),
+            _socialIcon(Icons.camera_alt, context.tr("Instagram")),
+            _socialIcon(Icons.facebook, context.tr("Facebook")),
+            _socialIcon(Icons.link, context.tr("LinkedIn")),
           ],
         ),
 
@@ -356,9 +364,11 @@ class _ViewOrganiserProfileScreenState extends State<ViewOrganiserProfileScreen>
             ],
           )
         else
-          const Text(
-            "Phone number is available only to approved volunteers when the organiser enables sharing.",
-            style: TextStyle(fontSize: 13, color: Colors.grey),
+          Text(
+            context.tr(
+              "Phone number is available only to approved volunteers when the organiser enables sharing.",
+            ),
+            style: const TextStyle(fontSize: 13, color: Colors.grey),
           ),
       ],
     ),
@@ -406,15 +416,15 @@ Widget _socialIcon(IconData icon, String label) {
       return _card(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
+          children: [
             Text(
-              "Volunteer Reviews",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              context.tr("Volunteer Reviews"),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
             Text(
-              "No reviews yet",
-              style: TextStyle(fontSize: 14, color: Colors.grey),
+              context.tr("No reviews yet"),
+              style: const TextStyle(fontSize: 14, color: Colors.grey),
             ),
           ],
         ),
@@ -428,16 +438,18 @@ Widget _socialIcon(IconData icon, String label) {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "Volunteer Reviews",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          Text(
+            context.tr("Volunteer Reviews"),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
           ...displayReviews.map((review) {
             final score = review["score"] ?? 0;
             final comment = review["comment"]?.toString() ?? "";
-            final raterName = review["rater_name"]?.toString() ?? "Anonymous";
-            final eventTitle = review["event_title"]?.toString() ?? "Unknown Event";
+            final raterName =
+                review["rater_name"]?.toString() ?? context.tr("Anonymous");
+            final eventTitle =
+                review["event_title"]?.toString() ?? context.tr("Unknown Event");
             
             return Padding(
               padding: const EdgeInsets.only(bottom: 12.0),
@@ -449,7 +461,10 @@ Widget _socialIcon(IconData icon, String label) {
               child: TextButton(
                 onPressed: _showAllReviews,
                 child: Text(
-                  "View All ${_reviewsList.length} Reviews",
+                  context.tr(
+                    "View All {count} Reviews",
+                    args: {"count": _reviewsList.length.toString()},
+                  ),
                   style: const TextStyle(color: Color(0xFF2E6BE6)),
                 ),
               ),
@@ -636,9 +651,9 @@ class _AllReviewsModalState extends State<_AllReviewsModal> {
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
-            "All Reviews",
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          Text(
+            context.tr("All Reviews"),
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
           Expanded(
@@ -655,13 +670,17 @@ class _AllReviewsModalState extends State<_AllReviewsModal> {
                     ),
                   )
                 else if (_eventRatings.isNotEmpty) ...[
-                  const Text(
-                    "Last 5 Events Overall Rating",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  Text(
+                    context.tr("Last 5 Events Overall Rating"),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   ..._eventRatings.map((event) {
-                    final title = event["event_title"]?.toString() ?? "Unknown";
+                    final title =
+                        event["event_title"]?.toString() ?? context.tr("Unknown");
                     final avgRating = event["avg_rating"] ?? 0;
                     final reviewCount = event["review_count"] ?? 0;
                     final rating = double.tryParse(avgRating.toString()) ?? 0.0;
@@ -674,16 +693,22 @@ class _AllReviewsModalState extends State<_AllReviewsModal> {
                 ],
                 
                 // Individual Reviews Section
-                const Text(
-                  "Individual Reviews",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                Text(
+                  context.tr("Individual Reviews"),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 ...widget.reviews.map((review) {
                   final score = review["score"] ?? 0;
                   final comment = review["comment"]?.toString() ?? "";
-                  final raterName = review["rater_name"]?.toString() ?? "Anonymous";
-                  final eventTitle = review["event_title"]?.toString() ?? "Unknown Event";
+                  final raterName =
+                      review["rater_name"]?.toString() ?? context.tr("Anonymous");
+                  final eventTitle =
+                      review["event_title"]?.toString() ??
+                      context.tr("Unknown Event");
                   
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 16.0),
@@ -724,7 +749,10 @@ class _AllReviewsModalState extends State<_AllReviewsModal> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  "$count reviews",
+                  context.tr(
+                    "{count} reviews",
+                    args: {"count": count.toString()},
+                  ),
                   style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
               ],

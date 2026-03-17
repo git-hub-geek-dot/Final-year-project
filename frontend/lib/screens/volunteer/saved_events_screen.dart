@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/saved_events_service.dart';
 import '../../utils/ist_date_time.dart';
 import 'view_event_screen.dart';
+import '../../localization/localization_extensions.dart';
 
 class SavedEventsScreen extends StatefulWidget {
   const SavedEventsScreen({super.key});
@@ -39,7 +40,7 @@ class _SavedEventsScreenState extends State<SavedEventsScreen> {
       if (!mounted) return;
       setState(() {
         loading = false;
-        errorMessage = "Failed to load saved events.";
+        errorMessage = context.tr("Failed to load saved events.");
       });
     }
   }
@@ -53,7 +54,7 @@ class _SavedEventsScreenState extends State<SavedEventsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Saved Events"),
+        title: Text(context.tr("Saved Events")),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -75,13 +76,14 @@ class _SavedEventsScreenState extends State<SavedEventsScreen> {
                   ),
                 )
               : savedEvents.isEmpty
-                  ? const Center(child: Text("No saved events yet"))
+                  ? Center(child: Text(context.tr("No saved events yet")))
                   : ListView.builder(
                       padding: const EdgeInsets.all(16),
                       itemCount: savedEvents.length,
                       itemBuilder: (context, index) {
                         final event = savedEvents[index];
-                        final title = event["title"] ?? "Unknown Event";
+                        final title =
+                            event["title"] ?? context.tr("Unknown Event");
                         final location = event["location"] ?? "";
                         final formatted =
                             IstDateTime.formatDate(event["event_date"]);

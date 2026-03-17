@@ -7,6 +7,7 @@ import '../../config/api_config.dart';
 import '../../services/event_service.dart';
 import '../../services/token_service.dart';
 import '../../utils/ist_date_time.dart';
+import '../../localization/localization_extensions.dart';
 import 'view_event_screen.dart';
 
 class MyApplicationsScreen extends StatefulWidget {
@@ -41,7 +42,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
       if (token == null || token.isEmpty) {
         setState(() {
           loading = false;
-          errorMessage = "Token not found. Please login again.";
+          errorMessage = context.tr("Token not found. Please login again.");
         });
         return;
       }
@@ -79,13 +80,22 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
       } else {
         setState(() {
           loading = false;
-          errorMessage = "Error ${response.statusCode}: ${response.body}";
+          errorMessage = context.tr(
+            "Error {code}: {body}",
+            args: {
+              "code": response.statusCode.toString(),
+              "body": response.body.toString(),
+            },
+          );
         });
       }
     } catch (e) {
       setState(() {
         loading = false;
-        errorMessage = "Error: $e";
+        errorMessage = context.tr(
+          "Error: {error}",
+          args: {"error": e.toString()},
+        );
       });
     }
   }
@@ -114,12 +124,12 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to load event details")),
+        SnackBar(content: Text(context.tr("Failed to load event details"))),
       );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Failed to load event details")),
+        SnackBar(content: Text(context.tr("Failed to load event details"))),
       );
     }
   }
@@ -152,17 +162,17 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
   String statusLabel(String status) {
     switch (_normalizedStatus(status)) {
       case "approved":
-        return "Approved";
+        return context.tr("Approved");
       case "rejected":
-        return "Rejected";
+        return context.tr("Rejected");
       case "cancelled":
-        return "Cancelled";
+        return context.tr("Cancelled");
       case "waitlisted":
-        return "Waitlisted";
+        return context.tr("Waitlisted");
       case "completed":
-        return "Completed";
+        return context.tr("Completed");
       case "pending":
-        return "Pending";
+        return context.tr("Pending");
       default:
         return status;
     }
@@ -247,7 +257,9 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
   }
 
   String _formatEventDate(String? rawDate) {
-    if (rawDate == null || rawDate.isEmpty) return "Date not available";
+    if (rawDate == null || rawDate.isEmpty) {
+      return context.tr("Date not available");
+    }
 
     final parsed = IstDateTime.tryParse(rawDate);
     if (parsed == null) {
@@ -308,35 +320,45 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
 
     if (_isEventCompleted(app)) {
       if (attendanceStatus == "present") {
-        return "Your attendance was marked present for this event.";
+        return context.tr("Your attendance was marked present for this event.");
       }
       if (attendanceStatus == "absent") {
-        return "You were marked absent for this event.";
+        return context.tr("You were marked absent for this event.");
       }
     }
 
     switch (status) {
       case "pending":
-        return "Your application is under review.";
+        return context.tr("Your application is under review.");
       case "waitlisted":
-        return "This event is full right now. You will be notified if a spot opens.";
+        return context.tr(
+          "This event is full right now. You will be notified if a spot opens.",
+        );
       case "approved":
         if (_isEventCompleted(app)) {
-          return "You were approved for this event. The event has now ended.";
+          return context.tr(
+            "You were approved for this event. The event has now ended.",
+          );
         }
-        return "You are confirmed for this event.";
+        return context.tr("You are confirmed for this event.");
       case "rejected":
-        return "This application was not approved.";
+        return context.tr("This application was not approved.");
       case "cancelled":
         if (adminCancelReason.isNotEmpty) {
-          return "Cancelled by admin. Reason: $adminCancelReason";
+          return context.tr(
+            "Cancelled by admin. Reason: {reason}",
+            args: {"reason": adminCancelReason},
+          );
         }
         if (volunteerCancelReason.isNotEmpty) {
-          return "You cancelled your participation. Reason: $volunteerCancelReason";
+          return context.tr(
+            "You cancelled your participation. Reason: {reason}",
+            args: {"reason": volunteerCancelReason},
+          );
         }
-        return "This application was cancelled.";
+        return context.tr("This application was cancelled.");
       case "completed":
-        return "Your participation for this event is completed.";
+        return context.tr("Your participation for this event is completed.");
       default:
         return null;
     }
@@ -345,13 +367,13 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
   String? _appealStatusLabel(String status) {
     switch (status.toLowerCase()) {
       case "eligible":
-        return "Appeal available";
+        return context.tr("Appeal available");
       case "pending":
-        return "Appeal pending";
+        return context.tr("Appeal pending");
       case "approved":
-        return "Appeal approved";
+        return context.tr("Appeal approved");
       case "rejected":
-        return "Appeal rejected";
+        return context.tr("Appeal rejected");
       default:
         return null;
     }
@@ -387,18 +409,18 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
     final appealLabel = _appealStatusLabel(appealStatus);
 
     if (_isEventCompleted(app)) {
-      chips.add(_infoChip("Event completed", Colors.blueGrey));
+      chips.add(_infoChip(context.tr("Event completed"), Colors.blueGrey));
     }
     if (attendanceStatus == "present") {
-      chips.add(_infoChip("Attendance present", Colors.green));
+      chips.add(_infoChip(context.tr("Attendance present"), Colors.green));
     } else if (attendanceStatus == "absent") {
-      chips.add(_infoChip("Attendance absent", Colors.deepOrange));
+      chips.add(_infoChip(context.tr("Attendance absent"), Colors.deepOrange));
     }
     if (warningIssued) {
-      chips.add(_infoChip("Warning issued", Colors.deepOrange));
+      chips.add(_infoChip(context.tr("Warning issued"), Colors.deepOrange));
     }
     if (strikeIssued) {
-      chips.add(_infoChip("Strike applied", Colors.redAccent));
+      chips.add(_infoChip(context.tr("Strike applied"), Colors.redAccent));
     }
     if (appealLabel != null) {
       final Color appealColor;
@@ -430,9 +452,11 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
     if (_isEventCompleted(app) || _hasEventStarted(app)) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            "This event has already started. Cancellation is no longer available.",
+            context.tr(
+              "This event has already started. Cancellation is no longer available.",
+            ),
           ),
         ),
       );
@@ -441,7 +465,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
 
     final hoursBefore = _hoursBeforeEvent(app);
     final isWithinLockWindow = _isWithinLockWindow(app);
-    final title = (app["title"] ?? "this event").toString();
+    final title = (app["title"] ?? context.tr("this event")).toString();
 
     final reasonController = TextEditingController();
     String? documentUrl;
@@ -457,25 +481,34 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
             String policyText;
             if (isWithinLockWindow) {
               policyText =
-                  "This event starts in less than 48 hours. Cancelling now applies an immediate strike."
-                  " Supporting document upload is mandatory to continue.";
+                  context.tr(
+                    "This event starts in less than 48 hours. Cancelling now applies an immediate strike. Supporting document upload is mandatory to continue.",
+                  );
             } else if (hoursBefore != null && hoursBefore <= 72) {
               policyText =
-                  "This cancellation is within 48-72 hours before the event. You will receive a warning."
-                  " Repeated cancellations without a reason may lead to a strike.";
+                  context.tr(
+                    "This cancellation is within 48-72 hours before the event. You will receive a warning. Repeated cancellations without a reason may lead to a strike.",
+                  );
             } else {
               policyText =
-                  "This cancellation is outside the strike window. No strike will be applied.";
+                  context.tr(
+                    "This cancellation is outside the strike window. No strike will be applied.",
+                  );
             }
 
             return AlertDialog(
-              title: const Text("Cancel Participation"),
+              title: Text(context.tr("Cancel Participation")),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("Event: $title"),
+                    Text(
+                      context.tr(
+                        "Event: {title}",
+                        args: {"title": title},
+                      ),
+                    ),
                     const SizedBox(height: 10),
                     Text(
                       policyText,
@@ -493,10 +526,12 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                       maxLines: 4,
                       decoration: InputDecoration(
                         labelText: isWithinLockWindow
-                            ? "Reason *"
-                            : "Reason (optional but recommended)",
+                            ? context.tr("Reason *")
+                            : context.tr("Reason (optional but recommended)"),
                         helperText: isWithinLockWindow
-                            ? "Mandatory for cancellations within 48 hours"
+                            ? context.tr(
+                                "Mandatory for cancellations within 48 hours",
+                              )
                             : null,
                         errorText: reasonError,
                         border: const OutlineInputBorder(),
@@ -508,8 +543,8 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                       children: [
                         Text(
                           isWithinLockWindow
-                              ? "Supporting document *"
-                              : "Supporting document",
+                              ? context.tr("Supporting document *")
+                              : context.tr("Supporting document"),
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 6),
@@ -519,9 +554,15 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                               child: Text(
                                 documentUrl == null
                                     ? (isWithinLockWindow
-                                        ? "Mandatory for cancellations within 48 hours"
-                                        : "No supporting document uploaded")
-                                    : "Supporting document attached",
+                                        ? context.tr(
+                                            "Mandatory for cancellations within 48 hours",
+                                          )
+                                        : context.tr(
+                                            "No supporting document uploaded",
+                                          ))
+                                    : context.tr(
+                                        "Supporting document attached",
+                                      ),
                                 style: TextStyle(
                                   color: documentUrl == null
                                       ? Colors.black54
@@ -554,7 +595,10 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                                             .showSnackBar(
                                           SnackBar(
                                             content: Text(
-                                              "Failed to upload document: $e",
+                                              context.tr(
+                                                "Failed to upload document: {error}",
+                                                args: {"error": e.toString()},
+                                              ),
                                             ),
                                           ),
                                         );
@@ -572,7 +616,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                                       ),
                                     )
                                   : const Icon(Icons.upload_file),
-                              label: const Text("Upload"),
+                              label: Text(context.tr("Upload")),
                             ),
                           ],
                         ),
@@ -594,7 +638,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context, false),
-                  child: const Text("Keep"),
+                  child: Text(context.tr("Keep")),
                 ),
                 ElevatedButton(
                   onPressed: () {
@@ -602,10 +646,12 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                       final trimmedReason = reasonController.text.trim();
                       setLocalState(() {
                         reasonError = trimmedReason.isEmpty
-                            ? "Reason is mandatory within 48 hours"
+                            ? context.tr("Reason is mandatory within 48 hours")
                             : null;
                         documentError = documentUrl == null
-                            ? "Supporting document is mandatory within 48 hours"
+                            ? context.tr(
+                                "Supporting document is mandatory within 48 hours",
+                              )
                             : null;
                       });
 
@@ -615,7 +661,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                     }
                     Navigator.pop(context, true);
                   },
-                  child: const Text("Confirm Cancel"),
+                  child: Text(context.tr("Confirm Cancel")),
                 ),
               ],
             );
@@ -640,11 +686,13 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
       final strikeIssued = response["strikeIssued"] == true;
       final warningIssued = response["warningIssued"] == true;
 
-      final message = strikeIssued
-          ? "Participation cancelled. A strike was applied."
+    final message = strikeIssued
+          ? context.tr("Participation cancelled. A strike was applied.")
           : warningIssued
-              ? "Participation cancelled. Warning issued for 48-72 hour window."
-              : "Participation cancelled.";
+              ? context.tr(
+                  "Participation cancelled. Warning issued for 48-72 hour window.",
+                )
+              : context.tr("Participation cancelled.");
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
@@ -653,7 +701,14 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to cancel: $e")),
+        SnackBar(
+          content: Text(
+            context.tr(
+              "Failed to cancel: {error}",
+              args: {"error": e.toString()},
+            ),
+          ),
+        ),
       );
     } finally {
       if (mounted) {
@@ -677,23 +732,25 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setLocalState) => AlertDialog(
-            title: const Text("Submit Strike Appeal"),
+            title: Text(context.tr("Submit Strike Appeal")),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    "Supporting document is mandatory for strike removal review.",
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                  Text(
+                    context.tr(
+                      "Supporting document is mandatory for strike removal review.",
+                    ),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: reasonController,
                     minLines: 2,
                     maxLines: 4,
-                    decoration: const InputDecoration(
-                      labelText: "Appeal reason",
+                    decoration: InputDecoration(
+                      labelText: context.tr("Appeal reason"),
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -703,8 +760,8 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                       Expanded(
                         child: Text(
                           documentUrl == null
-                              ? "No document uploaded"
-                              : "Document uploaded",
+                              ? context.tr("No document uploaded")
+                              : context.tr("Document uploaded"),
                           style: TextStyle(
                             color: documentUrl == null
                                 ? Colors.black54
@@ -731,7 +788,13 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                                   if (!mounted) return;
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                        content: Text("Upload failed: $e")),
+                                      content: Text(
+                                        context.tr(
+                                          "Upload failed: {error}",
+                                          args: {"error": e.toString()},
+                                        ),
+                                      ),
+                                    ),
                                   );
                                 } finally {
                                   setLocalState(() => uploadingDoc = false);
@@ -745,7 +808,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                                     CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Icon(Icons.upload_file),
-                        label: const Text("Upload"),
+                        label: Text(context.tr("Upload")),
                       ),
                     ],
                   ),
@@ -755,23 +818,26 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text("Cancel"),
+                child: Text(context.tr("Cancel")),
               ),
               ElevatedButton(
                 onPressed: () {
                   if (reasonController.text.trim().isEmpty ||
                       documentUrl == null) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content:
-                            Text("Reason and supporting document are required"),
+                      SnackBar(
+                        content: Text(
+                          context.tr(
+                            "Reason and supporting document are required",
+                          ),
+                        ),
                       ),
                     );
                     return;
                   }
                   Navigator.pop(context, true);
                 },
-                child: const Text("Submit Appeal"),
+                child: Text(context.tr("Submit Appeal")),
               ),
             ],
           ),
@@ -789,13 +855,20 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Strike appeal submitted")),
+        SnackBar(content: Text(context.tr("Strike appeal submitted"))),
       );
       await fetchMyApplications();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to submit appeal: $e")),
+        SnackBar(
+          content: Text(
+            context.tr(
+              "Failed to submit appeal: {error}",
+              args: {"error": e.toString()},
+            ),
+          ),
+        ),
       );
     }
   }
@@ -804,7 +877,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("My Applications"),
+        title: Text(context.tr("My Applications")),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -826,14 +899,15 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                   ),
                 )
               : applications.isEmpty
-                  ? const Center(child: Text("No applications found"))
+                  ? Center(child: Text(context.tr("No applications found")))
                   : ListView.builder(
                       padding: const EdgeInsets.all(16),
                       itemCount: applications.length,
                        itemBuilder: (context, index) {
                          final app = applications[index];
 
-                         final title = app["title"] ?? "Unknown Event";
+                         final title =
+                             app["title"] ?? context.tr("Unknown Event");
                          final location = app["location"] ?? "";
                          final status = _normalizedStatus(
                            (app["status"] ?? "pending").toString(),
@@ -861,7 +935,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                          final infoChips = _buildInfoChips(app);
                          final statusDescription = _statusDescription(app);
                          final chipLabel = attendanceStatus == "absent"
-                             ? "ATTENDANCE ABSENT"
+                             ? context.tr("Attendance absent").toUpperCase()
                              : statusLabel(status).toUpperCase();
                          final chipColor = attendanceStatus == "absent"
                              ? Colors.deepOrange
@@ -976,16 +1050,22 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                                                    )
                                                  : Text(
                                                      isWithinLockWindow
-                                                         ? "Cancel participation"
-                                                         : "Cancel",
+                                                         ? context.tr(
+                                                             "Cancel participation",
+                                                           )
+                                                         : context.tr(
+                                                             "Cancel",
+                                                           ),
                                                    ),
                                            ),
-                                         if (canAppeal)
-                                           TextButton(
-                                             onPressed:
-                                                 () => _submitStrikeAppeal(app),
-                                             child: const Text("Submit appeal"),
-                                           ),
+                                        if (canAppeal)
+                                          TextButton(
+                                            onPressed:
+                                                () => _submitStrikeAppeal(app),
+                                            child: Text(
+                                              context.tr("Submit appeal"),
+                                            ),
+                                          ),
                                        ],
                                      ),
                                    ],

@@ -9,7 +9,7 @@ import '../../services/saved_events_service.dart';
 import '../../services/verification_service.dart';
 import '../../services/event_service.dart';
 import '../../utils/ist_date_time.dart';
-import '../../utils/payment_format.dart';
+import '../../localization/localization_extensions.dart';
 import 'view_organiser_profile_screen.dart';
 import 'get_verified_screen.dart';
 import '../chat/event_group_chat_screen.dart';
@@ -172,7 +172,11 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
       isSaved = updated;
     });
 
-    _snack(updated ? "Saved event" : "Removed from saved");
+    _snack(
+      updated
+          ? context.tr("Saved event")
+          : context.tr("Removed from saved"),
+    );
   }
 
   // ================= APPLICATION STATUS =================
@@ -308,7 +312,9 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
       } else if (response.statusCode == 403) {
         // Verification required error from backend
         final data = jsonDecode(response.body);
-        _snack(data["message"] ?? "Verification required to apply");
+        _snack(
+          data["message"] ?? context.tr("Verification required to apply"),
+        );
         setState(() {
           isApplying = false;
         });
@@ -322,14 +328,14 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
           ),
         );
       } else {
-        _snack("Unable to apply");
+        _snack(context.tr("Unable to apply"));
         setState(() {
           isApplying = false;
         });
       }
     } catch (_) {
       if (!mounted) return;
-      _snack("Network error");
+      _snack(context.tr("Network error"));
       setState(() => isApplying = false);
     }
   }
@@ -340,23 +346,25 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
-        title: const Text("Event Details"),
+        title: Text(context.tr("Event Details")),
         actions: [
           IconButton(
             icon: Icon(isSaved ? Icons.bookmark : Icons.bookmark_border),
             onPressed: _toggleSaved,
-            tooltip: isSaved ? "Remove from saved" : "Save event",
+            tooltip: isSaved
+                ? context.tr("Remove from saved")
+                : context.tr("Save event"),
           ),
           IconButton(
             icon: const Icon(Icons.share),
             onPressed: () {
               final text = """
 ${widget.event["title"]}
-Location: ${widget.event["location"]}
-Date: ${IstDateTime.formatDate(widget.event["event_date"])}
+${context.tr("Location")}: ${widget.event["location"]}
+${context.tr("Date")}: ${IstDateTime.formatDate(widget.event["event_date"])}
 
 
-Join on VolunteerX
+${context.tr("Join on VolunteerX")}
 """;
 
               Share.share(text);
@@ -450,7 +458,10 @@ Join on VolunteerX
             ),
           ),
           const SizedBox(height: 16),
-          _iconRow(Icons.location_on, widget.event["location"] ?? "N/A"),
+          _iconRow(
+            Icons.location_on,
+            widget.event["location"] ?? context.tr("N/A"),
+          ),
           _iconRow(
             Icons.calendar_today,
             _formatDateRange(),
@@ -458,7 +469,14 @@ Join on VolunteerX
           ..._buildScheduleRows(),
           _iconRow(
             Icons.people,
-            "Volunteers Needed: ${widget.event["volunteers_required"] ?? "N/A"}",
+            context.tr(
+              "Volunteers Needed: {count}",
+              args: {
+                "count":
+                    (widget.event["volunteers_required"] ?? context.tr("N/A"))
+                        .toString(),
+              },
+            ),
           ),
           _iconRow(
             Icons.payments,
@@ -502,14 +520,14 @@ Join on VolunteerX
                         builder: (_) => RatingScreen(
                           eventId: widget.event["id"],
                           rateeId: organiserId,
-                          title: "Rate Organiser",
+                          title: context.tr("Rate Organiser"),
                         ),
                       ),
                     );
                     await _fetchMyRating();
                   },
                   icon: const Icon(Icons.star_border),
-                  label: const Text("Rate organiser"),
+                  label: Text(context.tr("Rate organiser")),
                 ),
               ),
           ],
@@ -542,7 +560,10 @@ Join on VolunteerX
           ),
           const SizedBox(height: 6),
           Text(
-            "You rated $score/5",
+            context.tr(
+              "You rated {score}/5",
+              args: {"score": score.toString()},
+            ),
             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
           ),
           if (comment != null && comment.trim().isNotEmpty) ...[
@@ -563,14 +584,14 @@ Join on VolunteerX
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "About this Event",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          Text(
+            context.tr("About this Event"),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
             widget.event["description"] ??
-                "No description provided by organiser.",
+                context.tr("No description provided by organiser."),
           ),
         ],
       ),
@@ -588,13 +609,13 @@ Join on VolunteerX
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "Your Responsibilities",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          Text(
+            context.tr("Your Responsibilities"),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
           if (items.isEmpty)
-            const Text("No responsibilities provided by organiser."),
+            Text(context.tr("No responsibilities provided by organiser.")),
           if (items.isNotEmpty) ...items.map(_checkItem),
         ],
       ),
@@ -604,13 +625,14 @@ Join on VolunteerX
   // ================= ORGANISER =================
   Widget _organiserCard() {
     final organiserId = widget.event["organiser_id"];
-    final organiserName = widget.event["organiser_name"] ?? "Organiser";
+    final organiserName =
+        widget.event["organiser_name"] ?? context.tr("Organiser");
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () {
         if (organiserId == null) {
-          _snack("Organiser profile not available");
+          _snack(context.tr("Organiser profile not available"));
           return;
         }
         Navigator.push(
@@ -636,9 +658,9 @@ Join on VolunteerX
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
-                  const Text(
-                    "View organiser profile",
-                    style: TextStyle(color: Colors.grey),
+                  Text(
+                    context.tr("View organiser profile"),
+                    style: const TextStyle(color: Colors.grey),
                   ),
                 ],
               ),
@@ -701,12 +723,12 @@ Join on VolunteerX
     if (applicationStatus == null &&
         (isCompleted || isCancelled || isRemoved || isClosed)) {
       final closedLabel = isCompleted
-          ? "Event completed"
+          ? context.tr("Event completed")
           : isCancelled
-              ? "Event cancelled"
+              ? context.tr("Event cancelled")
               : isRemoved
-                  ? "Event removed"
-                  : "Applications closed";
+                  ? context.tr("Event removed")
+                  : context.tr("Applications closed");
       return SizedBox(
         height: 54,
         width: double.infinity,
@@ -747,15 +769,15 @@ Join on VolunteerX
               borderRadius: BorderRadius.all(Radius.circular(30)),
             ),
             child: Center(
-              child: isApplying
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text(
-                      "Apply for this Event",
-                      style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white),
-                    ),
+                child: isApplying
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : Text(
+                        context.tr("Apply for this Event"),
+                        style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white),
+                      ),
             ),
           ),
         ),
@@ -767,7 +789,7 @@ Join on VolunteerX
     final canCancel = _isCancelableStatus(currentStatus) && !_hasEventStarted();
     final isApprovedState = _isApprovedStatus(currentStatus);
     final statusText = currentAttendance == "absent"
-        ? "Attendance Absent"
+        ? context.tr("Attendance Absent")
         : _statusText(currentStatus);
     final statusColor = currentAttendance == "absent"
         ? Colors.deepOrange
@@ -786,13 +808,13 @@ Join on VolunteerX
             children: [
               Expanded(
                 child: _quickActionPill(
-                  label: "Announcements",
+                  label: context.tr("Announcements"),
                   icon: Icons.campaign_outlined,
                   color: const Color(0xFF2E6BE6),
                   onTap: () {
                     final eventId = widget.event["id"] as int?;
                     if (eventId == null) {
-                      _snack("Event not found");
+                      _snack(context.tr("Event not found"));
                       return;
                     }
                     Navigator.push(
@@ -801,7 +823,8 @@ Join on VolunteerX
                         builder: (_) => EventAnnouncementsScreen(
                           eventId: eventId,
                           eventTitle:
-                              (widget.event["title"] ?? "Event").toString(),
+                              (widget.event["title"] ?? context.tr("Event"))
+                                  .toString(),
                         ),
                       ),
                     );
@@ -811,13 +834,13 @@ Join on VolunteerX
               const SizedBox(width: 10),
               Expanded(
                 child: _quickActionPill(
-                  label: "Event Chat",
+                  label: context.tr("Event Chat"),
                   icon: Icons.groups_2_outlined,
                   color: const Color(0xFF2ECC71),
                   onTap: () {
                     final eventId = widget.event["id"] as int?;
                     if (eventId == null) {
-                      _snack("Event not found");
+                      _snack(context.tr("Event not found"));
                       return;
                     }
                     Navigator.push(
@@ -826,7 +849,8 @@ Join on VolunteerX
                         builder: (_) => EventGroupChatScreen(
                           eventId: eventId,
                           eventTitle:
-                              (widget.event["title"] ?? "Event").toString(),
+                              (widget.event["title"] ?? context.tr("Event"))
+                                  .toString(),
                         ),
                       ),
                     );
@@ -851,8 +875,8 @@ Join on VolunteerX
                     )
                   : Text(
                       _isWithinLockWindow()
-                          ? "Cancel Participation (Locked)"
-                          : "Cancel Participation",
+                          ? context.tr("Cancel Participation (Locked)")
+                          : context.tr("Cancel Participation"),
                     ),
             ),
           ),
@@ -933,7 +957,8 @@ Join on VolunteerX
 
     final hoursBefore = _hoursBeforeEvent();
     final isWithinLockWindow = hoursBefore != null && hoursBefore <= 48;
-    final title = (widget.event["title"] ?? "this event").toString();
+    final title =
+        (widget.event["title"] ?? context.tr("this event")).toString();
     final reasonController = TextEditingController();
     String? documentUrl;
     bool uploadingDoc = false;
@@ -948,23 +973,34 @@ Join on VolunteerX
             String policyText;
             if (isWithinLockWindow) {
               policyText =
-                  "This event starts in less than 48 hours. Cancelling now applies an immediate strike. Supporting document upload is mandatory to continue.";
+                  context.tr(
+                    "This event starts in less than 48 hours. Cancelling now applies an immediate strike. Supporting document upload is mandatory to continue.",
+                  );
             } else if (hoursBefore != null && hoursBefore <= 72) {
               policyText =
-                  "This cancellation is within 48-72 hours before the event. You will receive a warning. Repeated cancellations without a reason may lead to a strike.";
+                  context.tr(
+                    "This cancellation is within 48-72 hours before the event. You will receive a warning. Repeated cancellations without a reason may lead to a strike.",
+                  );
             } else {
               policyText =
-                  "This cancellation is outside the strike window. No strike will be applied.";
+                  context.tr(
+                    "This cancellation is outside the strike window. No strike will be applied.",
+                  );
             }
 
             return AlertDialog(
-              title: const Text("Cancel Participation"),
+              title: Text(context.tr("Cancel Participation")),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("Event: $title"),
+                    Text(
+                      context.tr(
+                        "Event: {title}",
+                        args: {"title": title},
+                      ),
+                    ),
                     const SizedBox(height: 10),
                     Text(
                       policyText,
@@ -982,10 +1018,12 @@ Join on VolunteerX
                       maxLines: 4,
                       decoration: InputDecoration(
                         labelText: isWithinLockWindow
-                            ? "Reason *"
-                            : "Reason (optional but recommended)",
+                            ? context.tr("Reason *")
+                            : context.tr("Reason (optional but recommended)"),
                         helperText: isWithinLockWindow
-                            ? "Mandatory for cancellations within 48 hours"
+                            ? context.tr(
+                                "Mandatory for cancellations within 48 hours",
+                              )
                             : null,
                         errorText: reasonError,
                         border: const OutlineInputBorder(),
@@ -997,8 +1035,8 @@ Join on VolunteerX
                       children: [
                         Text(
                           isWithinLockWindow
-                              ? "Supporting document *"
-                              : "Supporting document",
+                              ? context.tr("Supporting document *")
+                              : context.tr("Supporting document"),
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 6),
@@ -1008,9 +1046,15 @@ Join on VolunteerX
                               child: Text(
                                 documentUrl == null
                                     ? (isWithinLockWindow
-                                        ? "Mandatory for cancellations within 48 hours"
-                                        : "No supporting document uploaded")
-                                    : "Supporting document attached",
+                                        ? context.tr(
+                                            "Mandatory for cancellations within 48 hours",
+                                          )
+                                        : context.tr(
+                                            "No supporting document uploaded",
+                                          ))
+                                    : context.tr(
+                                        "Supporting document attached",
+                                      ),
                                 style: TextStyle(
                                   color: documentUrl == null
                                       ? Colors.black54
@@ -1043,7 +1087,10 @@ Join on VolunteerX
                                             .showSnackBar(
                                           SnackBar(
                                             content: Text(
-                                              "Failed to upload document: $e",
+                                              context.tr(
+                                                "Failed to upload document: {error}",
+                                                args: {"error": e.toString()},
+                                              ),
                                             ),
                                           ),
                                         );
@@ -1061,7 +1108,7 @@ Join on VolunteerX
                                       ),
                                     )
                                   : const Icon(Icons.upload_file),
-                              label: const Text("Upload"),
+                              label: Text(context.tr("Upload")),
                             ),
                           ],
                         ),
@@ -1083,7 +1130,7 @@ Join on VolunteerX
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context, false),
-                  child: const Text("Keep"),
+                  child: Text(context.tr("Keep")),
                 ),
                 ElevatedButton(
                   onPressed: () {
@@ -1091,10 +1138,12 @@ Join on VolunteerX
                       final trimmedReason = reasonController.text.trim();
                       setLocalState(() {
                         reasonError = trimmedReason.isEmpty
-                            ? "Reason is mandatory within 48 hours"
+                            ? context.tr("Reason is mandatory within 48 hours")
                             : null;
                         documentError = documentUrl == null
-                            ? "Supporting document is mandatory within 48 hours"
+                            ? context.tr(
+                                "Supporting document is mandatory within 48 hours",
+                              )
                             : null;
                       });
 
@@ -1104,7 +1153,7 @@ Join on VolunteerX
                     }
                     Navigator.pop(context, true);
                   },
-                  child: const Text("Confirm Cancel"),
+                  child: Text(context.tr("Confirm Cancel")),
                 ),
               ],
             );
@@ -1133,16 +1182,23 @@ Join on VolunteerX
         applicationStatus = "cancelled";
       });
 
-      final message = strikeIssued
-          ? "Participation cancelled. A strike was applied."
+    final message = strikeIssued
+          ? context.tr("Participation cancelled. A strike was applied.")
           : warningIssued
-              ? "Participation cancelled. Warning issued for 48-72 hour window."
-              : "Participation cancelled.";
-      _snack(message);
-    } catch (e) {
-      if (!mounted) return;
-      _snack("Failed to cancel: $e");
-    } finally {
+              ? context.tr(
+                  "Participation cancelled. Warning issued for 48-72 hour window.",
+                )
+              : context.tr("Participation cancelled.");
+    _snack(message);
+  } catch (e) {
+    if (!mounted) return;
+    _snack(
+      context.tr(
+        "Failed to cancel: {error}",
+        args: {"error": e.toString()},
+      ),
+    );
+  } finally {
       if (mounted) {
         setState(() => isCancelling = false);
       }
@@ -1167,11 +1223,21 @@ Join on VolunteerX
           final formattedDate = _formatDateToDDMMYYYY(dateStr);
           final startTime = _formatTime(schedule["start_time"]);
           final endTime = _formatTime(schedule["end_time"]);
-          final dayLabel = "Day $dayNumber";
+          final dayLabel = context.tr(
+            "Day {number}",
+            args: {"number": dayNumber.toString()},
+          );
           dayNumber++;
           return _iconRow(
             Icons.access_time,
-            "$dayLabel | $formattedDate | $startTime-$endTime",
+            context.tr(
+              "{day} | {date} | {time}",
+              args: {
+                "day": dayLabel,
+                "date": formattedDate,
+                "time": "$startTime-$endTime",
+              },
+            ),
           );
         }).toList();
       } else {
@@ -1182,7 +1248,10 @@ Join on VolunteerX
         return [
           _iconRow(
             Icons.access_time,
-            "Time | $startTime-$endTime",
+            context.tr(
+              "Time | {time}",
+              args: {"time": "$startTime-$endTime"},
+            ),
           ),
         ];
       }
@@ -1192,13 +1261,19 @@ Join on VolunteerX
     return [
       _iconRow(
         Icons.access_time,
-        "Time | ${_formatTime(widget.event["start_time"])}-${_formatTime(widget.event["end_time"])}",
+        context.tr(
+          "Time | {time}",
+          args: {
+            "time":
+                "${_formatTime(widget.event["start_time"])}-${_formatTime(widget.event["end_time"])}",
+          },
+        ),
       ),
     ];
   }
 
   String _formatDateToDDMMYYYY(String dateStr) {
-    if (dateStr.isEmpty) return "N/A";
+    if (dateStr.isEmpty) return context.tr("N/A");
     final parsed = IstDateTime.tryParse(dateStr);
     if (parsed == null) return dateStr;
     final day = parsed.day.toString().padLeft(2, "0");
@@ -1210,10 +1285,10 @@ Join on VolunteerX
     final startDateRaw = widget.event["event_date"]?.toString();
     final endDateRaw = widget.event["end_date"]?.toString();
 
-    if (startDateRaw == null || startDateRaw.isEmpty) return "N/A";
+    if (startDateRaw == null || startDateRaw.isEmpty) return context.tr("N/A");
 
     final startParsed = IstDateTime.tryParse(startDateRaw);
-    if (startParsed == null) return "N/A";
+    if (startParsed == null) return context.tr("N/A");
     final startDate = IstDateTime.formatDate(startParsed);
 
     // If no end date or same as start date, show single date
@@ -1231,16 +1306,16 @@ Join on VolunteerX
     }
 
     // Show date range for multi-day events
-    return "$startDate to $endDate";
+    return "$startDate ${context.tr("to")} $endDate";
   }
 
   String _formatTime(dynamic timeValue) {
-    if (timeValue == null) return "N/A";
+    if (timeValue == null) return context.tr("N/A");
     try {
       final time = timeValue.toString();
       return time.length >= 5 ? time.substring(0, 5) : time;
     } catch (_) {
-      return "N/A";
+      return context.tr("N/A");
     }
   }
 
@@ -1279,16 +1354,42 @@ Join on VolunteerX
     return trimmed.startsWith("/") ? "$origin$trimmed" : "$origin/$trimmed";
   }
 
-  String _paymentText(dynamic eventType, dynamic paymentPerDay) {
-    final type = eventType?.toString().toLowerCase();
-    if (type == "paid") {
-      final amount = paymentPerDay?.toString();
-      if (amount != null && amount.isNotEmpty) {
-        return "Paid: ₹$amount/day";
-      }
-      return "Paid";
+  String _paymentRateLabel(dynamic rateType) {
+    switch (rateType?.toString().toLowerCase()) {
+      case "per_hour":
+        return context.tr("per hour");
+      case "fixed":
+        return context.tr("fixed amount");
+      case "per_day":
+      default:
+        return context.tr("per day");
     }
-    return "Unpaid";
+  }
+
+  String? _formatPaidPaymentAmount(
+    dynamic amount,
+    dynamic rateType,
+  ) {
+    final amountText = amount?.toString();
+    if (amountText == null || amountText.isEmpty) {
+      return null;
+    }
+
+    if (rateType?.toString().toLowerCase() == "fixed") {
+      return context.tr(
+        "Rs. {amount} fixed amount",
+        args: {"amount": amountText},
+      );
+    }
+
+    final rateLabel = _paymentRateLabel(rateType);
+    return context.tr(
+      "Rs. {amount} {rate}",
+      args: {
+        "amount": amountText,
+        "rate": rateLabel,
+      },
+    );
   }
 
   String _paymentSummaryText(
@@ -1296,8 +1397,21 @@ Join on VolunteerX
     dynamic paymentAmount,
     dynamic paymentRateType,
   ) {
-    _paymentText(eventType, paymentAmount);
-    return formatEventPaymentText(eventType, paymentAmount, paymentRateType);
+    final type = eventType?.toString().toLowerCase();
+    if (type != "paid") {
+      return context.tr("Unpaid");
+    }
+
+    final paymentText =
+        _formatPaidPaymentAmount(paymentAmount, paymentRateType);
+    if (paymentText == null) {
+      return context.tr("Paid");
+    }
+
+    return context.tr(
+      "Paid: {text}",
+      args: {"text": paymentText},
+    );
   }
 
   String? _paymentClearanceText(dynamic eventType, dynamic paymentClearanceDate) {
@@ -1311,7 +1425,10 @@ Join on VolunteerX
       return null;
     }
 
-    return "Payment clears by: ${IstDateTime.formatDate(rawDate)}";
+    return context.tr(
+      "Payment clears by: {date}",
+      args: {"date": IstDateTime.formatDate(rawDate)},
+    );
   }
 
   Widget _card({required Widget child}) {
@@ -1478,19 +1595,19 @@ Join on VolunteerX
   String _statusText(String status) {
     switch (_normalizedStatus(status)) {
       case "pending":
-        return "Application Pending";
+        return context.tr("Application Pending");
       case "approved":
-        return "Application Approved";
+        return context.tr("Application Approved");
       case "rejected":
-        return "Application Rejected";
+        return context.tr("Application Rejected");
       case "cancelled":
-        return "Application Cancelled";
+        return context.tr("Application Cancelled");
       case "waitlisted":
-        return "Application Waitlisted";
+        return context.tr("Application Waitlisted");
       case "completed":
-        return "Event Completed";
+        return context.tr("Event Completed");
       default:
-        return "Application Status Updated";
+        return context.tr("Application Status Updated");
     }
   }
 
@@ -1507,7 +1624,9 @@ Join on VolunteerX
     if (!context.mounted) return;
 
     if (verificationStatus == null) {
-      _snack("Couldn't verify your account status. Please try again.");
+      _snack(
+        context.tr("Couldn't verify your account status. Please try again."),
+      );
       return;
     }
 
@@ -1541,63 +1660,88 @@ Join on VolunteerX
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Center(
+                  Center(
                     child: Text(
-                      "Volunteer Terms & Conditions",
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      context.tr("Volunteer Terms & Conditions"),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                      "• Participation is voluntary and does not constitute employment."),
+                  Text(
+                    context.tr(
+                      "• Participation is voluntary and does not constitute employment.",
+                    ),
+                  ),
                   const SizedBox(height: 8),
-                  const Text(
-                      "• Volunteers must follow organiser instructions and maintain respectful conduct."),
+                  Text(
+                    context.tr(
+                      "• Volunteers must follow organiser instructions and maintain respectful conduct.",
+                    ),
+                  ),
                   const SizedBox(height: 8),
-                  const Text(
-                      "• Volunteers are responsible for their own safety during the event."),
+                  Text(
+                    context.tr(
+                      "• Volunteers are responsible for their own safety during the event.",
+                    ),
+                  ),
                   const SizedBox(height: 8),
-                  const Text(
-                      "• Accurate profile and contact information must be maintained at all times."),
+                  Text(
+                    context.tr(
+                      "• Accurate profile and contact information must be maintained at all times.",
+                    ),
+                  ),
                   const SizedBox(height: 8),
-                  const Text(
-                    "• VolunteerX is not responsible for any payments, donations, reimbursements, or financial matters related to events; all such transactions are solely between the volunteer and the organiser.",
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                  Text(
+                    context.tr(
+                      "• VolunteerX is not responsible for any payments, donations, reimbursements, or financial matters related to events; all such transactions are solely between the volunteer and the organiser.",
+                    ),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    "Event dates: ${_formatDateRange()}",
+                    context.tr(
+                      "Event dates: {dates}",
+                      args: {"dates": _formatDateRange()},
+                    ),
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    "Time: ${_formatTime(widget.event["start_time"])}-${_formatTime(widget.event["end_time"])}",
+                    context.tr(
+                      "Time: {time}",
+                      args: {
+                        "time":
+                            "${_formatTime(widget.event["start_time"])}-${_formatTime(widget.event["end_time"])}",
+                      },
+                    ),
                     style: const TextStyle(color: Colors.grey),
                   ),
                   const SizedBox(height: 14),
-                  const Text(
-                    "Availability for this event",
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                  Text(
+                    context.tr("Availability for this event"),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 6),
                   Wrap(
                     spacing: 8,
                     children: [
                       ChoiceChip(
-                        label: const Text("Available"),
+                        label: Text(context.tr("Available")),
                         selected: availabilityStatus == "available",
                         onSelected: (_) =>
                             setState(() => availabilityStatus = "available"),
                       ),
                       ChoiceChip(
-                        label: const Text("Partially available"),
+                        label: Text(context.tr("Partially available")),
                         selected: availabilityStatus == "partial",
                         onSelected: (_) =>
                             setState(() => availabilityStatus = "partial"),
                       ),
                       ChoiceChip(
-                        label: const Text("Not sure"),
+                        label: Text(context.tr("Not sure")),
                         selected: availabilityStatus == "unsure",
                         onSelected: (_) =>
                             setState(() => availabilityStatus = "unsure"),
@@ -1605,16 +1749,18 @@ Join on VolunteerX
                     ],
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    "Prior Experience (optional)",
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                  Text(
+                    context.tr("Prior Experience (optional)"),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 6),
                   TextField(
                     maxLines: 3,
                     textInputAction: TextInputAction.newline,
-                    decoration: const InputDecoration(
-                      hintText: "Briefly describe any relevant experience",
+                    decoration: InputDecoration(
+                      hintText: context.tr(
+                        "Briefly describe any relevant experience",
+                      ),
                       border: OutlineInputBorder(),
                     ),
                     onChanged: (value) =>
@@ -1625,7 +1771,7 @@ Join on VolunteerX
                     contentPadding: EdgeInsets.zero,
                     value: agreed,
                     onChanged: (v) => setState(() => agreed = v!),
-                    title: const Text("I agree to the Terms & Conditions"),
+                    title: Text(context.tr("I agree to the Terms & Conditions")),
                   ),
                   SizedBox(
                     width: double.infinity,
@@ -1640,7 +1786,7 @@ Join on VolunteerX
                               );
                             }
                           : null,
-                      child: const Text("Confirm & Apply"),
+                      child: Text(context.tr("Confirm & Apply")),
                     ),
                   ),
                 ],
@@ -1660,14 +1806,18 @@ Join on VolunteerX
     switch (verificationStatus) {
       case "pending":
         message =
-            "Your verification is under review. You can apply for events after approval.";
-        actionText = "OK";
+            context.tr(
+              "Your verification is under review. You can apply for events after approval.",
+            );
+        actionText = context.tr("OK");
         action = () => Navigator.pop(context);
         break;
       case "rejected":
         message =
-            "Your verification was rejected. Please submit verification again to apply for events.";
-        actionText = "Get Verified";
+            context.tr(
+              "Your verification was rejected. Please submit verification again to apply for events.",
+            );
+        actionText = context.tr("Get Verified");
         action = () {
           Navigator.pop(context);
           Navigator.push(
@@ -1679,8 +1829,10 @@ Join on VolunteerX
         };
         break;
       default: // "not_requested" or null
-        message = "You need to be verified before applying for events.";
-        actionText = "Get Verified";
+        message = context.tr(
+          "You need to be verified before applying for events.",
+        );
+        actionText = context.tr("Get Verified");
         action = () {
           Navigator.pop(context);
           Navigator.push(
@@ -1696,12 +1848,12 @@ Join on VolunteerX
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Verification Required"),
+        title: Text(context.tr("Verification Required")),
         content: Text(message),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
+            child: Text(context.tr("Cancel")),
           ),
           TextButton(
             onPressed: action,

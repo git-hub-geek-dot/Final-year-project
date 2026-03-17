@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../services/notification_api_service.dart';
 import '../../utils/ist_date_time.dart';
+import '../../localization/localization_extensions.dart';
 
 class EventAnnouncementsScreen extends StatefulWidget {
   final int eventId;
@@ -83,16 +84,26 @@ class _EventAnnouncementsScreenState extends State<EventAnnouncementsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Announcements"),
+        title: Text(context.tr("Announcements")),
       ),
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : error != null
-              ? Center(child: Text("Failed to load announcements\n$error"))
+              ? Center(
+                  child: Text(
+                    context.tr(
+                      "Failed to load announcements\n{error}",
+                      args: {"error": error.toString()},
+                    ),
+                  ),
+                )
               : items.isEmpty
                   ? Center(
                       child: Text(
-                        "No announcements for ${widget.eventTitle}",
+                        context.tr(
+                          "No announcements for {event}",
+                          args: {"event": widget.eventTitle},
+                        ),
                         textAlign: TextAlign.center,
                       ),
                     )
@@ -103,7 +114,8 @@ class _EventAnnouncementsScreenState extends State<EventAnnouncementsScreen> {
                       itemBuilder: (context, index) {
                         final row = items[index];
                         final title =
-                            (row["title"] ?? "Announcement").toString();
+                            (row["title"] ?? context.tr("Announcement"))
+                                .toString();
                         final body = (row["body"] ?? "").toString();
                         final createdAt =
                             _formatTime(row["created_at"]?.toString());

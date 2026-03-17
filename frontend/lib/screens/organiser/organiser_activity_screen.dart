@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import '../../services/event_service.dart';
 import '../../utils/ist_date_time.dart';
+import '../../localization/localization_extensions.dart';
 
 class OrganiserActivityScreen extends StatefulWidget {
   const OrganiserActivityScreen({super.key});
@@ -76,16 +77,28 @@ class _OrganiserActivityScreenState extends State<OrganiserActivityScreen>
 
   String _statusLabel(String status) {
     switch (status) {
+      case "ongoing":
+        return "Ongoing";
+      case "upcoming":
+        return "Upcoming";
+      case "completed":
+        return "Completed";
+      case "draft":
+        return "Draft";
+      case "cancelled":
+        return "Cancelled";
       case "deleted_by_admin":
-        return "REMOVED";
+        return "Removed";
       default:
-        return status.toUpperCase();
+        return status;
     }
   }
 
   String _dateText(dynamic value) {
     final formatted = IstDateTime.formatDate(value);
-    if (formatted == "-" || formatted.isEmpty) return "Date not set";
+    if (formatted == "-" || formatted.isEmpty) {
+      return "Date not set";
+    }
     return formatted;
   }
 
@@ -114,9 +127,9 @@ class _OrganiserActivityScreenState extends State<OrganiserActivityScreen>
                   child: Icon(Icons.business, size: 36),
                 ),
                 const SizedBox(height: 10),
-                const Text(
-                  "Your Organisation",
-                  style: TextStyle(
+                Text(
+                  context.tr("Your Organisation"),
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -131,11 +144,11 @@ class _OrganiserActivityScreenState extends State<OrganiserActivityScreen>
                   indicatorColor: Colors.white,
                   labelColor: Colors.white,
                   unselectedLabelColor: Colors.white70,
-                  tabs: const [
-                    Tab(text: "Volunteers"),
-                    Tab(text: "Events"),
-                    Tab(text: "Rating"),
-                    Tab(text: "Reviews"),
+                  tabs: [
+                    Tab(text: context.tr("Volunteers")),
+                    Tab(text: context.tr("Events")),
+                    Tab(text: context.tr("Rating")),
+                    Tab(text: context.tr("Reviews")),
                   ],
                 ),
               ],
@@ -147,7 +160,9 @@ class _OrganiserActivityScreenState extends State<OrganiserActivityScreen>
             child: TabBarView(
               controller: _tabController,
               children: [
-                const Center(child: Text("Your volunteers will appear here")),
+                Center(
+                  child: Text(context.tr("Your volunteers will appear here")),
+                ),
 
                 RefreshIndicator(
                   onRefresh: () => _loadEvents(),
@@ -156,9 +171,9 @@ class _OrganiserActivityScreenState extends State<OrganiserActivityScreen>
                       : _events.isEmpty
                           ? ListView(
                               physics: const AlwaysScrollableScrollPhysics(),
-                              children: const [
-                                SizedBox(height: 220),
-                                Center(child: Text("No events found")),
+                              children: [
+                                const SizedBox(height: 220),
+                                Center(child: Text(context.tr("No events found"))),
                               ],
                             )
                           : ListView.builder(
@@ -192,7 +207,9 @@ class _OrganiserActivityScreenState extends State<OrganiserActivityScreen>
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              (event["title"] ?? "Untitled Event").toString(),
+                                              (event["title"] ??
+                                                      context.tr("Untitled Event"))
+                                                  .toString(),
                                               style: const TextStyle(
                                                 fontSize: 15,
                                                 fontWeight: FontWeight.bold,
@@ -204,14 +221,14 @@ class _OrganiserActivityScreenState extends State<OrganiserActivityScreen>
                                             Text(
                                               event["location"]?.toString().isNotEmpty == true
                                                   ? event["location"].toString()
-                                                  : "Location not set",
+                                                  : context.tr("Location not set"),
                                               style: TextStyle(color: Colors.grey.shade700),
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                             ),
                                             const SizedBox(height: 4),
                                             Text(
-                                              _dateText(event["event_date"]),
+                                              context.tr(_dateText(event["event_date"])),
                                               style: TextStyle(
                                                 color: Colors.grey.shade600,
                                                 fontSize: 12,
@@ -231,7 +248,7 @@ class _OrganiserActivityScreenState extends State<OrganiserActivityScreen>
                                           borderRadius: BorderRadius.circular(20),
                                         ),
                                         child: Text(
-                                          _statusLabel(status),
+                                          context.tr(_statusLabel(status)),
                                           style: TextStyle(
                                             color: statusColor,
                                             fontWeight: FontWeight.bold,
@@ -246,14 +263,16 @@ class _OrganiserActivityScreenState extends State<OrganiserActivityScreen>
                             ),
                 ),
 
-                const Center(
+                Center(
                   child: Text(
-                    "Your organisation rating",
-                    style: TextStyle(fontSize: 16),
+                    context.tr("Your organisation rating"),
+                    style: const TextStyle(fontSize: 16),
                   ),
                 ),
 
-                const Center(child: Text("Volunteer reviews will appear here")),
+                Center(
+                  child: Text(context.tr("Volunteer reviews will appear here")),
+                ),
               ],
             ),
           ),

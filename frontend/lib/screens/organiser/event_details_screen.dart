@@ -10,6 +10,7 @@ import '../chat/event_group_chat_screen.dart';
 import 'edit_event_screen.dart';
 import 'review_application_screen.dart';
 import '../../widgets/robust_image.dart';
+import '../../localization/localization_extensions.dart';
 
 class EventDetailsScreen extends StatefulWidget {
   final Map event;
@@ -99,7 +100,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
   String _statusText(Map event) {
     switch (_normalizedStatus(event)) {
       case "deleted_by_admin":
-        return "Removed by Admin";
+        return "Removed by admin";
       case "cancelled":
         return "Cancelled";
       case "completed":
@@ -122,7 +123,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     final eventId = int.tryParse("${event["id"]}");
     if (eventId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Invalid event id")),
+        SnackBar(content: Text(context.tr("Invalid event id"))),
       );
       return;
     }
@@ -130,18 +131,18 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Publish Event"),
-        content: const Text(
-          "Do you want to publish this draft event now?",
+        title: Text(context.tr("Publish Event")),
+        content: Text(
+          context.tr("Do you want to publish this draft event now?"),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
+            child: Text(context.tr("Cancel")),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text("Publish"),
+            child: Text(context.tr("Publish")),
           ),
         ],
       ),
@@ -154,7 +155,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
       await EventService.publishDraftEvent(eventId);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Event published successfully")),
+        SnackBar(content: Text(context.tr("Event published successfully"))),
       );
       Navigator.pop(context, true);
     } catch (e) {
@@ -191,15 +192,15 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
           builder: (context, setDialogState) {
             final isOther = selectedReason == "Other";
             return AlertDialog(
-              title: const Text("Cancel Event"),
+              title: Text(context.tr("Cancel Event")),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      "Select a cancellation reason",
-                      style: TextStyle(fontWeight: FontWeight.w600),
+                    Text(
+                      context.tr("Select a cancellation reason"),
+                      style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 10),
                     ...reasonOptions.map(
@@ -208,7 +209,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                         dense: true,
                         value: reason,
                         groupValue: selectedReason,
-                        title: Text(reason),
+                        title: Text(context.tr(reason)),
                         onChanged: (value) {
                           if (value == null) return;
                           setDialogState(() {
@@ -223,9 +224,9 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                       TextField(
                         controller: customReasonController,
                         maxLines: 3,
-                        decoration: const InputDecoration(
-                          hintText: "Write cancellation reason",
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          hintText: context.tr("Write cancellation reason"),
+                          border: const OutlineInputBorder(),
                         ),
                         onChanged: (_) {
                           if (validationError != null) {
@@ -250,7 +251,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text("Back"),
+                  child: Text(context.tr("Back")),
                 ),
                 ElevatedButton(
                   onPressed: () {
@@ -260,14 +261,15 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
 
                     if (reason.isEmpty) {
                       setDialogState(() {
-                        validationError = "Please provide cancellation reason";
+                        validationError =
+                            context.tr("Please provide cancellation reason");
                       });
                       return;
                     }
 
                     Navigator.pop(context, reason);
                   },
-                  child: const Text("Cancel Event"),
+                  child: Text(context.tr("Cancel Event")),
                 ),
               ],
             );
@@ -284,7 +286,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     final eventId = int.tryParse("${event["id"]}");
     if (eventId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Invalid event id")),
+        SnackBar(content: Text(context.tr("Invalid event id"))),
       );
       return;
     }
@@ -297,7 +299,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
       await EventService.cancelEvent(id: eventId, reason: reason.trim());
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Event cancelled successfully")),
+        SnackBar(content: Text(context.tr("Event cancelled successfully"))),
       );
       Navigator.pop(context, true);
     } catch (e) {
@@ -321,14 +323,14 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: const Text("Send Announcement"),
+              title: Text(context.tr("Send Announcement")),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    "Write a message for volunteers in this event.",
-                    style: TextStyle(fontSize: 13),
+                  Text(
+                    context.tr("Write a message for volunteers in this event."),
+                    style: const TextStyle(fontSize: 13),
                   ),
                   const SizedBox(height: 10),
                   TextField(
@@ -336,7 +338,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                     maxLength: 500,
                     maxLines: 5,
                     decoration: InputDecoration(
-                      hintText: "Type announcement...",
+                      hintText: context.tr("Type announcement..."),
                       border: const OutlineInputBorder(),
                       errorText: validationError,
                     ),
@@ -351,21 +353,21 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text("Cancel"),
+                  child: Text(context.tr("Cancel")),
                 ),
                 ElevatedButton.icon(
                   onPressed: () {
                     final value = controller.text.trim();
                     if (value.isEmpty) {
                       setDialogState(() {
-                        validationError = "Message is required";
+                        validationError = context.tr("Message is required");
                       });
                       return;
                     }
                     Navigator.pop(context, value);
                   },
                   icon: const Icon(Icons.send),
-                  label: const Text("Send"),
+                  label: Text(context.tr("Send")),
                 ),
               ],
             );
@@ -382,7 +384,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     final eventId = int.tryParse("${event["id"]}");
     if (eventId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Invalid event id")),
+        SnackBar(content: Text(context.tr("Invalid event id"))),
       );
       return;
     }
@@ -398,10 +400,18 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
       );
       if (!mounted) return;
 
-      final recipientLabel = recipients == 1 ? "volunteer" : "volunteers";
+      final recipientLabel = recipients == 1
+          ? context.tr("volunteer")
+          : context.tr("volunteers");
       final successText = recipients > 0
-          ? "Announcement sent to $recipients $recipientLabel"
-          : "Announcement sent. No volunteers to notify yet.";
+          ? context.tr(
+              "Announcement sent to {count} {label}",
+              args: {
+                "count": recipients.toString(),
+                "label": recipientLabel,
+              },
+            )
+          : context.tr("Announcement sent. No volunteers to notify yet.");
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(successText)),
@@ -436,7 +446,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
       backgroundColor: const Color(0xFFF5F7FB),
       appBar: AppBar(
         elevation: 0,
-        title: const Text("Event Details"),
+        title: Text(context.tr("Event Details")),
         flexibleSpace: const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -478,7 +488,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      event["title"] ?? "Untitled Event",
+                      event["title"] ?? context.tr("Untitled Event"),
                       style: const TextStyle(
                           fontSize: 20, fontWeight: FontWeight.bold),
                     ),
@@ -502,10 +512,12 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      "Event Overview",
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    Text(
+                      context.tr("Event Overview"),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 14),
                     loadingStats
@@ -513,12 +525,18 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                         : Row(
                             children: [
                               _statBox(
-                                  "Applied", applied.toString(), Icons.person),
-                              _statBox("Approved", approved.toString(),
+                                  context.tr("Applied"),
+                                  applied.toString(),
+                                  Icons.person),
+                              _statBox(context.tr("Approved"),
+                                  approved.toString(),
                                   Icons.check_circle),
-                              _statBox("Pending / Waitlisted", pending.toString(),
+                              _statBox(
+                                  context.tr("Pending / Waitlisted"),
+                                  pending.toString(),
                                   Icons.hourglass_bottom),
-                              _statBox("Rejected", rejected.toString(),
+                              _statBox(context.tr("Rejected"),
+                                  rejected.toString(),
                                   Icons.cancel),
                             ],
                           ),
@@ -527,9 +545,23 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                            "Volunteers Needed: ${event["volunteers_required"] ?? 0}"),
+                          context.tr(
+                            "Volunteers Needed: {count}",
+                            args: {
+                              "count":
+                                  (event["volunteers_required"] ?? 0).toString(),
+                            },
+                          ),
+                        ),
                         Text(
-                          "Slots Remaining: ${(event["volunteers_required"] ?? 0) - approved}",
+                          context.tr(
+                            "Slots Remaining: {count}",
+                            args: {
+                              "count": ((event["volunteers_required"] ?? 0) -
+                                      approved)
+                                  .toString(),
+                            },
+                          ),
                         ),
                       ],
                     ),
@@ -540,23 +572,44 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      "Event Info",
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    Text(
+                      context.tr("Event Info"),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 12),
-                    _infoRow(Icons.location_on, event["location"]),
-                    _infoRow(Icons.category, event["event_type"]),
-                    if (_paymentText(event) != null)
-                      _infoRow(Icons.payments, _paymentText(event)),
-                    if (_paymentClearanceText(event) != null)
-                      _infoRow(Icons.schedule, _paymentClearanceText(event)),
+                    _infoRow(
+                      Icons.location_on,
+                      (event["location"] ?? context.tr("N/A")).toString(),
+                    ),
+                    _infoRow(
+                      Icons.category,
+                      (event["event_type"] ?? context.tr("N/A")).toString(),
+                    ),
+                    if (_paymentText(context, event) != null)
+                      _infoRow(Icons.payments, _paymentText(context, event)),
+                    if (_paymentClearanceText(context, event) != null)
+                      _infoRow(
+                        Icons.schedule,
+                        _paymentClearanceText(context, event),
+                      ),
                     _infoRow(Icons.calendar_today, eventDateRangeText),
                     _infoRow(Icons.access_time,
-                        "Time: $startTimeText - $endTimeText"),
+                        context.tr(
+                          "Time: {start} - {end}",
+                          args: {
+                            "start": startTimeText,
+                            "end": endTimeText,
+                          },
+                        )),
                     _infoRow(
-                        Icons.timer, "Application Deadline: $deadlineText"),
+                        Icons.timer,
+                        context.tr(
+                          "Application Deadline: {date}",
+                          args: {"date": deadlineText},
+                        )),
                   ],
                 ),
               ),
@@ -564,14 +617,16 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      "Responsibilities",
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    Text(
+                      context.tr("Responsibilities"),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     if (responsibilities.isEmpty)
-                      const Text("No responsibilities added"),
+                      Text(context.tr("No responsibilities added")),
                     if (responsibilities.isNotEmpty)
                       ...responsibilities.map(
                         (item) => Padding(
@@ -628,7 +683,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
             elevation: 2,
             textStyle: const TextStyle(fontWeight: FontWeight.w700),
           ),
-          child: const Text("View Volunteers"),
+          child: Text(context.tr("View Volunteers")),
         );
 
         final editEventButton = OutlinedButton.icon(
@@ -644,7 +699,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
             }
           },
           icon: const Icon(Icons.edit),
-          label: const Text("Edit Event"),
+          label: Text(context.tr("Edit Event")),
         );
 
         final announceButton = OutlinedButton.icon(
@@ -665,7 +720,9 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                   ),
                 )
               : const Icon(Icons.campaign),
-          label: Text(announcingEvent ? "Sending..." : "Announce"),
+          label: Text(
+            announcingEvent ? context.tr("Sending...") : context.tr("Announce"),
+          ),
         );
 
         final eventChatButton = OutlinedButton.icon(
@@ -673,7 +730,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
             final eventId = int.tryParse("${event["id"]}");
             if (eventId == null) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Invalid event id")),
+                SnackBar(content: Text(context.tr("Invalid event id"))),
               );
               return;
             }
@@ -682,7 +739,8 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
               MaterialPageRoute(
                 builder: (_) => EventGroupChatScreen(
                   eventId: eventId,
-                  eventTitle: (event["title"] ?? "Event").toString(),
+                  eventTitle:
+                      (event["title"] ?? context.tr("Event")).toString(),
                 ),
               ),
             );
@@ -692,7 +750,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
             side: BorderSide(color: Colors.green.shade300),
           ),
           icon: const Icon(Icons.forum_outlined),
-          label: const Text("Event Chat"),
+          label: Text(context.tr("Event Chat")),
         );
 
         final cancelEventButton = OutlinedButton.icon(
@@ -717,10 +775,10 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
               : const Icon(Icons.event_busy),
           label: Text(
             isCompletedEvent
-                ? "Event Completed"
+                ? context.tr("Event Completed")
                 : isCancelledEvent
-                    ? "Event Cancelled"
-                    : "Cancel Event",
+                    ? context.tr("Event Cancelled")
+                    : context.tr("Cancel Event"),
           ),
         );
 
@@ -798,7 +856,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                 minimumSize: const Size(double.infinity, 56),
                 side: const BorderSide(color: Color(0xFF3B82F6)),
               ),
-              child: const Text("Edit Draft"),
+              child: Text(context.tr("Edit Draft")),
             ),
           ),
           const SizedBox(width: 12),
@@ -826,9 +884,9 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                             color: Colors.white,
                           ),
                         )
-                      : const Text(
-                          "Publish Event",
-                          style: TextStyle(
+                      : Text(
+                          context.tr("Publish Event"),
+                          style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
                           ),
@@ -873,7 +931,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     );
   }
 
-  static Widget _statusChip(String text) {
+  Widget _statusChip(String text) {
     final normalized = text.toLowerCase();
     final isCancelled = normalized.contains("cancel");
     final isCompleted = normalized.contains("complete");
@@ -909,26 +967,30 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
         children: [
           Icon(Icons.circle, size: 8, color: dotColor),
           const SizedBox(width: 6),
-          Text(text),
+          Text(context.tr(text)),
         ],
       ),
     );
   }
 
-  static Widget _infoRow(IconData icon, String? text) {
+  Widget _infoRow(IconData icon, String? text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         children: [
           Icon(icon, size: 18, color: Colors.blue),
           const SizedBox(width: 10),
-          Expanded(child: Text(text ?? "-")),
+          Expanded(
+            child: Text(
+              (text == null || text.isEmpty) ? context.tr("N/A") : text,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  static String? _paymentText(Map event) {
+  String? _paymentText(BuildContext context, Map event) {
     final type = event["event_type"]?.toString().toLowerCase();
     if (type != "paid") {
       return null;
@@ -938,10 +1000,10 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
           event["payment_amount"],
           event["payment_rate_type"],
         ) ??
-        "Paid event";
+        context.tr("Paid event");
   }
 
-  static String? _paymentClearanceText(Map event) {
+  String? _paymentClearanceText(BuildContext context, Map event) {
     final type = event["event_type"]?.toString().toLowerCase();
     if (type != "paid") {
       return null;
@@ -952,14 +1014,17 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
       return null;
     }
 
-    return "Payment clears by: ${_fmtDate(rawDate)}";
+    return context.tr(
+      "Payment clears by: {date}",
+      args: {"date": _fmtDate(rawDate)},
+    );
   }
 
-  static String _formatEventDateRange(Map event) {
+  String _formatEventDateRange(Map event) {
     final startDateRaw = event["event_date"]?.toString();
     final endDateRaw = event["end_date"]?.toString();
 
-    if (startDateRaw == null || startDateRaw.isEmpty) return "-";
+    if (startDateRaw == null || startDateRaw.isEmpty) return context.tr("N/A");
 
     final startDate = IstDateTime.formatDate(startDateRaw);
 
@@ -976,7 +1041,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     }
 
     // Show date range for multi-day events
-    return "$startDate to $endDate";
+    return "$startDate ${context.tr("to")} $endDate";
   }
 
   static String _fmtDate(dynamic value) {

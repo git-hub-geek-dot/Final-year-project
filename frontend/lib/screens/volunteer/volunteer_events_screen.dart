@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../utils/ist_date_time.dart';
 import 'view_event_screen.dart';
+import '../../localization/localization_extensions.dart';
 
 class VolunteerEventsScreen extends StatefulWidget {
   final List events;
@@ -107,27 +108,27 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
           _tabsRow(),
           const SizedBox(height: 12),
           if (!hasAny)
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(top: 24),
-              child: Center(child: Text("No events found")),
+              child: Center(child: Text(context.tr("No events found"))),
             )
           else if (!isSplitTab) ...[
             ...filtered.map(_eventCard),
           ] else ...[
             if (appliedEvents.isEmpty && selectedTab == "past")
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(top: 24),
-                child: Center(child: Text("No volunteer history yet")),
+                child: Center(child: Text(context.tr("No volunteer history yet"))),
               ),
             if (appliedEvents.isNotEmpty) ...[
-              _sectionHeader("Applied Events"),
+              _sectionHeader(context.tr("Applied Events")),
               const SizedBox(height: 8),
               ...appliedEvents.map(_eventCard),
               if (openEvents.isNotEmpty && selectedTab != "past")
                 const SizedBox(height: 8),
             ],
             if (openEvents.isNotEmpty && selectedTab != "past") ...[
-              _sectionHeader("Open Events"),
+              _sectionHeader(context.tr("Open Events")),
               const SizedBox(height: 8),
               ...openEvents.map(_eventCard),
             ],
@@ -149,7 +150,7 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
               onChanged: (value) =>
                   setState(() => searchQuery = value.toLowerCase()),
               decoration: InputDecoration(
-                hintText: "Search",
+                hintText: context.tr("Search"),
                 prefixIcon: const Icon(Icons.search),
                 filled: true,
                 fillColor: Colors.white,
@@ -171,7 +172,7 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
                   showSearch = true;
                 });
               },
-              tooltip: "Search",
+              tooltip: context.tr("Search"),
             ),
           ),
         const SizedBox(width: 10),
@@ -197,7 +198,7 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
                 });
                 _searchFocus.unfocus();
               },
-              tooltip: "Close search",
+              tooltip: context.tr("Close search"),
             ),
           ),
         if (showSearch) const SizedBox(width: 10),
@@ -207,7 +208,7 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
           child: IconButton(
             icon: const Icon(Icons.filter_list, color: Color(0xFF2E6BE6)),
             onPressed: _openFilterSheet,
-            tooltip: "Filters",
+            tooltip: context.tr("Filters"),
           ),
         ),
       ],
@@ -257,7 +258,7 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            label,
+            context.tr(label),
             style: const TextStyle(
               color: Color(0xFF2E6BE6),
               fontSize: 12,
@@ -295,10 +296,10 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
       ),
       child: Row(
         children: [
-          Expanded(child: _tabButton("All", "all")),
-          Expanded(child: _tabButton("Upcoming", "upcoming")),
-          Expanded(child: _tabButton("Ongoing", "ongoing")),
-          Expanded(child: _tabButton("Past", "past")),
+          Expanded(child: _tabButton(context.tr("All"), "all")),
+          Expanded(child: _tabButton(context.tr("Upcoming"), "upcoming")),
+          Expanded(child: _tabButton(context.tr("Ongoing"), "ongoing")),
+          Expanded(child: _tabButton(context.tr("Past"), "past")),
         ],
       ),
     );
@@ -353,19 +354,19 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Center(
+                    Center(
                       child: Text(
-                        "Filter Events",
-                        style: TextStyle(
+                        context.tr("Filter Events"),
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
                     const SizedBox(height: 20),
-                    const Text(
-                      "Category",
-                      style: TextStyle(fontWeight: FontWeight.w600),
+                    Text(
+                      context.tr("Category"),
+                      style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 8),
                     Wrap(
@@ -374,7 +375,7 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
                       children: categories.map((cat) {
                         final selected = sheetCategory == cat;
                         return ChoiceChip(
-                          label: Text(cat),
+                          label: Text(context.tr(cat)),
                           selected: selected,
                           onSelected: (_) {
                             setSheetState(() {
@@ -385,9 +386,9 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
                       }).toList(),
                     ),
                     const SizedBox(height: 20),
-                    const Text(
-                      "Date",
-                      style: TextStyle(fontWeight: FontWeight.w600),
+                    Text(
+                      context.tr("Date"),
+                      style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 8),
                     Wrap(
@@ -395,7 +396,7 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
                       children: dateFilters.map((date) {
                         final selected = sheetDate == date;
                         return ChoiceChip(
-                          label: Text(date),
+                          label: Text(context.tr(date)),
                           selected: selected,
                           onSelected: (_) {
                             setSheetState(() {
@@ -417,7 +418,7 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
                               });
                               Navigator.pop(context);
                             },
-                            child: const Text("Clear"),
+                            child: Text(context.tr("Clear")),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -430,7 +431,7 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
                               });
                               Navigator.pop(context);
                             },
-                            child: const Text("Apply"),
+                            child: Text(context.tr("Apply")),
                           ),
                         ),
                       ],
@@ -590,20 +591,20 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
   String _eventStatusLabel(String status) {
     switch (status) {
       case "upcoming":
-        return "Upcoming";
+        return context.tr("Upcoming");
       case "ongoing":
-        return "Ongoing";
+        return context.tr("Ongoing");
       case "completed":
-        return "Completed";
+        return context.tr("Completed");
       case "cancelled":
-        return "Cancelled";
+        return context.tr("Cancelled");
       case "deleted_by_admin":
-        return "Removed";
+        return context.tr("Removed");
       case "draft":
-        return "Draft";
+        return context.tr("Draft");
       case "open":
       default:
-        return "Open";
+        return context.tr("Open");
     }
   }
 
@@ -687,7 +688,13 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
       "volunteers_filled",
     ]);
     if (filled != null) {
-      return "$filled/$required approved";
+      return context.tr(
+        "{filled}/{required} approved",
+        args: {
+          "filled": filled.toString(),
+          "required": required.toString(),
+        },
+      );
     }
 
     final applied = _readIntFromKeys(event, [
@@ -697,7 +704,13 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
       "total_applications",
     ]);
     final fallback = applied ?? 0;
-    return "$fallback/$required approved";
+    return context.tr(
+      "{filled}/{required} approved",
+      args: {
+        "filled": fallback.toString(),
+        "required": required.toString(),
+      },
+    );
   }
 
   Widget _eventCard(Map<String, dynamic> event) {
@@ -878,19 +891,23 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
     if (isPastTab || isClosed) return null;
 
     if (status == "pending") {
-      return _ActionState("Pending", false, Colors.orange);
+      return _ActionState(context.tr("Pending"), false, Colors.orange);
     }
     if (status == "accepted" || status == "approved") {
-      return _ActionState("Approved", false, Colors.green);
+      return _ActionState(context.tr("Approved"), false, Colors.green);
     }
     if (status == "rejected") {
-      return _ActionState("Rejected", false, Colors.red);
+      return _ActionState(context.tr("Rejected"), false, Colors.red);
     }
     if (status == "cancelled") {
-      return _ActionState("Cancelled", false, Colors.red);
+      return _ActionState(context.tr("Cancelled"), false, Colors.red);
     }
 
-    return _ActionState("Apply", true, const Color(0xFF2ECC71));
+    return _ActionState(
+      context.tr("Apply"),
+      true,
+      const Color(0xFF2ECC71),
+    );
   }
 
   String? _applicationStatusForEvent(Map<String, dynamic> event) {
@@ -997,8 +1014,7 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
     final startParsed = IstDateTime.tryParse(startDateRaw);
     if (startParsed == null) return "";
 
-    final startFormatted =
-        "${startParsed.day.toString().padLeft(2, "0")} ${_monthName(startParsed.month)} ${startParsed.year}";
+    final startFormatted = IstDateTime.formatDate(startParsed);
 
     // If no end date, show single date
     if (endDateRaw == null || endDateRaw.isEmpty) {
@@ -1019,8 +1035,7 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
     }
 
     // Show date range for multi-day events
-    final endFormatted =
-        "${endParsed.day.toString().padLeft(2, "0")} ${_monthName(endParsed.month)} ${endParsed.year}";
+    final endFormatted = IstDateTime.formatDate(endParsed);
     return "$startFormatted - $endFormatted";
   }
 
@@ -1030,23 +1045,6 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
     return text.substring(0, 5);
   }
 
-  String _monthName(int month) {
-    const months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
-    return months[month - 1];
-  }
 }
 
 class _ActionState {

@@ -8,6 +8,7 @@ import '../../services/report_service.dart';
 import '../../services/token_service.dart';
 import '../../utils/ist_date_time.dart';
 import '../../utils/payment_format.dart';
+import '../../localization/localization_extensions.dart';
 
 class CompensationStatusScreen extends StatefulWidget {
   const CompensationStatusScreen({super.key});
@@ -40,7 +41,7 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
       if (token == null || token.isEmpty) {
         setState(() {
           loading = false;
-          errorMessage = "Token not found. Please login again.";
+          errorMessage = context.tr("Token not found. Please login again.");
         });
         return;
       }
@@ -75,13 +76,22 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
       } else {
         setState(() {
           loading = false;
-          errorMessage = "Error ${response.statusCode}: ${response.body}";
+          errorMessage = context.tr(
+            "Error {statusCode}: {message}",
+            args: {
+              "statusCode": response.statusCode.toString(),
+              "message": response.body,
+            },
+          );
         });
       }
     } catch (e) {
       setState(() {
         loading = false;
-        errorMessage = "Error: $e";
+        errorMessage = context.tr(
+          "Error: {error}",
+          args: {"error": e.toString()},
+        );
       });
     }
   }
@@ -120,18 +130,25 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
 
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Status updated")),
+          SnackBar(content: Text(context.tr("Status updated"))),
         );
       } else {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Failed: ${response.body}")),
+          SnackBar(
+            content: Text(
+              context.tr(
+                "Failed: {message}",
+                args: {"message": response.body},
+              ),
+            ),
+          ),
         );
       }
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Failed to update status")),
+        SnackBar(content: Text(context.tr("Failed to update status"))),
       );
     }
   }
@@ -150,11 +167,11 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
   String _statusLabel(String status) {
     switch (status.toLowerCase()) {
       case "received":
-        return "Received";
+        return context.tr("Received");
       case "not_applicable":
-        return "Not applicable";
+        return context.tr("Not applicable");
       default:
-        return "Pending";
+        return context.tr("Pending");
     }
   }
 
@@ -217,7 +234,11 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
     if (applicationId == null || eventId == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Payment report details are not available.")),
+        SnackBar(
+          content: Text(
+            context.tr("Payment report details are not available."),
+          ),
+        ),
       );
       return;
     }
@@ -225,7 +246,11 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
     if (_reportedApplicationIds.contains(applicationId)) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("This unpaid payment report was already submitted.")),
+        SnackBar(
+          content: Text(
+            context.tr("This unpaid payment report was already submitted."),
+          ),
+        ),
       );
       return;
     }
@@ -239,14 +264,20 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
         return StatefulBuilder(
           builder: (dialogContext, setLocalState) {
             return AlertDialog(
-              title: const Text("Report Unpaid Payment"),
+              title: Text(context.tr("Report Unpaid Payment")),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      "This will create an admin report for unpaid compensation on ${(app["title"] ?? "this event").toString()}.",
+                      context.tr(
+                        "This will create an admin report for unpaid compensation on {event}.",
+                        args: {
+                          "event": (app["title"] ?? context.tr("this event"))
+                              .toString(),
+                        },
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -259,8 +290,10 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
                       minLines: 3,
                       maxLines: 5,
                       decoration: InputDecoration(
-                        labelText: "Details",
-                        hintText: "Add any payment issue details for admin review.",
+                        labelText: context.tr("Details"),
+                        hintText: context.tr(
+                          "Add any payment issue details for admin review.",
+                        ),
                         errorText: detailsError,
                         border: const OutlineInputBorder(),
                       ),
@@ -271,19 +304,21 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(dialogContext).pop(false),
-                  child: const Text("Cancel"),
+                  child: Text(context.tr("Cancel")),
                 ),
                 ElevatedButton(
                   onPressed: () {
                     if (detailsController.text.trim().isEmpty) {
                       setLocalState(() {
-                        detailsError = "Please add a short note for admin review.";
+                        detailsError = context.tr(
+                          "Please add a short note for admin review.",
+                        );
                       });
                       return;
                     }
                     Navigator.of(dialogContext).pop(true);
                   },
-                  child: const Text("Submit Report"),
+                  child: Text(context.tr("Submit Report")),
                 ),
               ],
             );
@@ -298,12 +333,13 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
     }
 
     try {
-      final title = (app["title"] ?? "Unknown event").toString();
+      final title =
+          (app["title"] ?? context.tr("Unknown event")).toString();
       final paymentText = formatPaidPaymentAmount(
             app["payment_amount"],
             app["payment_rate_type"],
           ) ??
-          "Paid event";
+          context.tr("Paid event");
       final clearanceText = app["payment_clearance_date"]?.toString();
       final volunteerNote = detailsController.text.trim();
       final autoDetails = [
@@ -326,14 +362,23 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
         _reportedApplicationIds.add(applicationId);
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Unpaid payment report submitted for admin review."),
+        SnackBar(
+          content: Text(
+            context.tr("Unpaid payment report submitted for admin review."),
+          ),
         ),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to submit report: $e")),
+        SnackBar(
+          content: Text(
+            context.tr(
+              "Failed to submit report: {error}",
+              args: {"error": e.toString()},
+            ),
+          ),
+        ),
       );
     } finally {
       detailsController.dispose();
@@ -343,7 +388,7 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Payment Status")),
+      appBar: AppBar(title: Text(context.tr("Payment Status"))),
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : errorMessage != null
@@ -358,15 +403,16 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
                   ),
                 )
               : applications.isEmpty
-                  ? const Center(
-                      child: Text("No approved events yet"),
+                  ? Center(
+                      child: Text(context.tr("No approved events yet")),
                     )
                   : ListView.builder(
                       padding: const EdgeInsets.all(16),
                       itemCount: applications.length,
                       itemBuilder: (context, index) {
                         final app = applications[index];
-                        final title = app["title"] ?? "Unknown Event";
+                        final title =
+                            app["title"] ?? context.tr("Unknown Event");
                         final location = (app["location"] ?? "").toString();
                         final eventType =
                             (app["event_type"] ?? "unpaid").toString();
@@ -412,7 +458,9 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
                                                     Icons.check_circle,
                                                     color: Colors.green,
                                                   ),
-                                                  title: const Text("Received"),
+                                                  title: Text(
+                                                    context.tr("Received"),
+                                                  ),
                                                   onTap: () => Navigator.pop(
                                                     context,
                                                     "received",
@@ -423,7 +471,9 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
                                                     Icons.hourglass_top,
                                                     color: Colors.orange,
                                                   ),
-                                                  title: const Text("Pending"),
+                                                  title: Text(
+                                                    context.tr("Pending"),
+                                                  ),
                                                   onTap: () => Navigator.pop(
                                                     context,
                                                     "pending",
@@ -452,8 +502,12 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
                                       Expanded(
                                         child: Text(
                                           alreadyReported
-                                              ? "Unpaid payment report submitted."
-                                              : "Payment is still pending after clearance date.",
+                                              ? context.tr(
+                                                  "Unpaid payment report submitted.",
+                                                )
+                                              : context.tr(
+                                                  "Payment is still pending after clearance date.",
+                                                ),
                                           style: TextStyle(
                                             fontSize: 12,
                                             color: alreadyReported
@@ -470,8 +524,10 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
                                         icon: const Icon(Icons.report_outlined),
                                         label: Text(
                                           alreadyReported
-                                              ? "Reported"
-                                              : "Report unpaid payment",
+                                              ? context.tr("Reported")
+                                              : context.tr(
+                                                  "Report unpaid payment",
+                                                ),
                                         ),
                                       ),
                                     ],

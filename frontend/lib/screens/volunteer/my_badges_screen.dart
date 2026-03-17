@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/badge_service.dart';
+import '../../localization/localization_extensions.dart';
 
 class MyBadgesScreen extends StatefulWidget {
   const MyBadgesScreen({super.key});
@@ -51,7 +52,7 @@ class _MyBadgesScreenState extends State<MyBadgesScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = "Unable to load badges right now.";
+        _error = context.tr("Unable to load badges right now.");
         _loading = false;
       });
     }
@@ -81,16 +82,24 @@ class _MyBadgesScreenState extends State<MyBadgesScreen> {
   String _badgeSubtitle(Map<String, dynamic> badge) {
     final description = (badge["description"] ?? "").toString().trim();
     final threshold = _toInt(badge["threshold"]);
-    final noun = _role == "organiser" ? "hosted events" : "completed events";
-    final requirement = "Requires $threshold $noun";
+    final noun = _role == "organiser"
+        ? context.tr("hosted events")
+        : context.tr("completed events");
+    final requirement = context.tr(
+      "Requires {threshold} {noun}",
+      args: {
+        "threshold": threshold.toString(),
+        "noun": noun,
+      },
+    );
 
     if (description.isEmpty) return requirement;
     return "$description\n$requirement";
   }
 
   String _countLabel() {
-    if (_role == "organiser") return "Hosted events";
-    return "Completed events";
+    if (_role == "organiser") return context.tr("Hosted events");
+    return context.tr("Completed events");
   }
 
   Color _badgeBaseColor(Map<String, dynamic> badge) {
@@ -118,7 +127,7 @@ class _MyBadgesScreenState extends State<MyBadgesScreen> {
 
     if (_error != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text("My Badges")),
+        appBar: AppBar(title: Text(context.tr("My Badges"))),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -129,7 +138,7 @@ class _MyBadgesScreenState extends State<MyBadgesScreen> {
                 const SizedBox(height: 12),
                 ElevatedButton(
                   onPressed: _loadBadges,
-                  child: const Text("Retry"),
+                  child: Text(context.tr("Retry")),
                 ),
               ],
             ),
@@ -139,19 +148,19 @@ class _MyBadgesScreenState extends State<MyBadgesScreen> {
     }
 
     final currentBadgeName =
-        (_currentBadge?["name"] ?? "No badge yet").toString();
+        (_currentBadge?["name"] ?? context.tr("No badge yet")).toString();
     final nextBadgeName = _nextBadge?["name"]?.toString();
     final nextBadgeThreshold = _toInt(_nextBadge?["threshold"]);
     final countLabel = _countLabel();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("My Badges"),
+        title: Text(context.tr("My Badges")),
         actions: [
           IconButton(
             onPressed: _loadBadges,
             icon: const Icon(Icons.refresh),
-            tooltip: "Refresh",
+            tooltip: context.tr("Refresh"),
           ),
         ],
       ),
@@ -161,29 +170,45 @@ class _MyBadgesScreenState extends State<MyBadgesScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              "Current Badge: $currentBadgeName",
+              context.tr(
+                "Current Badge: {badge}",
+                args: {"badge": currentBadgeName},
+              ),
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             LinearProgressIndicator(value: _progress),
             const SizedBox(height: 8),
             Text(
-              "$countLabel: $_completedCount",
+              context.tr(
+                "{label}: {count}",
+                args: {
+                  "label": countLabel,
+                  "count": _completedCount.toString(),
+                },
+              ),
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
             if (nextBadgeName != null) ...[
               const SizedBox(height: 4),
               Text(
-                "Next badge: $nextBadgeName at $nextBadgeThreshold ${countLabel.toLowerCase()}",
+                context.tr(
+                  "Next badge: {name} at {threshold} {label}",
+                  args: {
+                    "name": nextBadgeName,
+                    "threshold": nextBadgeThreshold.toString(),
+                    "label": countLabel,
+                  },
+                ),
                 style: const TextStyle(color: Colors.grey),
               ),
             ],
             const SizedBox(height: 20),
             if (_badges.isEmpty)
-              const Expanded(
+              Expanded(
                 child: Center(
                   child: Text(
-                    "No badges configured in system yet.",
+                    context.tr("No badges configured in system yet."),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -205,7 +230,9 @@ class _MyBadgesScreenState extends State<MyBadgesScreen> {
                               ? baseColor
                               : baseColor.withValues(alpha: 0.35),
                         ),
-                        title: Text((badge["name"] ?? "Badge").toString()),
+                        title: Text(
+                          (badge["name"] ?? context.tr("Badge")).toString(),
+                        ),
                         subtitle: Text(_badgeSubtitle(badge)),
                         isThreeLine: true,
                         trailing: earned

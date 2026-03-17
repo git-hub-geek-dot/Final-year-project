@@ -7,6 +7,7 @@ import '../../services/verification_service.dart';
 import '../../services/notification_api_service.dart';
 import '../../utils/ist_date_time.dart';
 import '../../widgets/organiser_bottom_nav.dart';
+import '../../localization/localization_extensions.dart';
 import 'create_event_screen.dart';
 import 'review_application_screen.dart';
 import 'event_details_screen.dart';
@@ -80,7 +81,9 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
       if (!mounted) return;
       setState(() {
         loading = false;
-        loadError = "Failed to load events. Pull to refresh or tap Retry.";
+        loadError = context.tr(
+          "Failed to load events. Pull to refresh or tap Retry.",
+        );
       });
     }
   }
@@ -109,18 +112,21 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
     String message;
     switch (status) {
       case "pending":
-        message =
-            "Your verification is under review. You can create events after approval.";
+        message = context.tr(
+          "Your verification is under review. You can create events after approval.",
+        );
         break;
       case "rejected":
-        message =
-            "Your verification was rejected. Please submit verification again to create events.";
+        message = context.tr(
+          "Your verification was rejected. Please submit verification again to create events.",
+        );
         break;
       case "not_requested":
-        message = "You need to be verified before creating events.";
+        message = context.tr("You need to be verified before creating events.");
         break;
       default:
-        message = "Unable to verify your account right now. Please try again.";
+        message =
+            context.tr("Unable to verify your account right now. Please try again.");
         break;
     }
 
@@ -238,7 +244,7 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
                                 ),
                                 child: Text(
                                   _unreadNotifications > 99
-                                      ? "99+"
+                                      ? context.tr("99+")
                                       : _unreadNotifications.toString(),
                                   style: const TextStyle(
                                     color: Colors.white,
@@ -277,10 +283,10 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
                   ),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: const Center(
+                child: Center(
                   child: Text(
-                    'Create Event',
-                    style: TextStyle(
+                    context.tr('Create Event'),
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -295,7 +301,7 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Align(
               alignment: Alignment.centerLeft,
-              child: _eventScopeButton('Events', true, () {}),
+              child: _eventScopeButton(context.tr('Events'), true, () {}),
             ),
           ),
           const SizedBox(height: 12),
@@ -307,17 +313,17 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    _tabButton('All', 0, count: events.length),
+                    _tabButton(context.tr('All'), 0, count: events.length),
                     const SizedBox(width: 8),
-                    _tabButton('Ongoing', 1, count: ongoing.length),
+                    _tabButton(context.tr('Ongoing'), 1, count: ongoing.length),
                     const SizedBox(width: 8),
-                    _tabButton('Upcoming', 2, count: upcoming.length),
+                    _tabButton(context.tr('Upcoming'), 2, count: upcoming.length),
                     const SizedBox(width: 8),
-                    _tabButton('Completed', 3, count: completed.length),
+                    _tabButton(context.tr('Completed'), 3, count: completed.length),
                     const SizedBox(width: 8),
-                    _tabButton('Draft', 4, count: draft.length),
+                    _tabButton(context.tr('Draft'), 4, count: draft.length),
                     const SizedBox(width: 8),
-                    _tabButton('Cancelled', 5, count: cancelled.length),
+                    _tabButton(context.tr('Cancelled'), 5, count: cancelled.length),
                   ],
                 ),
               ),
@@ -357,27 +363,27 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
                                   ),
                                   TextButton(
                                     onPressed: loadEvents,
-                                    child: const Text("Retry"),
+                                    child: Text(context.tr("Retry")),
                                   ),
                                 ],
                               ),
                             ),
                           ),
                         if (_selectedTab == 0)
-                          _section('All Events', events)
+                          _section(context.tr('All Events'), events)
                         else if (_selectedTab == 1)
-                          _section('Ongoing Events', ongoing,
+                          _section(context.tr('Ongoing Events'), ongoing,
                               isCompleted: false)
                         else if (_selectedTab == 2)
-                          _section('Upcoming Events', upcoming,
+                          _section(context.tr('Upcoming Events'), upcoming,
                               isCompleted: false)
                         else if (_selectedTab == 3)
-                          _section('Completed Events', completed,
+                          _section(context.tr('Completed Events'), completed,
                               isCompleted: true)
                         else if (_selectedTab == 4)
-                          _section('Draft Events', draft, isDraft: true),
+                          _section(context.tr('Draft Events'), draft, isDraft: true),
                         if (_selectedTab == 5)
-                          _section('Cancelled Events', cancelled),
+                          _section(context.tr('Cancelled Events'), cancelled),
                       ],
                     ),
                   ),
@@ -399,7 +405,10 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 40),
           child: Text(
-            'No $title',
+            context.tr(
+              'No {title}',
+              args: {"title": title},
+            ),
             style: const TextStyle(color: Colors.grey, fontSize: 16),
           ),
         ),
@@ -517,6 +526,23 @@ Widget eventCard(
   final isEventDraft = statusKey == 'draft';
   final isEventCancelled = statusKey == 'cancelled';
   final isEventDeleted = statusKey == 'deleted_by_admin';
+  final progressLabel = progress == null
+      ? null
+      : progress['accepted'] != null
+          ? context.tr(
+              'Approved: {accepted} / {required}',
+              args: {
+                'accepted': (progress['accepted'] ?? 0).toString(),
+                'required': (progress['required'] ?? 0).toString(),
+              },
+            )
+          : context.tr(
+              'Applicants: {raw} / {required}',
+              args: {
+                'raw': (progress['applicants'] ?? 0).toString(),
+                'required': (progress['required'] ?? 0).toString(),
+              },
+            );
 
   return InkWell(
     onTap: () {
@@ -563,14 +589,14 @@ Widget eventCard(
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
-                          statusLabel,
+                          context.tr(statusLabel),
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
                             color: statusColor,
                           ),
+                          ),
                         ),
-                      ),
                       if (urgency != null)
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -582,7 +608,12 @@ Widget eventCard(
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
-                            urgency['text'] as String,
+                            context.tr(
+                              urgency['text'] as String,
+                              args: (urgency['args']
+                                      as Map<String, String>?) ??
+                                  const {},
+                            ),
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
@@ -596,7 +627,10 @@ Widget eventCard(
                   Padding(
                     padding: const EdgeInsets.only(bottom: 6),
                     child: Text(
-                      'Organiser: ${event['organiser_name']}',
+                      context.tr(
+                        'Organiser: {name}',
+                        args: {"name": event['organiser_name'].toString()},
+                      ),
                       style: const TextStyle(
                         fontSize: 12,
                         color: Colors.black54,
@@ -604,16 +638,27 @@ Widget eventCard(
                     ),
                   ),
                 Text(
-                  event['title'] ?? 'Untitled',
+                  event['title'] ?? context.tr('Untitled'),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 6),
-                Text('Location: ${event['location'] ?? 'N/A'}'),
                 Text(
-                  'Date: ${_formatDateRange(event)}',
+                  context.tr(
+                    'Location: {location}',
+                    args: {
+                      "location": (event['location'] ?? context.tr('N/A'))
+                          .toString()
+                    },
+                  ),
+                ),
+                Text(
+                  context.tr(
+                    'Date: {date}',
+                    args: {"date": _formatDateRange(event)},
+                  ),
                 ),
                 if (progress != null) ...[
                   const SizedBox(height: 10),
@@ -630,7 +675,7 @@ Widget eventCard(
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    progress['label'] as String,
+                    progressLabel ?? '',
                     style: TextStyle(
                       fontSize: 11,
                       color: Colors.grey.shade700,
@@ -658,7 +703,12 @@ Widget eventCard(
                               ),
                             ),
                             child: Text(
-                              signal,
+                              context.tr(
+                                signal['key'] as String,
+                                args: (signal['args']
+                                        as Map<String, String>?) ??
+                                    const {},
+                              ),
                               style: const TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,
@@ -679,7 +729,7 @@ Widget eventCard(
                       Text(
                         event['rating'] != null
                             ? "${event['rating']} (${event['review_count'] ?? 0})"
-                            : 'No ratings yet',
+                            : context.tr('No ratings yet'),
                         style: const TextStyle(
                             fontSize: 12, color: Colors.black54),
                       ),
@@ -713,9 +763,9 @@ Widget eventCard(
                   ),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Text(
-                  'Review',
-                  style: TextStyle(
+                child: Text(
+                  context.tr('Review'),
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
@@ -855,7 +905,8 @@ Map<String, dynamic>? _urgencyBadge(Map event, String status) {
     }
     if (days <= 2) {
       return {
-        'text': 'Starts in ${days}d',
+        'text': 'Starts in {days}d',
+        'args': {'days': days.toString()},
         'color': const Color(0xFFB45309),
         'bg': const Color(0xFFFEF3C7),
       };
@@ -913,15 +964,15 @@ Map<String, dynamic>? _progressData(Map event) {
   };
 }
 
-List<String> _healthSignals(
+List<Map<String, dynamic>> _healthSignals(
   Map event,
   String status,
   Map<String, dynamic>? progress,
 ) {
-  final signals = <String>[];
+  final signals = <Map<String, dynamic>>[];
 
   if (status == 'draft') {
-    signals.add('Draft not visible to volunteers');
+    signals.add({'key': 'Draft not visible to volunteers'});
     return signals;
   }
 
@@ -929,7 +980,7 @@ List<String> _healthSignals(
   if (status == 'upcoming' &&
       deadline != null &&
       deadline.isBefore(IstDateTime.now())) {
-    signals.add('Application deadline passed');
+    signals.add({'key': 'Application deadline passed'});
   }
 
   final applicants = progress?['applicants'] as int?;
@@ -937,7 +988,7 @@ List<String> _healthSignals(
   final required = progress?['required'] as int?;
 
   if (status == 'upcoming' && applicants != null && applicants == 0) {
-    signals.add('No applications yet');
+    signals.add({'key': 'No applications yet'});
   }
 
   if (status == 'ongoing' &&
@@ -945,7 +996,10 @@ List<String> _healthSignals(
       required > 0 &&
       accepted != null &&
       accepted < required) {
-    signals.add('Understaffed by ${required - accepted}');
+    signals.add({
+      'key': 'Understaffed by {count}',
+      'args': {'count': (required - accepted).toString()},
+    });
   }
 
   return signals;

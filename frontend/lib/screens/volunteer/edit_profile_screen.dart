@@ -179,6 +179,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final origin =
         "${baseUri.scheme}://${baseUri.host}${baseUri.hasPort ? ':${baseUri.port}' : ''}";
 
+    final normalizedSlashes = url.replaceAll("\\", "/");
+    final uploadsIndex = normalizedSlashes.indexOf("/uploads/");
+    if (uploadsIndex != -1) {
+      return "$origin${normalizedSlashes.substring(uploadsIndex)}";
+    }
+
     if (url.startsWith("/uploads/")) {
       return "$origin$url";
     }

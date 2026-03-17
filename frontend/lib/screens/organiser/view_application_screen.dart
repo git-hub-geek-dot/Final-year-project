@@ -440,6 +440,12 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
     final origin =
         "${baseUri.scheme}://${baseUri.host}${baseUri.hasPort ? ':${baseUri.port}' : ''}";
 
+    final normalizedSlashes = url.replaceAll("\\", "/");
+    final uploadsIndex = normalizedSlashes.indexOf("/uploads/");
+    if (uploadsIndex != -1) {
+      return "$origin${normalizedSlashes.substring(uploadsIndex)}";
+    }
+
     if (url.startsWith("/uploads/")) {
       return "$origin$url";
     }
@@ -816,8 +822,10 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final compact = screenHeight < 780;
+    final screenSize = MediaQuery.of(context).size;
+    final screenHeight = screenSize.height;
+    final screenWidth = screenSize.width;
+    final compact = screenHeight < 780 || screenWidth < 380;
     final avatarRadius = compact ? 34.0 : 48.0;
     final titleSize = compact ? 24.0 : 34.0;
     final pagePadding = compact ? 10.0 : 16.0;
@@ -908,29 +916,37 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: EdgeInsets.all(pagePadding),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        CircleAvatar(
-                          radius: avatarRadius,
-                          backgroundColor: const Color(0xFFE9E4FF),
-                          backgroundImage:
-                              profileUrl != null ? NetworkImage(profileUrl) : null,
-                          child: profileUrl == null
-                              ? Icon(
-                                  Icons.person,
-                                  size: avatarRadius,
-                                  color: Colors.grey.shade600,
-                                )
-                              : null,
+                        Center(
+                          child: CircleAvatar(
+                            radius: avatarRadius,
+                            backgroundColor: const Color(0xFFE9E4FF),
+                            backgroundImage: profileUrl != null
+                                ? NetworkImage(profileUrl)
+                                : null,
+                            child: profileUrl == null
+                                ? Icon(
+                                    Icons.person,
+                                    size: avatarRadius,
+                                    color: Colors.grey.shade600,
+                                  )
+                                : null,
+                          ),
                         ),
                         SizedBox(height: compact ? 8 : 12),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(
-                              volunteerName.toString(),
-                              style: TextStyle(
-                                fontSize: titleSize,
-                                fontWeight: FontWeight.bold,
+                            Flexible(
+                              child: Text(
+                                volunteerName.toString(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: titleSize,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                             if (isVerified) ...[
@@ -959,24 +975,27 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                           ],
                         ),
                         SizedBox(height: compact ? 6 : 8),
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: statusHorizontal,
-                            vertical: statusVertical,
-                          ),
-                          decoration: BoxDecoration(
-                            color: statusColor(status).withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: statusColor(status).withOpacity(0.35),
+                        Align(
+                          alignment: Alignment.center,
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: statusHorizontal,
+                              vertical: statusVertical,
                             ),
-                          ),
-                          child: Text(
-                            statusLabel(status).toUpperCase(),
-                            style: TextStyle(
-                              color: statusColor(status),
-                              fontWeight: FontWeight.w700,
-                              fontSize: compact ? 16 : 18,
+                            decoration: BoxDecoration(
+                              color: statusColor(status).withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: statusColor(status).withOpacity(0.35),
+                              ),
+                            ),
+                            child: Text(
+                              statusLabel(status).toUpperCase(),
+                              style: TextStyle(
+                                color: statusColor(status),
+                                fontWeight: FontWeight.w700,
+                                fontSize: compact ? 16 : 18,
+                              ),
                             ),
                           ),
                         ),
@@ -1306,16 +1325,21 @@ Widget infoRow(String label, String value, {bool compact = false}) {
   return Padding(
     padding: EdgeInsets.symmetric(vertical: compact ? 3 : 6),
     child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.grey,
-            fontSize: compact ? 16 : 18,
+        Expanded(
+          flex: 4,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: Colors.grey,
+              fontSize: compact ? 16 : 18,
+            ),
           ),
         ),
-        Flexible(
+        const SizedBox(width: 12),
+        Expanded(
+          flex: 6,
           child: Text(
             demonstrateShortValue(value),
             style: TextStyle(

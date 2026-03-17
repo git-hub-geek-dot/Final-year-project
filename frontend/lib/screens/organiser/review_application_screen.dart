@@ -1,7 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../../services/event_service.dart';
+import '../../services/token_service.dart';
 import '../../utils/application_status.dart';
 import '../../utils/ist_date_time.dart';
+import 'package:frontend/config/api_config.dart';
 import '../../widgets/organiser_bottom_nav.dart';
 import 'view_application_screen.dart';
 import '../notifications/notifications_screen.dart';
@@ -18,15 +23,15 @@ class ReviewApplicationsScreen extends StatefulWidget {
 
 class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
   String selectedStatus =
-      "pending"; // pending | approved | waitlisted | rejected | cancelled | absent | completed
+      "pending"; // all | pending | approved | waitlisted | rejected | cancelled
   String selectedSort = "newest"; // newest | oldest | name
-  String selectedAvailability = "all"; // all | available | partial | unsure
   String selectedShortlist = "all"; // all | shortlisted | not_shortlisted
   bool loading = true;
   String? loadError;
   List applications = [];
   int volunteersRequired = 0;
   int approvedCount = 0;
+  final Map<int, String> _profilePictureUrlByApplicationId = {};
 
   bool get isSlotsFull =>
       volunteersRequired > 0 && approvedCount >= volunteersRequired;
@@ -41,6 +46,7 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
     setState(() {
       loading = true;
       loadError = null;
+      _profilePictureUrlByApplicationId.clear();
     });
 
     try {
@@ -63,11 +69,70 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
         loading = false;
         loadError = null;
       });
+
+      _hydrateMissingProfilePictures(data);
     } catch (e) {
       setState(() {
         loading = false;
         loadError = "Failed to load applications. Please try again.";
       });
+    }
+  }
+
+  Future<void> _hydrateMissingProfilePictures(List<dynamic> rows) async {
+    final missingIds = <int>[];
+
+    for (final row in rows) {
+      if (row is! Map) continue;
+      final applicationId = _asInt(row["id"]);
+      if (applicationId <= 0) continue;
+
+      final existingUrl = row["profile_picture_url"]?.toString().trim();
+      if (existingUrl != null && existingUrl.isNotEmpty) continue;
+      if (_profilePictureUrlByApplicationId.containsKey(applicationId)) continue;
+
+      missingIds.add(applicationId);
+    }
+
+    if (missingIds.isEmpty) return;
+
+    final token = await TokenService.getToken();
+    if (token == null || token.isEmpty) return;
+
+    // Fallback: some deployments don't include profile_picture_url in the list
+    // endpoint, but it is present in the single-application details response.
+    for (final applicationId in missingIds) {
+      if (!mounted) return;
+
+      try {
+        final url =
+            Uri.parse("${ApiConfig.baseUrl}/applications/$applicationId");
+        final response = await http.get(
+          url,
+          headers: {
+            "Authorization": "Bearer $token",
+            "Content-Type": "application/json",
+          },
+        );
+
+        if (response.statusCode != 200) continue;
+
+        final decoded = jsonDecode(response.body);
+        final dynamic app = (decoded is Map && decoded["application"] != null)
+            ? decoded["application"]
+            : decoded;
+        if (app is! Map) continue;
+
+        final pictureUrl = app["profile_picture_url"]?.toString().trim();
+        if (pictureUrl == null || pictureUrl.isEmpty) continue;
+
+        if (!mounted) return;
+        setState(() {
+          _profilePictureUrlByApplicationId[applicationId] = pictureUrl;
+        });
+      } catch (_) {
+        // ignore
+      }
     }
   }
 
@@ -101,15 +166,10 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
 
   List get filtered {
     return applications.where((a) {
-      final statusMatches = selectedStatus == "absent"
-          ? _normalizedAttendanceStatus(a) == "absent"
-          : _normalizedStatus(a) == selectedStatus;
+      final statusMatches =
+          selectedStatus == "all" || _normalizedStatus(a) == selectedStatus;
 
       if (!statusMatches) return false;
-
-      if (selectedAvailability != "all") {
-        return _normalizedAvailabilityStatus(a) == selectedAvailability;
-      }
 
       final isShortlisted = _asBool(a["is_shortlisted"]);
       if (selectedShortlist == "shortlisted" && !isShortlisted) {
@@ -178,20 +238,6 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
     }
   }
 
-  String get selectedAvailabilityLabel {
-    switch (selectedAvailability) {
-      case "available":
-        return "Available";
-      case "partial":
-        return "Partially available";
-      case "unsure":
-        return "Not sure";
-      case "all":
-      default:
-        return "All";
-    }
-  }
-
   String get selectedShortlistLabel {
     switch (selectedShortlist) {
       case "shortlisted":
@@ -206,6 +252,8 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
 
   String get emptyMessage {
     switch (selectedStatus) {
+      case "all":
+        return "No applications yet";
       case "approved":
         return "No approved applications yet";
       case "waitlisted":
@@ -214,10 +262,6 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
         return "No rejected applications yet";
       case "cancelled":
         return "No cancelled applications yet";
-      case "absent":
-        return "No absent volunteers marked yet";
-      case "completed":
-        return "No completed applications yet";
       case "pending":
       default:
         return "No pending applications yet";
@@ -225,13 +269,12 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
   }
 
   Map<String, int> get statusCounts {
+    final all = applications.length;
     var pending = 0;
     var approved = 0;
     var rejected = 0;
     var waitlisted = 0;
     var cancelled = 0;
-    var absent = 0;
-    var completed = 0;
 
     for (final application in applications) {
       final status = _normalizedStatus(application);
@@ -245,21 +288,16 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
         rejected++;
       } else if (status == "cancelled") {
         cancelled++;
-      } else if (_normalizedAttendanceStatus(application) == "absent") {
-        absent++;
-      } else if (status == "completed") {
-        completed++;
       }
     }
 
     return {
+      "all": all,
       "pending": pending,
       "approved": approved,
       "waitlisted": waitlisted,
       "rejected": rejected,
       "cancelled": cancelled,
-      "absent": absent,
-      "completed": completed,
     };
   }
 
@@ -318,12 +356,20 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
                 Expanded(
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        toggleButton(
-                          "Pending (${counts["pending"]})",
-                          selectedStatus == "pending",
-                          () {
+                     child: Row(
+                       children: [
+                         toggleButton(
+                           "All (${counts["all"]})",
+                           selectedStatus == "all",
+                           () {
+                             setState(() => selectedStatus = "all");
+                           },
+                         ),
+                         const SizedBox(width: 10),
+                         toggleButton(
+                           "Pending (${counts["pending"]})",
+                           selectedStatus == "pending",
+                           () {
                             setState(() => selectedStatus = "pending");
                           },
                         ),
@@ -359,22 +405,6 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
                             setState(() => selectedStatus = "cancelled");
                           },
                         ),
-                        const SizedBox(width: 10),
-                        toggleButton(
-                          "Absent (${counts["absent"]})",
-                          selectedStatus == "absent",
-                          () {
-                            setState(() => selectedStatus = "absent");
-                          },
-                        ),
-                        const SizedBox(width: 10),
-                        toggleButton(
-                          "Completed (${counts["completed"]})",
-                          selectedStatus == "completed",
-                          () {
-                            setState(() => selectedStatus = "completed");
-                          },
-                        ),
                       ],
                     ),
                   ),
@@ -400,50 +430,6 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
                   child: Row(
                     children: [
                       Text("Sort: $selectedSortLabel"),
-                      const Icon(Icons.arrow_drop_down),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 10),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                const Text(
-                  "Availability:",
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(width: 8),
-                PopupMenuButton<String>(
-                  initialValue: selectedAvailability,
-                  onSelected: (value) => setState(() {
-                    selectedAvailability = value;
-                  }),
-                  itemBuilder: (context) => const [
-                    PopupMenuItem(
-                      value: "all",
-                      child: Text("All"),
-                    ),
-                    PopupMenuItem(
-                      value: "available",
-                      child: Text("Available"),
-                    ),
-                    PopupMenuItem(
-                      value: "partial",
-                      child: Text("Partially available"),
-                    ),
-                    PopupMenuItem(
-                      value: "unsure",
-                      child: Text("Not sure"),
-                    ),
-                  ],
-                  child: Row(
-                    children: [
-                      Text(selectedAvailabilityLabel),
                       const Icon(Icons.arrow_drop_down),
                     ],
                   ),
@@ -518,28 +504,53 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
                       )
                     : visibleApplications.isEmpty
                         ? Center(child: Text(emptyMessage))
-                        : ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            itemCount: visibleApplications.length,
-                            itemBuilder: (context, i) {
-                              final a = visibleApplications[i];
-                              return ApplicationCard(
-                                name: a["name"] ?? "Unknown",
-                                location: a["city"] ?? "-",
-                                status: _normalizedStatus(a),
-                                attendanceStatus: _normalizedAttendanceStatus(a),
-                                availabilityStatus:
-                                    _normalizedAvailabilityStatus(a),
-                                isShortlisted: _asBool(a["is_shortlisted"]),
-                                appliedAt: a["applied_at"],
-                                applicationId: a["id"],
-                                slotsFull: isSlotsFull,
-                                approvedCount: approvedCount,
-                                volunteersRequired: volunteersRequired,
-                                onRefresh: loadApplications,
-                              );
-                            },
-                          ),
+                         : ListView.builder(
+                             padding: const EdgeInsets.symmetric(horizontal: 16),
+                             itemCount: visibleApplications.length,
+                              itemBuilder: (context, i) {
+                                final a = visibleApplications[i];
+                                final applicationId = _asInt(a["id"]);
+                                final listProfileUrl =
+                                    a["profile_picture_url"]?.toString();
+                                final hydratedProfileUrl =
+                                    _profilePictureUrlByApplicationId[applicationId];
+                                final status = _normalizedStatus(a);
+
+                                String? cancellationInfo;
+                                if (status == "cancelled" &&
+                                    a.containsKey("volunteer_cancelled_at")) {
+                                  final dynamic cancelledAt =
+                                      a["volunteer_cancelled_at"];
+                                  final bool cancelledByVolunteer =
+                                      cancelledAt != null &&
+                                          cancelledAt.toString().trim().isNotEmpty;
+                                  cancellationInfo = cancelledByVolunteer
+                                      ? "Cancelled by volunteer"
+                                      : "Cancelled by organiser/admin";
+                                }
+                                return ApplicationCard(
+                                  name: a["name"] ?? "Unknown",
+                                  location: a["city"] ?? "-",
+                                  status: status,
+                                  attendanceStatus: _normalizedAttendanceStatus(a),
+                                  availabilityStatus:
+                                      _normalizedAvailabilityStatus(a),
+                                  isShortlisted: _asBool(a["is_shortlisted"]),
+                                  appliedAt: a["applied_at"],
+                                  applicationId: applicationId,
+                                   profilePictureUrl:
+                                      (listProfileUrl == null ||
+                                              listProfileUrl.trim().isEmpty)
+                                          ? hydratedProfileUrl
+                                          : listProfileUrl,
+                                  cancellationInfo: cancellationInfo,
+                                  slotsFull: isSlotsFull,
+                                  approvedCount: approvedCount,
+                                  volunteersRequired: volunteersRequired,
+                                  onRefresh: loadApplications,
+                                );
+                              },
+                           ),
           ),
         ],
       ),
@@ -582,6 +593,8 @@ class ApplicationCard extends StatelessWidget {
   final bool isShortlisted;
   final dynamic appliedAt;
   final int applicationId;
+  final String? profilePictureUrl;
+  final String? cancellationInfo;
   final bool slotsFull;
   final int approvedCount;
   final int volunteersRequired;
@@ -597,11 +610,57 @@ class ApplicationCard extends StatelessWidget {
     required this.isShortlisted,
     required this.appliedAt,
     required this.applicationId,
+    required this.profilePictureUrl,
+    this.cancellationInfo,
     required this.slotsFull,
     required this.approvedCount,
     required this.volunteersRequired,
     required this.onRefresh,
   });
+
+  String? _normalizeProfileImageUrl(String? url) {
+    if (url == null || url.trim().isEmpty) return null;
+
+    final baseUri = Uri.parse(ApiConfig.baseUrl);
+    final origin =
+        "${baseUri.scheme}://${baseUri.host}${baseUri.hasPort ? ':${baseUri.port}' : ''}";
+
+    final normalizedSlashes = url.replaceAll("\\", "/");
+    final uploadsIndex = normalizedSlashes.indexOf("/uploads/");
+    if (uploadsIndex != -1) {
+      return "$origin${normalizedSlashes.substring(uploadsIndex)}";
+    }
+
+    if (url.startsWith("/uploads/")) {
+      return "$origin$url";
+    }
+
+    if (url.startsWith("uploads/")) {
+      return "$origin/$url";
+    }
+
+    final parsed = Uri.tryParse(url);
+    if (parsed != null && parsed.hasScheme) {
+      if (ApiConfig.useCloud) {
+        return url;
+      }
+
+      final host = parsed.host;
+      final isLocalLike = host == "localhost" ||
+          host == "127.0.0.1" ||
+          host.startsWith("10.") ||
+          host.startsWith("192.168.") ||
+          host.startsWith("172.");
+
+      if (isLocalLike && host != baseUri.host) {
+        final pathWithQuery =
+            parsed.hasQuery ? "${parsed.path}?${parsed.query}" : parsed.path;
+        return "$origin$pathWithQuery";
+      }
+    }
+
+    return url;
+  }
 
   String get statusLabel {
     if (attendanceStatus == "absent") {
@@ -652,6 +711,7 @@ class ApplicationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final normalizedProfileUrl = _normalizeProfileImageUrl(profilePictureUrl);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
@@ -663,7 +723,16 @@ class ApplicationCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const CircleAvatar(radius: 24),
+          CircleAvatar(
+            radius: 24,
+            backgroundColor: Colors.white.withValues(alpha: 0.25),
+            backgroundImage: normalizedProfileUrl != null
+                ? NetworkImage(normalizedProfileUrl)
+                : null,
+            child: normalizedProfileUrl == null
+                ? const Icon(Icons.person, color: Colors.white)
+                : null,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -693,9 +762,11 @@ class ApplicationCard extends StatelessWidget {
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.18),
+                        color: Colors.white.withValues(alpha: 0.94),
                         borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: statusColor.withOpacity(0.5)),
+                        border: Border.all(
+                          color: statusColor.withValues(alpha: 0.85),
+                        ),
                       ),
                       child: Text(
                         statusLabel,
@@ -712,10 +783,10 @@ class ApplicationCard extends StatelessWidget {
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: availabilityColor.withOpacity(0.16),
+                        color: Colors.white.withValues(alpha: 0.94),
                         borderRadius: BorderRadius.circular(999),
                         border: Border.all(
-                          color: availabilityColor.withOpacity(0.45),
+                          color: availabilityColor.withValues(alpha: 0.85),
                         ),
                       ),
                       child: Text(
@@ -741,9 +812,9 @@ class ApplicationCard extends StatelessWidget {
                           vertical: 3,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFEE2E2),
+                          color: Colors.white.withValues(alpha: 0.94),
                           borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: const Color(0xFFFCA5A5)),
+                          border: Border.all(color: const Color(0xFFEF4444)),
                         ),
                         child: Text(
                           "Slots full ($approvedCount/$volunteersRequired)",
@@ -756,6 +827,17 @@ class ApplicationCard extends StatelessWidget {
                       ),
                   ],
                 ),
+                if (cancellationInfo != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    cancellationInfo!,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 4),
                 Text(
                   "📍 $location",

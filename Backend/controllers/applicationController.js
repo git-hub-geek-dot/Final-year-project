@@ -252,6 +252,8 @@ exports.getEventApplications = async (req, res) => {
         COALESCE(a.is_shortlisted, false) AS is_shortlisted,
         COALESCE(a.availability_status, 'available') AS availability_status,
         a.applied_at,
+        a.volunteer_cancel_reason,
+        a.volunteer_cancelled_at,
         u.id AS volunteer_id,
         u.name,
         u.profile_picture_url,

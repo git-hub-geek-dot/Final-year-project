@@ -31,7 +31,13 @@ exports.uploadProfilePicture = async (req, res) => {
       const oldPictureUrl = oldUserResult.rows[0]?.profile_picture_url;
 
       // Build the image URL - multer storage provides the path/URL
-      const imageUrl = req.file.path;
+      const rawPath = req.file.path;
+      const looksLikeUrl =
+        typeof rawPath === "string" && /^https?:\/\//i.test(rawPath);
+
+      // When using local disk storage, `req.file.path` is a server filesystem path.
+      // Store a public URL path instead so clients can load it via `/uploads/...`.
+      const imageUrl = looksLikeUrl ? rawPath : `/uploads/${req.file.filename}`;
       console.log("Profile picture uploaded - URL:", imageUrl);
 
       // Update database with new profile picture URL

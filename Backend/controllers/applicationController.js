@@ -254,6 +254,7 @@ exports.getEventApplications = async (req, res) => {
         a.applied_at,
         u.id AS volunteer_id,
         u.name,
+        u.profile_picture_url,
         u.city
       FROM applications a
       JOIN users u ON u.id = a.volunteer_id

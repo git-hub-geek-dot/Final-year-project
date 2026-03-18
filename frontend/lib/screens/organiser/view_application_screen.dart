@@ -911,7 +911,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
-        title: const Text("Volunteer Details"),
+        title: Text(context.tr("Volunteer Details")),
         actions: [
           IconButton(
             onPressed: loadApplicationDetails,

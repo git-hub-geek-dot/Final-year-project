@@ -265,13 +265,19 @@ class _VolunteerGetVerifiedScreenState
                                 labelText: context.tr("ID Type"),
                                 border: const OutlineInputBorder(),
                               ),
-                              items: const [
+                              items: [
                                 DropdownMenuItem(
-                                    value: "aadhaar", child: Text("Aadhaar")),
+                                  value: "aadhaar",
+                                  child: Text(context.tr("Aadhaar")),
+                                ),
                                 DropdownMenuItem(
-                                    value: "pan", child: Text("PAN Card")),
+                                  value: "pan",
+                                  child: Text(context.tr("PAN Card")),
+                                ),
                                 DropdownMenuItem(
-                                    value: "passport", child: Text("Passport")),
+                                  value: "passport",
+                                  child: Text(context.tr("Passport")),
+                                ),
                               ],
                               onChanged: (value) =>
                                   setState(() => _idType = value),

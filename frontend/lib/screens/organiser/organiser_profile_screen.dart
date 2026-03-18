@@ -34,14 +34,14 @@ class HelpSupportScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Help & Support"),
+        title: Text(context.tr("Help & Support")),
         backgroundColor: const Color(0xFF3B82F6),
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          const Text(
-            "How can we help you?",
+          Text(
+            context.tr("How can we help you?"),
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -50,40 +50,40 @@ class HelpSupportScreen extends StatelessWidget {
           const SizedBox(height: 16),
           _helpTile(
             icon: Icons.question_answer_outlined,
-            title: "Frequently Asked Questions",
-            subtitle: "Find answers to common questions",
+            title: context.tr("Frequently Asked Questions"),
+            subtitle: context.tr("Find answers to common questions"),
             onTap: () {
               _showFaqDialog(context);
             },
           ),
           _helpTile(
             icon: Icons.support_agent,
-            title: "Contact Support",
-            subtitle: "Email our support team",
+            title: context.tr("Contact Support"),
+            subtitle: context.tr("Email our support team"),
             onTap: () {
               _showContactDialog(context);
             },
           ),
           _helpTile(
             icon: Icons.bug_report_outlined,
-            title: "Report a Problem",
-            subtitle: "Tell us if something isn't working",
+            title: context.tr("Report a Problem"),
+            subtitle: context.tr("Tell us if something isn't working"),
             onTap: () {
               _showReportDialog(context);
             },
           ),
           const SizedBox(height: 30),
-          const Text(
-            "App Information",
+          Text(
+            context.tr("App Information"),
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 10),
-          _infoTile("App Version", "1.0.0"),
-          _infoTile("Developed By", "Volunteerx Team"),
-          _infoTile("Support Email", "volunteerxteam@gmail.com"),
+          _infoTile(context.tr("App Version"), "1.0.0"),
+          _infoTile(context.tr("Developed By"), context.tr("Volunteerx Team")),
+          _infoTile(context.tr("Support Email"), "volunteerxteam@gmail.com"),
           const SizedBox(height: 20),
         ],
       ),
@@ -179,7 +179,7 @@ void _showFaqDialog(BuildContext context) {
   showDialog(
     context: context,
     builder: (dialogContext) => AlertDialog(
-      title: const Text("Frequently Asked Questions"),
+      title: Text(context.tr("Frequently Asked Questions")),
       content: SizedBox(
         width: MediaQuery.of(dialogContext).size.width * 0.85,
         child: SingleChildScrollView(
@@ -206,14 +206,14 @@ void _showFaqDialog(BuildContext context) {
                         childrenPadding:
                             const EdgeInsets.fromLTRB(12, 0, 12, 12),
                         title: Text(
-                          faq["question"] ?? "",
+                          context.tr(faq["question"] ?? ""),
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                         children: [
                           Align(
                             alignment: Alignment.centerLeft,
                             child: Text(
-                              faq["answer"] ?? "",
+                              context.tr(faq["answer"] ?? ""),
                               style: const TextStyle(height: 1.35),
                             ),
                           ),
@@ -229,7 +229,7 @@ void _showFaqDialog(BuildContext context) {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text("Close"),
+          child: Text(context.tr("Close")),
         ),
       ],
     ),
@@ -240,15 +240,16 @@ void _showContactDialog(BuildContext context) {
   showDialog(
     context: context,
     builder: (_) => AlertDialog(
-      title: const Text("Contact Support"),
-      content: const Text(
-        "You can reach us at:\n\nvolunteerxteam@gmail.com\n\n"
-        "We'll get back to you as soon as possible.",
+      title: Text(context.tr("Contact Support")),
+      content: Text(
+        context.tr(
+          "You can reach us at:\n\nvolunteerxteam@gmail.com\n\nWe'll get back to you as soon as possible.",
+        ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text("Close"),
+          child: Text(context.tr("Close")),
         ),
       ],
     ),
@@ -259,14 +260,16 @@ void _showReportDialog(BuildContext context) {
   showDialog(
     context: context,
     builder: (_) => AlertDialog(
-      title: const Text("Report a Problem"),
-      content: const Text(
-        "Please describe the issue and email it to:\n\nvolunteerxteam@gmail.com",
+      title: Text(context.tr("Report a Problem")),
+      content: Text(
+        context.tr(
+          "Please describe the issue and email it to:\n\nvolunteerxteam@gmail.com",
+        ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text("OK"),
+          child: Text(context.tr("OK")),
         ),
       ],
     ),
@@ -318,7 +321,7 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
       if (token == null || token.isEmpty) {
         setState(() {
           loading = false;
-          errorMessage = "Token not found. Please login again.";
+          errorMessage = context.tr("Token not found. Please login again.");
         });
         return;
       }
@@ -346,13 +349,19 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
       } else {
         setState(() {
           loading = false;
-          errorMessage = "Error ${response.statusCode}: ${response.body}";
+          errorMessage = context.tr(
+            "Error {code}: {message}",
+            args: {
+              "code": response.statusCode.toString(),
+              "message": response.body,
+            },
+          );
         });
       }
     } catch (e) {
       setState(() {
         loading = false;
-        errorMessage = "Error: $e";
+        errorMessage = context.tr("Error: {error}", args: {"error": "$e"});
       });
     }
   }
@@ -416,7 +425,7 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
 
     if (token == null || token.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Token not found. Please login again.")),
+        SnackBar(content: Text(context.tr("Token not found. Please login again."))),
       );
       return;
     }
@@ -424,19 +433,21 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Deactivate Account"),
-        content: const Text(
-          "Are you sure you want to deactivate your account?\n\nYour data will remain saved, but you will not be able to login again.",
+        title: Text(context.tr("Deactivate Account")),
+        content: Text(
+          context.tr(
+            "Are you sure you want to deactivate your account?\n\nYour data will remain saved, but you will not be able to login again.",
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
+            child: Text(context.tr("Cancel")),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              "Deactivate",
+            child: Text(
+              context.tr("Deactivate"),
               style: TextStyle(color: Colors.red),
             ),
           ),
@@ -470,7 +481,7 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
         if (!context.mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Account deactivated ✅")),
+          SnackBar(content: Text(context.tr("Account deactivated"))),
         );
 
         Navigator.pushNamedAndRemoveUntil(
@@ -479,7 +490,7 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
           (route) => false,
         );
       } else {
-        String msg = "Deactivate failed";
+        String msg = context.tr("Deactivate failed");
         try {
           final data = jsonDecode(response.body);
           msg = data["message"] ?? data["error"] ?? msg;
@@ -492,7 +503,11 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
     } catch (e) {
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Server error: $e")),
+        SnackBar(
+          content: Text(
+            context.tr("Server error: {error}", args: {"error": "$e"}),
+          ),
+        ),
       );
     }
   }
@@ -609,13 +624,22 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              "Rating: $_ratingValue ($_ratingCount)",
+                              context.tr(
+                                "Rating: {rating} ({count})",
+                                args: {
+                                  "rating": _ratingValue,
+                                  "count": _ratingCount,
+                                },
+                              ),
                               style: const TextStyle(color: Colors.white70),
                             ),
                             Text(
                               city == null || city!.isEmpty
-                                  ? "City not set"
-                                  : "$city, India",
+                                  ? context.tr("City not set")
+                                  : context.tr(
+                                      "{city}, India",
+                                      args: {"city": city!},
+                                    ),
                               style:
                                   const TextStyle(color: Colors.white70),
                             ),
@@ -643,8 +667,8 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(20),
                                 ),
-                                child: const Text(
-                                  "Edit Profile",
+                                child: Text(
+                                  context.tr("Edit Profile"),
                                   style: TextStyle(
                                     color: Color(0xFF22C55E),
                                     fontWeight: FontWeight.bold,
@@ -666,7 +690,7 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
                             _profileOption(
                               context: context,
                               icon: Icons.event,
-                              text: "My Events",
+                              text: context.tr("My Events"),
                               onTap: () {
                                 Navigator.push(
                                   context,
@@ -680,7 +704,7 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
                             _profileOption(
                               context: context,
                               icon: Icons.manage_accounts,
-                              text: "Account Settings",
+                              text: context.tr("Account Settings"),
                               onTap: () {
                                 Navigator.push(
                                   context,
@@ -694,7 +718,7 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
                             _profileOption(
                               context: context,
                               icon: Icons.emoji_events,
-                              text: "My Badges",
+                              text: context.tr("My Badges"),
                               onTap: () {
                                 Navigator.push(
                                   context,
@@ -708,19 +732,19 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
                               context: context,
                               icon: Icons.verified,
                               text: verificationStatus == "pending"
-                                  ? "Verification Under Review"
+                                  ? context.tr("Verification Under Review")
                                   : verificationStatus == "approved"
-                                      ? "Verified"
-                                      : "Get Verified",
+                                      ? context.tr("Verified")
+                                      : context.tr("Get Verified"),
                               onTap: () {
                                 final status =
                                     (verificationStatus ?? '').toLowerCase();
 
                                 if (status == 'approved') {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
+                                    SnackBar(
                                       content: Text(
-                                        "Your account is already verified.",
+                                        context.tr("Your account is already verified."),
                                       ),
                                     ),
                                   );
@@ -729,9 +753,9 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
 
                                 if (status == 'pending') {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
+                                    SnackBar(
                                       content: Text(
-                                        "Your verification request is under review.",
+                                        context.tr("Your verification request is under review."),
                                       ),
                                     ),
                                   );
@@ -750,7 +774,7 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
                             _profileOption(
                               context: context,
                               icon: Icons.dashboard,
-                              text: "Organisation Activity",
+                              text: context.tr("Organisation Activity"),
                               onTap: () {
                                 Navigator.push(
                                   context,
@@ -765,7 +789,7 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
                             _profileOption(
                               context: context,
                               icon: Icons.help_outline,
-                              text: "Help & Support",
+                              text: context.tr("Help & Support"),
                               onTap: () {
                                 Navigator.push(
                                   context,
@@ -779,7 +803,7 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
                             _profileOption(
                               context: context,
                               icon: Icons.info_outline,
-                              text: "About Volunteerx",
+                              text: context.tr("About Volunteerx"),
                               onTap: () {
                                 Navigator.push(
                                   context,
@@ -793,13 +817,13 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
                             _profileOption(
                               context: context,
                               icon: Icons.logout,
-                              text: "Logout",
+                              text: context.tr("Logout"),
                               isLogout: true,
                             ),
                             _profileOption(
                               context: context,
                               icon: Icons.delete_forever,
-                              text: "Delete Account",
+                              text: context.tr("Delete Account"),
                               isDelete: true,
                               onTap: () =>
                                   handleDeactivateAccount(context),

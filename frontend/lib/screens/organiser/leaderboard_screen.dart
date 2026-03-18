@@ -120,16 +120,16 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                       const SizedBox(height: 10),
                       ElevatedButton(
                         onPressed: _loadLeaderboard,
-                        child: const Text("Retry"),
+                        child: Text(context.tr("Retry")),
                       ),
                     ],
                   ),
                 ),
               )
             else if (data.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 120),
-                child: Center(child: Text("No leaderboard data available")),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 120),
+                child: Center(child: Text(context.tr("No leaderboard data available"))),
               )
             else ...[
               _topThree(data),

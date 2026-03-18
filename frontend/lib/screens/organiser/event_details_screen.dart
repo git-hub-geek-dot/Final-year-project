@@ -9,6 +9,7 @@ import '../../widgets/organiser_bottom_nav.dart';
 import '../chat/event_group_chat_screen.dart';
 import 'edit_event_screen.dart';
 import 'review_application_screen.dart';
+import 'attendance_feedback_screen.dart';
 import '../../widgets/robust_image.dart';
 import '../../localization/localization_extensions.dart';
 
@@ -282,6 +283,60 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     return chosen;
   }
 
+  Future<bool> _showCancelFinalConfirmDialog(
+    Map event,
+    String reason,
+  ) async {
+    final title = (event["title"] ?? context.tr("Event")).toString();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(context.tr("Confirm cancellation")),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              context.tr("Please review details before cancelling this event."),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              context.tr("Event: {title}", args: {"title": title}),
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              context.tr("Reason: {reason}", args: {"reason": reason}),
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              context.tr("This action is irreversible. All data will be lost."),
+              style: const TextStyle(color: Colors.redAccent),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(context.tr("Back")),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(context.tr("Confirm")),
+          ),
+        ],
+      ),
+    );
+
+    return confirmed == true;
+  }
+
   Future<void> _cancelEvent(Map event) async {
     final eventId = int.tryParse("${event["id"]}");
     if (eventId == null) {
@@ -293,6 +348,10 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
 
     final reason = await _showCancelReasonDialog();
     if (reason == null || reason.trim().isEmpty) return;
+
+    final confirmed =
+      await _showCancelFinalConfirmDialog(event, reason.trim());
+    if (!confirmed) return;
 
     setState(() => cancellingEvent = true);
     try {
@@ -663,6 +722,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
         final isDraftEvent = _isDraft(event);
         final isCancelledEvent = _isCancelled(event);
         final isCompletedEvent = _isCompleted(event);
+        final isOngoingEvent = _normalizedStatus(event) == "ongoing";
 
         final viewVolunteersButton = ElevatedButton(
           onPressed: () async {
@@ -700,6 +760,35 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
           },
           icon: const Icon(Icons.edit),
           label: Text(context.tr("Edit Event")),
+        );
+
+        final markAttendanceButton = OutlinedButton.icon(
+          onPressed: () {
+            final eventId = int.tryParse("${event["id"]}");
+            if (eventId == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(context.tr("Invalid event id"))),
+              );
+              return;
+            }
+
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => AttendanceFeedbackScreen(eventId: eventId),
+              ),
+            ).then((updated) {
+              if (updated == true) {
+                loadStats();
+              }
+            });
+          },
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.deepPurple.shade700,
+            side: BorderSide(color: Colors.deepPurple.shade300),
+          ),
+          icon: const Icon(Icons.fact_check_outlined),
+          label: Text(context.tr("Mark Attendance")),
         );
 
         final announceButton = OutlinedButton.icon(
@@ -790,6 +879,10 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                 viewVolunteersButton,
                 const SizedBox(height: 10),
               ],
+              if (!isDraftEvent && !isCancelledEvent && isOngoingEvent) ...[
+                markAttendanceButton,
+                const SizedBox(height: 10),
+              ],
               if (!isDraftEvent && !isCancelledEvent) ...[
                 announceButton,
                 const SizedBox(height: 10),
@@ -811,6 +904,10 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
           children: [
             if (!isDraftEvent && !isCancelledEvent) ...[
               Expanded(child: viewVolunteersButton),
+              const SizedBox(width: 10),
+            ],
+            if (!isDraftEvent && !isCancelledEvent && isOngoingEvent) ...[
+              markAttendanceButton,
               const SizedBox(width: 10),
             ],
             if (!isDraftEvent && !isCancelledEvent) ...[

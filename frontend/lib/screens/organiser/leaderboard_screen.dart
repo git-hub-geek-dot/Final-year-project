@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import '../../localization/localization_extensions.dart';
 import '../../services/event_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/organiser_bottom_nav.dart';
@@ -52,7 +53,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       final parsed = <Map<String, dynamic>>[];
       for (var i = 0; i < raw.length; i++) {
         final item = raw[i] as Map;
-        final name = item["name"]?.toString() ?? "Unknown";
+        final name = item["name"]?.toString() ?? context.tr("Unknown");
         final events = int.tryParse(item["completed_events"].toString()) ?? 0;
         parsed.add({
           "rank": i + 1,
@@ -70,7 +71,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = "Failed to load leaderboard";
+        _error = context.tr("Failed to load leaderboard");
       });
     }
   }
@@ -82,7 +83,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
-        title: const Text("Leaderboard"),
+        title: Text(context.tr("Leaderboard")),
         backgroundColor: Colors.transparent,
         elevation: 0,
         foregroundColor: Colors.white,

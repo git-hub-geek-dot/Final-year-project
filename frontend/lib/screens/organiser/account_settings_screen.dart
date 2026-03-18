@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../localization/localization_extensions.dart';
 import '../../services/preferences_service.dart';
 import 'change_password_screen.dart';
 import 'update_email_screen.dart';
@@ -41,8 +42,8 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     if (!context.mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Account deleted successfully"),
+      SnackBar(
+        content: Text(context.tr("Account deleted successfully.")),
         backgroundColor: Colors.red,
       ),
     );
@@ -59,7 +60,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Account Settings"),
+        title: Text(context.tr("Account Settings")),
         backgroundColor: const Color(0xFF3B82F6),
       ),
       body: ListView(
@@ -67,7 +68,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         children: [
           _settingTile(
             icon: Icons.lock_outline,
-            title: "Change Password",
+            title: context.tr("Change Password"),
             onTap: () {
               Navigator.push(
                 context,
@@ -80,7 +81,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
           _settingTile(
             icon: Icons.email_outlined,
-            title: "Update Email",
+            title: context.tr("Update Email"),
             onTap: () {
               Navigator.push(
                 context,
@@ -93,7 +94,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
           _settingTile(
             icon: Icons.phone_outlined,
-            title: "Update Phone Number",
+            title: context.tr("Update Phone Number"),
             onTap: () {
               Navigator.push(
                 context,
@@ -106,8 +107,8 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
           const SizedBox(height: 30),
 
-          const Text(
-            "Preferences",
+          Text(
+            context.tr("Preferences"),
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 16,
@@ -116,7 +117,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           const SizedBox(height: 10),
 
           SwitchListTile(
-            title: const Text("New Volunteer Applications"),
+            title: Text(context.tr("New Volunteer Applications")),
             value: newApplications,
             onChanged: (val) async {
               setState(() => newApplications = val);
@@ -125,7 +126,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           ),
 
           SwitchListTile(
-            title: const Text("Event Updates"),
+            title: Text(context.tr("Event Updates")),
             value: eventUpdates,
             onChanged: (val) async {
               setState(() => eventUpdates = val);
@@ -134,7 +135,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           ),
 
           SwitchListTile(
-            title: const Text("Promotional Notifications"),
+            title: Text(context.tr("Promotional Notifications")),
             value: promotions,
             onChanged: (val) async {
               setState(() => promotions = val);
@@ -146,12 +147,12 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
           _dangerTile(
             icon: Icons.pause_circle_outline,
-            title: "Deactivate Account",
+            title: context.tr("Deactivate Account"),
             onTap: () {
               _showConfirmDialog(
                 context,
-                "Deactivate Account",
-                "Your account will be temporarily disabled.",
+                context.tr("Deactivate Account"),
+                context.tr("Your account will be temporarily disabled."),
                 onConfirm: () {
                   // You can add deactivate logic later
                 },
@@ -161,12 +162,12 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
           _dangerTile(
             icon: Icons.delete_outline,
-            title: "Delete Account",
+            title: context.tr("Delete Account"),
             onTap: () {
               _showConfirmDialog(
                 context,
-                "Delete Account",
-                "This action is irreversible. All data will be lost.",
+                context.tr("Delete Account"),
+                context.tr("This action is irreversible. All data will be lost."),
                 onConfirm: () => _deleteAccount(context),
               );
             },
@@ -225,7 +226,7 @@ void _showConfirmDialog(
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text("Cancel"),
+          child: Text(context.tr("Cancel")),
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
@@ -235,7 +236,7 @@ void _showConfirmDialog(
             Navigator.pop(context);
             onConfirm();
           },
-          child: const Text("Confirm"),
+          child: Text(context.tr("Confirm")),
         ),
       ],
     ),

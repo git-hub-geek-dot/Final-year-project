@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../localization/localization_extensions.dart';
 import '../../services/event_service.dart';
 import '../../utils/ist_date_time.dart';
 import '../../widgets/organiser_bottom_nav.dart';
@@ -337,7 +338,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
 
   void _generateDailySchedules() {
     if (eventStartDate == null || eventEndDate == null) {
-      _toast("Select start and end dates first");
+      _toast(context.tr("Select start and end dates first"));
       return;
     }
 
@@ -410,49 +411,51 @@ class _EditEventScreenState extends State<EditEventScreen> {
     }
 
     if (titleController.text.trim().isEmpty) {
-      _toast("Event title is required");
+      _toast(context.tr("Event title is required"));
       return;
     }
     if (locationController.text.trim().isEmpty) {
-      _toast("Location is required");
+      _toast(context.tr("Location is required"));
       return;
     }
     if (descriptionController.text.trim().isEmpty) {
-      _toast("Description is required");
+      _toast(context.tr("Description is required"));
       return;
     }
     if (_parseVolunteers() == null) {
-      _toast("Enter valid volunteers required");
+      _toast(context.tr("Enter valid volunteers required"));
       return;
     }
     if (eventStartDate == null || eventEndDate == null) {
-      _toast("Select event start and end dates");
+      _toast(context.tr("Select event start and end dates"));
       return;
     }
     if (eventStartTime == null || eventEndTime == null) {
-      _toast("Select event start and end time");
+      _toast(context.tr("Select event start and end time"));
       return;
     }
     if (applicationDeadline == null) {
-      _toast("Select application deadline");
+      _toast(context.tr("Select application deadline"));
       return;
     }
     if (selectedCategories.isEmpty) {
-      _toast("Select at least one category");
+      _toast(context.tr("Select at least one category"));
       return;
     }
     if (eventType == "paid") {
       final amount = double.tryParse(paymentController.text);
       if (amount == null || amount <= 0) {
-        _toast("Enter valid payment amount");
+        _toast(context.tr("Enter valid payment amount"));
         return;
       }
       if (paymentClearanceDate == null) {
-        _toast("Select payment clearance date");
+        _toast(context.tr("Select payment clearance date"));
         return;
       }
       if (eventEndDate != null && paymentClearanceDate!.isBefore(eventEndDate!)) {
-        _toast("Payment clearance date cannot be before the event end date");
+        _toast(
+          context.tr("Payment clearance date cannot be before the event end date"),
+        );
         return;
       }
     }
@@ -493,14 +496,14 @@ class _EditEventScreenState extends State<EditEventScreen> {
 
       if (success && mounted) {
         if (publish) {
-          _toast("Event published");
+          _toast(context.tr("Event published"));
         } else {
-          _toast("Event updated");
+          _toast(context.tr("Event updated"));
         }
         Navigator.pop(context, true);
       }
     } catch (e) {
-      _toast("Update failed: $e");
+      _toast(context.tr("Update failed: {message}", args: {"message": e.toString()}));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -510,7 +513,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Edit Event"),
+        title: Text(context.tr("Edit Event")),
         flexibleSpace: const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -522,50 +525,50 @@ class _EditEventScreenState extends State<EditEventScreen> {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(children: [
-          _sectionCard("Basic Details", [
-            _input("Event Title", titleController),
-            _input("Location", locationController),
-            _input("Description", descriptionController, maxLines: 4),
-            _input("Volunteers Required", volunteersController,
+          _sectionCard(context.tr("Basic Details"), [
+            _input(context.tr("Event Title"), titleController),
+            _input(context.tr("Location"), locationController),
+            _input(context.tr("Description"), descriptionController, maxLines: 4),
+            _input(context.tr("Volunteers Required"), volunteersController,
                 keyboardType: TextInputType.number),
           ]),
-          _sectionCard("Schedule", [
+          _sectionCard(context.tr("Schedule"), [
             Row(children: [
               Expanded(
                 child: _dateTile(
-                    "Start Date", eventStartDate, () => pickDate(true)),
+                    context.tr("Start Date"), eventStartDate, () => pickDate(true)),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child:
-                    _dateTile("End Date", eventEndDate, () => pickDate(false)),
+                    _dateTile(context.tr("End Date"), eventEndDate, () => pickDate(false)),
               ),
             ]),
             Row(children: [
               Expanded(
                 child: _timeTile(
-                    "Start Time", eventStartTime, () => pickTime(true)),
+                    context.tr("Start Time"), eventStartTime, () => pickTime(true)),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child:
-                    _timeTile("End Time", eventEndTime, () => pickTime(false)),
+                    _timeTile(context.tr("End Time"), eventEndTime, () => pickTime(false)),
               ),
             ]),
             _dateTile(
-                "Application Deadline", applicationDeadline, pickDeadline),
+                context.tr("Application Deadline"), applicationDeadline, pickDeadline),
           ]),
           // Daily Schedules Section for Multi-day Events
           if (eventStartDate != null &&
               eventEndDate != null &&
               eventStartDate != eventEndDate)
-            _sectionCard("Daily Schedules", [
+            _sectionCard(context.tr("Daily Schedules"), [
               Padding(
                 padding: const EdgeInsets.only(bottom: 12.0),
                 child: ElevatedButton.icon(
                   onPressed: _generateDailySchedules,
                   icon: const Icon(Icons.add),
-                  label: const Text("Generate schedules from dates"),
+                  label: Text(context.tr("Generate schedules from dates")),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF3B82F6),
                     foregroundColor: Colors.white,
@@ -588,7 +591,13 @@ class _EditEventScreenState extends State<EditEventScreen> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  "Day ${schedule['dayNumber']}: ${schedule['date']}",
+                                  context.tr(
+                                    "Day {number}: {date}",
+                                    args: {
+                                      "number": schedule['dayNumber'].toString(),
+                                      "date": schedule['date'].toString(),
+                                    },
+                                  ),
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 14,
@@ -617,7 +626,14 @@ class _EditEventScreenState extends State<EditEventScreen> {
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: Text(
-                                        "Start: ${schedule['start_time'].toString().substring(0, 5)}",
+                                        context.tr(
+                                          "Start: {time}",
+                                          args: {
+                                            "time": schedule['start_time']
+                                                .toString()
+                                                .substring(0, 5),
+                                          },
+                                        ),
                                         style: const TextStyle(fontSize: 13),
                                       ),
                                     ),
@@ -635,7 +651,14 @@ class _EditEventScreenState extends State<EditEventScreen> {
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: Text(
-                                        "End: ${schedule['end_time'].toString().substring(0, 5)}",
+                                        context.tr(
+                                          "End: {time}",
+                                          args: {
+                                            "time": schedule['end_time']
+                                                .toString()
+                                                .substring(0, 5),
+                                          },
+                                        ),
                                         style: const TextStyle(fontSize: 13),
                                       ),
                                     ),
@@ -650,7 +673,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
                   }).toList(),
                 ),
             ]),
-          _sectionCard("Event Banner (Optional)", [
+          _sectionCard(context.tr("Event Banner (Optional)"), [
             InkWell(
               onTap: pickBannerImage,
               child: Container(
@@ -686,43 +709,46 @@ class _EditEventScreenState extends State<EditEventScreen> {
                                 errorBuilder: (_, __, ___) => const Center(
                                     child: Icon(Icons.broken_image))),
                           )
-                        : const Center(
-                            child: Text("Upload Event Banner (Optional)")),
+                        : Center(
+                            child: Text(
+                              context.tr("Upload Event Banner (Optional)"),
+                            ),
+                          ),
               ),
             ),
           ]),
-          _sectionCard("Event Type", [
+          _sectionCard(context.tr("Event Type"), [
             RadioListTile(
               value: "paid",
               groupValue: eventType,
-              title: const Text("Paid"),
+              title: Text(context.tr("Paid")),
               onChanged: (v) => _setEventType(v!),
             ),
             RadioListTile(
               value: "unpaid",
               groupValue: eventType,
-              title: const Text("Unpaid"),
+              title: Text(context.tr("Unpaid")),
               onChanged: (v) => _setEventType(v!),
             ),
             if (eventType == "paid") ...[
-              _input("Payment Amount", paymentController,
+              _input(context.tr("Payment Amount"), paymentController,
                   keyboardType: TextInputType.number),
               _paymentRateField(),
               _dateTile(
-                "Payment Clearance Date",
+                context.tr("Payment Clearance Date"),
                 paymentClearanceDate,
                 pickPaymentClearanceDate,
               ),
             ],
           ]),
-          _sectionCard("Responsibilities", [
+          _sectionCard(context.tr("Responsibilities"), [
             Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: responsibilityController,
                     decoration: InputDecoration(
-                      hintText: "Add responsibility",
+                      hintText: context.tr("Add responsibility"),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -739,7 +765,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
             ),
             const SizedBox(height: 8),
             if (responsibilities.isEmpty)
-              const Text("No responsibilities added"),
+              Text(context.tr("No responsibilities added")),
             if (responsibilities.isNotEmpty)
               Wrap(
                 spacing: 8,
@@ -756,14 +782,14 @@ class _EditEventScreenState extends State<EditEventScreen> {
                     .toList(),
               ),
           ]),
-          _sectionCard("Categories", [
+          _sectionCard(context.tr("Categories"), [
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: categories.map((c) {
                 final selected = selectedCategories.contains(c);
                 return ChoiceChip(
-                  label: Text(c),
+                  label: Text(context.tr(c)),
                   selected: selected,
                   selectedColor: const Color(0xFF22C55E),
                   labelStyle:
@@ -827,9 +853,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
             ),
             borderRadius: BorderRadius.circular(30),
           ),
-          child: const Center(
+          child: Center(
             child: Text(
-              "Update Event",
+              context.tr("Update Event"),
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
@@ -849,7 +875,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
               minimumSize: const Size(double.infinity, 56),
               side: const BorderSide(color: Color(0xFF3B82F6)),
             ),
-            child: const Text("Save Draft"),
+            child: Text(context.tr("Save Draft")),
           ),
         ),
         const SizedBox(width: 12),
@@ -865,9 +891,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
                 ),
                 borderRadius: BorderRadius.circular(30),
               ),
-              child: const Center(
+              child: Center(
                 child: Text(
-                  "Publish Event",
+                  context.tr("Publish Event"),
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -903,13 +929,22 @@ class _EditEventScreenState extends State<EditEventScreen> {
       child: DropdownButtonFormField<String>(
         value: paymentRateType,
         decoration: InputDecoration(
-          labelText: "Payment Rate",
+          labelText: context.tr("Payment Rate"),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         ),
-        items: const [
-          DropdownMenuItem(value: "per_day", child: Text("Per Day")),
-          DropdownMenuItem(value: "per_hour", child: Text("Per Hour")),
-          DropdownMenuItem(value: "fixed", child: Text("Fixed Amount")),
+        items: [
+          DropdownMenuItem(
+            value: "per_day",
+            child: Text(context.tr("Per Day")),
+          ),
+          DropdownMenuItem(
+            value: "per_hour",
+            child: Text(context.tr("Per Hour")),
+          ),
+          DropdownMenuItem(
+            value: "fixed",
+            child: Text(context.tr("Fixed Amount")),
+          ),
         ],
         onChanged: (value) {
           if (value == null) return;

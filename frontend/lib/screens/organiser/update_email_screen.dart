@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../localization/localization_extensions.dart';
+
 class UpdateEmailScreen extends StatefulWidget {
   const UpdateEmailScreen({super.key});
 
@@ -38,8 +40,8 @@ class _UpdateEmailScreenState extends State<UpdateEmailScreen> {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Verification email sent to new address"),
+      SnackBar(
+        content: Text(context.tr("Verification email sent to new address")),
         backgroundColor: Colors.green,
       ),
     );
@@ -51,7 +53,7 @@ class _UpdateEmailScreenState extends State<UpdateEmailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Update Email"),
+        title: Text(context.tr("Update Email")),
         backgroundColor: const Color(0xFF3B82F6),
       ),
       body: SingleChildScrollView(
@@ -64,7 +66,7 @@ class _UpdateEmailScreenState extends State<UpdateEmailScreen> {
                 controller: _currentEmailController,
                 enabled: false,
                 decoration: InputDecoration(
-                  labelText: "Current Email",
+                  labelText: context.tr("Current Email"),
                   hintText: "user@example.com",
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -79,15 +81,15 @@ class _UpdateEmailScreenState extends State<UpdateEmailScreen> {
                 keyboardType: TextInputType.emailAddress,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return "Enter new email address";
+                    return context.tr("Enter new email address");
                   }
                   if (!value.contains("@")) {
-                    return "Enter a valid email";
+                    return context.tr("Enter a valid email");
                   }
                   return null;
                 },
                 decoration: InputDecoration(
-                  labelText: "New Email",
+                  labelText: context.tr("New Email"),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -100,9 +102,11 @@ class _UpdateEmailScreenState extends State<UpdateEmailScreen> {
                 controller: _passwordController,
                 obscureText: _obscurePassword,
                 validator: (value) =>
-                    value == null || value.isEmpty ? "Enter your password" : null,
+                    value == null || value.isEmpty
+                        ? context.tr("Enter your password")
+                        : null,
                 decoration: InputDecoration(
-                  labelText: "Password",
+                  labelText: context.tr("Password"),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -133,8 +137,8 @@ class _UpdateEmailScreenState extends State<UpdateEmailScreen> {
                           color: Colors.white,
                           strokeWidth: 2,
                         )
-                      : const Text(
-                          "Update Email",
+                      : Text(
+                          context.tr("Update Email"),
                           style: TextStyle(fontSize: 16),
                         ),
                 ),

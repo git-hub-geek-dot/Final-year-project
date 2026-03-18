@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../../localization/localization_extensions.dart';
 import '../../services/event_service.dart';
 import '../../services/token_service.dart';
 import '../../utils/application_status.dart';
@@ -74,7 +75,7 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
     } catch (e) {
       setState(() {
         loading = false;
-        loadError = "Failed to load applications. Please try again.";
+        loadError = context.tr("Failed to load applications. Please try again.");
       });
     }
   }
@@ -229,42 +230,42 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
   String get selectedSortLabel {
     switch (selectedSort) {
       case "oldest":
-        return "Oldest";
+        return context.tr("Oldest");
       case "name":
-        return "Name A-Z";
+        return context.tr("Name A-Z");
       case "newest":
       default:
-        return "Newest";
+        return context.tr("Newest");
     }
   }
 
   String get selectedShortlistLabel {
     switch (selectedShortlist) {
       case "shortlisted":
-        return "Shortlisted";
+        return context.tr("Shortlisted");
       case "not_shortlisted":
-        return "Not shortlisted";
+        return context.tr("Not shortlisted");
       case "all":
       default:
-        return "All";
+        return context.tr("All");
     }
   }
 
   String get emptyMessage {
     switch (selectedStatus) {
       case "all":
-        return "No applications yet";
+        return context.tr("No applications yet");
       case "approved":
-        return "No approved applications yet";
+        return context.tr("No approved applications yet");
       case "waitlisted":
-        return "No waitlisted applications yet";
+        return context.tr("No waitlisted applications yet");
       case "rejected":
-        return "No rejected applications yet";
+        return context.tr("No rejected applications yet");
       case "cancelled":
-        return "No cancelled applications yet";
+        return context.tr("No cancelled applications yet");
       case "pending":
       default:
-        return "No pending applications yet";
+        return context.tr("No pending applications yet");
     }
   }
 
@@ -324,7 +325,7 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  "Volunteerx",
+                  "VolunteerX",
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 22,
@@ -359,15 +360,15 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
                      child: Row(
                        children: [
                          toggleButton(
-                           "All (${counts["all"]})",
+                           "${context.tr("All")} (${counts["all"]})",
                            selectedStatus == "all",
                            () {
                              setState(() => selectedStatus = "all");
                            },
                          ),
                          const SizedBox(width: 10),
-                         toggleButton(
-                           "Pending (${counts["pending"]})",
+                        toggleButton(
+                          "${context.tr("Pending")} (${counts["pending"]})",
                            selectedStatus == "pending",
                            () {
                             setState(() => selectedStatus = "pending");
@@ -375,7 +376,7 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
                         ),
                         const SizedBox(width: 10),
                         toggleButton(
-                          "Approved (${counts["approved"]})",
+                          "${context.tr("Approved")} (${counts["approved"]})",
                           selectedStatus == "approved",
                           () {
                             setState(() => selectedStatus = "approved");
@@ -383,7 +384,7 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
                         ),
                         const SizedBox(width: 10),
                         toggleButton(
-                          "Waitlisted (${counts["waitlisted"]})",
+                          "${context.tr("Waitlisted")} (${counts["waitlisted"]})",
                           selectedStatus == "waitlisted",
                           () {
                             setState(() => selectedStatus = "waitlisted");
@@ -391,7 +392,7 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
                         ),
                         const SizedBox(width: 10),
                         toggleButton(
-                          "Rejected (${counts["rejected"]})",
+                          "${context.tr("Rejected")} (${counts["rejected"]})",
                           selectedStatus == "rejected",
                           () {
                             setState(() => selectedStatus = "rejected");
@@ -399,7 +400,7 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
                         ),
                         const SizedBox(width: 10),
                         toggleButton(
-                          "Cancelled (${counts["cancelled"]})",
+                          "${context.tr("Cancelled")} (${counts["cancelled"]})",
                           selectedStatus == "cancelled",
                           () {
                             setState(() => selectedStatus = "cancelled");
@@ -413,23 +414,28 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
                 PopupMenuButton<String>(
                   initialValue: selectedSort,
                   onSelected: (value) => setState(() => selectedSort = value),
-                  itemBuilder: (context) => const [
+                  itemBuilder: (context) => [
                     PopupMenuItem(
                       value: "newest",
-                      child: Text("Newest"),
+                      child: Text(context.tr("Newest")),
                     ),
                     PopupMenuItem(
                       value: "oldest",
-                      child: Text("Oldest"),
+                      child: Text(context.tr("Oldest")),
                     ),
                     PopupMenuItem(
                       value: "name",
-                      child: Text("Name A-Z"),
+                      child: Text(context.tr("Name A-Z")),
                     ),
                   ],
                   child: Row(
                     children: [
-                      Text("Sort: $selectedSortLabel"),
+                      Text(
+                        context.tr(
+                          "Sort: {label}",
+                          args: {"label": selectedSortLabel},
+                        ),
+                      ),
                       const Icon(Icons.arrow_drop_down),
                     ],
                   ),
@@ -443,8 +449,8 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
               children: [
-                const Text(
-                  "Shortlist:",
+                Text(
+                  context.tr("Shortlist:"),
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(width: 8),
@@ -453,18 +459,18 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
                   onSelected: (value) => setState(() {
                     selectedShortlist = value;
                   }),
-                  itemBuilder: (context) => const [
+                  itemBuilder: (context) => [
                     PopupMenuItem(
                       value: "all",
-                      child: Text("All"),
+                      child: Text(context.tr("All")),
                     ),
                     PopupMenuItem(
                       value: "shortlisted",
-                      child: Text("Shortlisted"),
+                      child: Text(context.tr("Shortlisted")),
                     ),
                     PopupMenuItem(
                       value: "not_shortlisted",
-                      child: Text("Not shortlisted"),
+                      child: Text(context.tr("Not shortlisted")),
                     ),
                   ],
                   child: Row(
@@ -497,7 +503,7 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
                             const SizedBox(height: 10),
                             OutlinedButton(
                               onPressed: loadApplications,
-                              child: const Text("Retry"),
+                              child: Text(context.tr("Retry")),
                             ),
                           ],
                         ),
@@ -525,11 +531,11 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
                                       cancelledAt != null &&
                                           cancelledAt.toString().trim().isNotEmpty;
                                   cancellationInfo = cancelledByVolunteer
-                                      ? "Cancelled by volunteer"
-                                      : "Cancelled by organiser/admin";
+                                      ? context.tr("Cancelled by volunteer")
+                                      : context.tr("Cancelled by organiser/admin");
                                 }
                                 return ApplicationCard(
-                                  name: a["name"] ?? "Unknown",
+                                  name: a["name"] ?? context.tr("Unknown"),
                                   location: a["city"] ?? "-",
                                   status: status,
                                   attendanceStatus: _normalizedAttendanceStatus(a),
@@ -664,9 +670,9 @@ class ApplicationCard extends StatelessWidget {
 
   String get statusLabel {
     if (attendanceStatus == "absent") {
-      return "ABSENT";
+      return "Absent";
     }
-    return applicationStatusLabel(status).toUpperCase();
+    return applicationStatusLabel(status);
   }
 
   Color get statusColor {
@@ -679,12 +685,12 @@ class ApplicationCard extends StatelessWidget {
   String get availabilityLabel {
     switch (availabilityStatus) {
       case "partial":
-        return "PARTIAL";
+        return "Partially available";
       case "unsure":
-        return "NOT SURE";
+        return "Not sure";
       case "available":
       default:
-        return "AVAILABLE";
+        return "Available";
     }
   }
 
@@ -746,8 +752,8 @@ class ApplicationCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  "Volunteer",
+                Text(
+                  context.tr("Volunteer"),
                   style: TextStyle(color: Colors.white70, fontSize: 12),
                 ),
                 const SizedBox(height: 4),
@@ -769,7 +775,7 @@ class ApplicationCard extends StatelessWidget {
                         ),
                       ),
                       child: Text(
-                        statusLabel,
+                        context.tr(statusLabel).toUpperCase(),
                         style: TextStyle(
                           color: statusColor,
                           fontSize: 10,
@@ -790,7 +796,7 @@ class ApplicationCard extends StatelessWidget {
                         ),
                       ),
                       child: Text(
-                        availabilityLabel,
+                        context.tr(availabilityLabel).toUpperCase(),
                         style: TextStyle(
                           color: availabilityColor,
                           fontSize: 10,
@@ -799,7 +805,10 @@ class ApplicationCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      appliedDateText,
+                      context.tr(
+                        "Applied: {date}",
+                        args: {"date": appliedDateText.replaceFirst("Applied: ", "")},
+                      ),
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 11,
@@ -817,7 +826,13 @@ class ApplicationCard extends StatelessWidget {
                           border: Border.all(color: const Color(0xFFEF4444)),
                         ),
                         child: Text(
-                          "Slots full ($approvedCount/$volunteersRequired)",
+                          context.tr(
+                            "Slots full ({approved}/{required})",
+                            args: {
+                              "approved": approvedCount.toString(),
+                              "required": volunteersRequired.toString(),
+                            },
+                          ),
                           style: const TextStyle(
                             color: Color(0xFFB91C1C),
                             fontSize: 10,
@@ -862,8 +877,8 @@ class ApplicationCard extends StatelessWidget {
                         SnackBar(
                           content: Text(
                             nextValue
-                                ? "Added to shortlist"
-                                : "Removed from shortlist",
+                                ? context.tr("Added to shortlist")
+                                : context.tr("Removed from shortlist"),
                           ),
                         ),
                       );
@@ -872,7 +887,14 @@ class ApplicationCard extends StatelessWidget {
                   } catch (e) {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Shortlist update failed: $e")),
+                        SnackBar(
+                          content: Text(
+                            context.tr(
+                              "Shortlist update failed: {error}",
+                              args: {"error": e.toString()},
+                            ),
+                          ),
+                        ),
                       );
                     }
                   }
@@ -903,7 +925,7 @@ class ApplicationCard extends StatelessWidget {
                   }
                 },
                 child: actionButton(
-                  text: "View Application",
+                  text: context.tr("View Application"),
                   color: Colors.white,
                   textColor: Colors.green,
                 ),

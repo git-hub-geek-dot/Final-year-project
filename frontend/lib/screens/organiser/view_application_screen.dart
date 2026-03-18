@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../../config/api_config.dart';
+import '../../localization/localization_extensions.dart';
 import '../../services/chat_service.dart';
 import '../../services/token_service.dart';
 import '../../utils/application_status.dart';
@@ -55,14 +56,14 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
         errorMessage = null;
       });
 
-      final token = await TokenService.getToken();
-      if (token == null || token.isEmpty) {
-        setState(() {
-          loading = false;
-          errorMessage = "Token not found. Please login again.";
-        });
-        return;
-      }
+        final token = await TokenService.getToken();
+        if (token == null || token.isEmpty) {
+          setState(() {
+            loading = false;
+            errorMessage = context.tr("Token not found. Please login again.");
+          });
+          return;
+        }
 
       final url = Uri.parse(
           "${ApiConfig.baseUrl}/applications/${widget.applicationId}");
@@ -88,13 +89,16 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
       } else {
         setState(() {
           loading = false;
-          errorMessage = "Failed: ${response.statusCode}\n${response.body}";
+          errorMessage = context.tr(
+            "Failed: {message}",
+            args: {"message": "${response.statusCode}\n${response.body}"},
+          );
         });
       }
     } catch (e) {
       setState(() {
         loading = false;
-        errorMessage = "Error: $e";
+        errorMessage = context.tr("Error: {error}", args: {"error": e.toString()});
       });
     }
   }
@@ -115,7 +119,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
       if (token == null || token.isEmpty) {
         setState(() => actionLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Token not found. Please login again.")),
+          SnackBar(content: Text(context.tr("Token not found. Please login again."))),
         );
         return;
       }
@@ -139,7 +143,12 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              "Application marked as ${statusLabel(status).toLowerCase()}.",
+              context.tr(
+                "Application marked as {status}.",
+                args: {
+                  "status": context.tr(statusLabel(status)).toLowerCase(),
+                },
+              ),
             ),
           ),
         );
@@ -169,7 +178,11 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
     } catch (e) {
       setState(() => actionLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
+        SnackBar(
+          content: Text(
+            context.tr("Error: {error}", args: {"error": e.toString()}),
+          ),
+        ),
       );
     }
   }
@@ -182,7 +195,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
     final volunteerId = app["volunteer_id"];
     if (eventId == null || volunteerId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Chat info not available")),
+        SnackBar(content: Text(context.tr("Chat info not available"))),
       );
       return;
     }
@@ -200,13 +213,13 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
         MaterialPageRoute(
           builder: (_) => ChatScreen(
             threadId: thread["id"],
-            title: "Chat",
+            title: context.tr("Chat"),
           ),
         ),
       );
     } catch (_) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Failed to open chat")),
+        SnackBar(content: Text(context.tr("Failed to open chat"))),
       );
     }
   }
@@ -224,7 +237,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
         builder: (_) => RatingScreen(
           eventId: eventId,
           rateeId: volunteerId,
-          title: "Rate Volunteer",
+          title: context.tr("Rate Volunteer"),
         ),
       ),
     );
@@ -260,7 +273,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
     final message = decoded?["message"]?.toString();
     if (error != null && error.isNotEmpty) return error;
     if (message != null && message.isNotEmpty) return message;
-    return "Failed to update application status.";
+    return context.tr("Failed to update application status.");
   }
 
   bool _isApprovedStatus(String status) {
@@ -274,15 +287,15 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
   String _finalStatusMessage(String status) {
     switch (normalizeApplicationStatus(status)) {
       case "approved":
-        return "This application is already approved.";
+        return context.tr("This application is already approved.");
       case "rejected":
-        return "This application is already rejected.";
+        return context.tr("This application is already rejected.");
       case "cancelled":
-        return "This application has been cancelled.";
+        return context.tr("This application has been cancelled.");
       case "completed":
-        return "This participation is already completed.";
+        return context.tr("This participation is already completed.");
       default:
-        return "This application can no longer be changed.";
+        return context.tr("This application can no longer be changed.");
     }
   }
 
@@ -295,7 +308,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
       if (token == null || token.isEmpty) {
         setState(() => shortlistLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Token not found. Please login again.")),
+          SnackBar(content: Text(context.tr("Token not found. Please login again."))),
         );
         return;
       }
@@ -322,7 +335,9 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              shortlisted ? "Added to shortlist" : "Removed from shortlist",
+              shortlisted
+                  ? context.tr("Added to shortlist")
+                  : context.tr("Removed from shortlist"),
             ),
           ),
         );
@@ -334,7 +349,11 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
     } catch (e) {
       setState(() => shortlistLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
+        SnackBar(
+          content: Text(
+            context.tr("Error: {error}", args: {"error": e.toString()}),
+          ),
+        ),
       );
     }
   }
@@ -350,9 +369,15 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
 
   String get _slotsFullMessage {
     if (volunteersRequired > 0) {
-      return "Cannot approve. Slots are full ($approvedCount/$volunteersRequired).";
+      return context.tr(
+        "Cannot approve. Slots are full ({approved}/{required}).",
+        args: {
+          "approved": approvedCount.toString(),
+          "required": volunteersRequired.toString(),
+        },
+      );
     }
-    return "Cannot approve. Slots are full.";
+    return context.tr("Cannot approve. Slots are full.");
   }
 
   double _asDouble(dynamic value) {
@@ -419,12 +444,12 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
   String _availabilityLabel(String status) {
     switch (status) {
       case "partial":
-        return "Partially available";
+        return context.tr("Partially available");
       case "unsure":
-        return "Not sure";
+        return context.tr("Not sure");
       case "available":
       default:
-        return "Available";
+        return context.tr("Available");
     }
   }
 
@@ -562,7 +587,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
         const SizedBox(height: 6),
         if (displayItems.isEmpty)
           Text(
-            emptyLabel ?? "Not provided",
+            emptyLabel ?? context.tr("Not provided"),
             style: TextStyle(
               color: Colors.grey.shade600,
               fontSize: compact ? 12 : 13,
@@ -631,7 +656,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          "Badges",
+          context.tr("Badges"),
           style: TextStyle(
             fontWeight: FontWeight.w600,
             fontSize: compact ? 14 : 16,
@@ -640,7 +665,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
         if (topBadgeName != null && topBadgeName.isNotEmpty) ...[
           const SizedBox(height: 6),
           Text(
-            "Top badge: $topBadgeName",
+            context.tr("Top badge: {badge}", args: {"badge": topBadgeName}),
             style: TextStyle(
               color: Colors.grey.shade700,
               fontSize: compact ? 12 : 13,
@@ -650,7 +675,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
         const SizedBox(height: 8),
         if (items.isEmpty)
           Text(
-            "No badges yet",
+            context.tr("No badges yet"),
             style: TextStyle(
               color: Colors.grey.shade600,
               fontSize: compact ? 12 : 13,
@@ -661,7 +686,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
             spacing: 8,
             runSpacing: 6,
             children: badges.map((badge) {
-              final name = (badge["name"] ?? "Badge").toString();
+              final name = (badge["name"] ?? context.tr("Badge")).toString();
               final baseColor = _badgeBaseColor(badge);
               return Chip(
                 label: Text(
@@ -688,7 +713,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          "Past Event Categories",
+          context.tr("Past Event Categories"),
           style: TextStyle(
             fontWeight: FontWeight.w600,
             fontSize: compact ? 14 : 16,
@@ -699,7 +724,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
           spacing: 8,
           runSpacing: 6,
           children: categories.map((row) {
-            final name = (row["name"] ?? "Category").toString();
+            final name = (row["name"] ?? context.tr("Category")).toString();
             final count = _asInt(row["count"]);
             return Chip(
               label: Text(
@@ -722,7 +747,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          "Recent Participation",
+          context.tr("Recent Participation"),
           style: TextStyle(
             fontWeight: FontWeight.w600,
             fontSize: compact ? 14 : 16,
@@ -731,7 +756,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
         const SizedBox(height: 8),
         if (rows.isEmpty)
           Text(
-            "No recent participation yet.",
+            context.tr("No recent participation yet."),
             style: TextStyle(
               color: Colors.grey.shade600,
               fontSize: compact ? 12 : 13,
@@ -740,7 +765,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
         else
           Column(
             children: rows.map((row) {
-              final title = (row["title"] ?? "Event").toString();
+              final title = (row["title"] ?? context.tr("Event")).toString();
               final eventDate = _parseDate(row["end_date"]) ??
                   _parseDate(row["event_date"]);
               final statusRaw = row["application_status"];
@@ -751,7 +776,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
 
               String statusLabelText = applicationStatusLabel(status);
               if (attendance == "absent") {
-                statusLabelText = "Absent";
+                statusLabelText = context.tr("Absent");
               }
 
               Color statusColor = applicationStatusColor(status);
@@ -783,7 +808,10 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            "Date: ${_formatShortDate(eventDate)}",
+                            context.tr(
+                              "Date: {date}",
+                              args: {"date": _formatShortDate(eventDate)},
+                            ),
                             style: TextStyle(
                               color: Colors.grey.shade600,
                               fontSize: compact ? 12 : 13,
@@ -803,7 +831,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                         border: Border.all(color: statusColor.withOpacity(0.4)),
                       ),
                       child: Text(
-                        statusLabelText.toUpperCase(),
+                        context.tr(statusLabelText).toUpperCase(),
                         style: TextStyle(
                           color: statusColor,
                           fontSize: compact ? 10 : 11,

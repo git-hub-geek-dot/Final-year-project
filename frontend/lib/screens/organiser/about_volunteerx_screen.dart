@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../localization/localization_extensions.dart';
+
 class AboutVolunteerxScreen extends StatelessWidget {
   const AboutVolunteerxScreen({super.key});
 
@@ -7,7 +9,7 @@ class AboutVolunteerxScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("About Volunteerx"),
+        title: Text(context.tr("About VolunteerX")),
         backgroundColor: const Color(0xFF3B82F6),
       ),
       body: SingleChildScrollView(
@@ -15,39 +17,32 @@ class AboutVolunteerxScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _sectionTitle("What is Volunteerx?"),
+            _sectionTitle(context.tr("What is VolunteerX?")),
             _paragraph(
-              "Volunteerx is a platform designed to connect event organizers "
-              "with passionate volunteers. It simplifies event management, "
-              "volunteer hiring, and application tracking.",
+              context.tr(
+                "VolunteerX is a platform designed to connect event organizers with passionate volunteers. It simplifies event management, volunteer hiring, and application tracking.",
+              ),
             ),
-
             const SizedBox(height: 20),
-
-            _sectionTitle("Our Mission"),
+            _sectionTitle(context.tr("Our Mission")),
             _paragraph(
-              "Our mission is to empower communities by making volunteering "
-              "more accessible, transparent, and impactful for everyone.",
+              context.tr(
+                "Our mission is to empower communities by making volunteering more accessible, transparent, and impactful for everyone.",
+              ),
             ),
-
             const SizedBox(height: 20),
-
-            _sectionTitle("What You Can Do"),
-            _bullet("Create and manage events"),
-            _bullet("Review volunteer applications"),
-            _bullet("Hire trusted volunteers"),
-            _bullet("Track volunteer performance"),
-
+            _sectionTitle(context.tr("What You Can Do")),
+            _bullet(context.tr("Create and manage events")),
+            _bullet(context.tr("Review volunteer applications")),
+            _bullet(context.tr("Hire trusted volunteers")),
+            _bullet(context.tr("Track volunteer performance")),
             const SizedBox(height: 20),
-
-            _sectionTitle("Version"),
-            _paragraph("Volunteerx v1.0.0"),
-
+            _sectionTitle(context.tr("Version")),
+            _paragraph(context.tr("VolunteerX v1.0.0")),
             const SizedBox(height: 30),
-
             Center(
               child: Text(
-                "© 2026 Volunteerx. All rights reserved.",
+                context.tr("Copyright 2026 VolunteerX. All rights reserved."),
                 style: TextStyle(
                   color: Colors.grey.shade600,
                   fontSize: 12,
@@ -60,7 +55,6 @@ class AboutVolunteerxScreen extends StatelessWidget {
     );
   }
 
-  // 🔹 SECTION TITLE
   Widget _sectionTitle(String text) {
     return Text(
       text,
@@ -71,7 +65,6 @@ class AboutVolunteerxScreen extends StatelessWidget {
     );
   }
 
-  // 🔹 PARAGRAPH TEXT
   Widget _paragraph(String text) {
     return Padding(
       padding: const EdgeInsets.only(top: 8),
@@ -85,14 +78,13 @@ class AboutVolunteerxScreen extends StatelessWidget {
     );
   }
 
-  // 🔹 BULLET POINT
   Widget _bullet(String text) {
     return Padding(
       padding: const EdgeInsets.only(top: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("•  "),
+          const Text("- "),
           Expanded(
             child: Text(
               text,

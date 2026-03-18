@@ -1,11 +1,13 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
 import '../../config/api_config.dart';
-import '../../services/token_service.dart';
+import '../../localization/localization_extensions.dart';
 import '../../services/event_service.dart';
+import '../../services/token_service.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -118,16 +120,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       final token = await TokenService.getToken();
       if (token == null || token.isEmpty) {
-        throw Exception("Token missing. Please login again.");
+        throw Exception(context.tr("Token missing. Please login again."));
       }
 
-      // If user selected a new image, upload it first
       String? uploadedUrl = _profilePictureUrl;
       if (_selectedImage != null) {
         uploadedUrl = await EventService.uploadImage(_selectedImage!);
       }
 
-      // Use authenticated profile update endpoint
       final response = await http.put(
         Uri.parse("${ApiConfig.baseUrl}/profile/update"),
         headers: {
@@ -148,20 +148,26 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final data = jsonDecode(response.body);
 
       if (response.statusCode != 200) {
-        throw Exception(data["message"] ?? data["error"] ?? "Update failed");
+        throw Exception(
+          data["message"] ?? data["error"] ?? context.tr("Update failed"),
+        );
       }
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Profile updated successfully ✅")),
+        SnackBar(content: Text(context.tr("Profile updated successfully"))),
       );
 
-      Navigator.pop(context, true); // 🔥 tells profile screen to refresh
+      Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
+        SnackBar(
+          content: Text(
+            context.tr("Error: {error}", args: {"error": e.toString()}),
+          ),
+        ),
       );
     } finally {
       setState(() => loading = false);
@@ -172,7 +178,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Edit Profile"),
+        title: Text(context.tr("Edit Profile")),
         backgroundColor: const Color(0xFF3B82F6),
       ),
       body: SingleChildScrollView(
@@ -211,23 +217,32 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 IconButton(
                   icon: const Icon(Icons.camera_alt, color: Colors.black54),
                   onPressed: () async {
-                    final picked = await _picker.pickImage(source: ImageSource.gallery);
-                    if (picked != null) setState(() => _selectedImage = picked);
+                    final picked = await _picker.pickImage(
+                      source: ImageSource.gallery,
+                    );
+                    if (picked != null) {
+                      setState(() => _selectedImage = picked);
+                    }
                   },
                 ),
               ],
             ),
             const SizedBox(height: 20),
-
-            _input(_nameController, "Full Name", Icons.person),
-            _input(_emailController, "Email", Icons.email),
-            _input(_cityController, "City", Icons.location_on),
-            _input(_contactController, "Contact Number", Icons.phone),
+            _input(_nameController, context.tr("Full Name"), Icons.person),
+            _input(_emailController, context.tr("Email"), Icons.email),
+            _input(_cityController, context.tr("City"), Icons.location_on),
+            _input(
+              _contactController,
+              context.tr("Contact Number"),
+              Icons.phone,
+            ),
             SwitchListTile.adaptive(
               contentPadding: EdgeInsets.zero,
-              title: const Text("Show contact number to volunteers"),
-              subtitle: const Text(
-                "Only volunteers viewing your organiser profile can see it.",
+              title: Text(context.tr("Show contact number to volunteers")),
+              subtitle: Text(
+                context.tr(
+                  "Only volunteers viewing your organiser profile can see it.",
+                ),
               ),
               value: _showContactToVolunteers,
               onChanged: (value) {
@@ -235,10 +250,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               },
             ),
             const SizedBox(height: 8),
-            _input(_govIdController, "Government ID (Optional)", Icons.badge),
-
+            _input(
+              _govIdController,
+              context.tr("Government ID (Optional)"),
+              Icons.badge,
+            ),
             const SizedBox(height: 30),
-
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -252,7 +269,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
                 child: loading
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text("Save Changes", style: TextStyle(fontSize: 16)),
+                    : Text(
+                        context.tr("Save Changes"),
+                        style: const TextStyle(fontSize: 16),
+                      ),
               ),
             ),
           ],

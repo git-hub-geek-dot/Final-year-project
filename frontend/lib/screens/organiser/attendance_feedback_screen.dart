@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../localization/localization_extensions.dart';
 import '../../services/event_service.dart';
 import '../../widgets/organiser_bottom_nav.dart';
 
@@ -115,7 +116,10 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            "Mark attendance for all volunteers before saving ($unmarkedCount remaining).",
+            context.tr(
+              "Mark attendance for all volunteers before saving ({count} remaining).",
+              args: {"count": unmarkedCount.toString()},
+            ),
           ),
         ),
       );
@@ -140,7 +144,7 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
 
       if (!mounted) return;
       final message =
-          (response["message"] ?? "Attendance saved").toString();
+          (response["message"] ?? context.tr("Attendance saved")).toString();
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
@@ -160,7 +164,7 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final title = (event?["title"] ?? "Event").toString();
+    final title = (event?["title"] ?? context.tr("Event")).toString();
     final totalCount = approvedVolunteers.length;
     final presentCount = attendanceByVolunteerId.values
         .where((status) => status == "present")
@@ -172,7 +176,7 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Attendance"),
+        title: Text(context.tr("Attendance")),
       ),
       body: loading
           ? const Center(child: CircularProgressIndicator())
@@ -191,7 +195,7 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
                         const SizedBox(height: 12),
                         ElevatedButton(
                           onPressed: _loadData,
-                          child: const Text("Retry"),
+                          child: Text(context.tr("Retry")),
                         ),
                       ],
                     ),
@@ -224,14 +228,31 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
                               spacing: 10,
                               runSpacing: 8,
                               children: [
-                                Text("Present: $presentCount"),
-                                Text("Absent: $absentCount"),
-                                Text("Unmarked: $unmarkedCount"),
+                                Text(
+                                  context.tr(
+                                    "Present: {count}",
+                                    args: {"count": presentCount.toString()},
+                                  ),
+                                ),
+                                Text(
+                                  context.tr(
+                                    "Absent: {count}",
+                                    args: {"count": absentCount.toString()},
+                                  ),
+                                ),
+                                Text(
+                                  context.tr(
+                                    "Unmarked: {count}",
+                                    args: {"count": unmarkedCount.toString()},
+                                  ),
+                                ),
                               ],
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              "Mark every approved volunteer as present or absent. Absent volunteers receive a strike only after the event is completed.",
+                              context.tr(
+                                "Mark every approved volunteer as present or absent. Absent volunteers receive a strike only after the event is completed.",
+                              ),
                               style: TextStyle(
                                 color: Colors.grey.shade700,
                                 fontSize: 12,
@@ -247,7 +268,9 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 24),
                             child: Text(
-                              "No approved volunteers found for this event yet.",
+                              context.tr(
+                                "No approved volunteers found for this event yet.",
+                              ),
                               style: TextStyle(color: Colors.grey.shade700),
                               textAlign: TextAlign.center,
                             ),
@@ -267,7 +290,9 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
                             final row = approvedVolunteers[index];
                             final volunteerId =
                                 _asInt(row["volunteer_id"] ?? row["id"]);
-                            final name = (row["name"] ?? "Volunteer").toString();
+                            final name =
+                                (row["name"] ?? context.tr("Volunteer"))
+                                    .toString();
                             final city = (row["city"] ?? "-").toString();
                             final selectedStatus =
                                 attendanceByVolunteerId[volunteerId] ?? "unmarked";
@@ -280,14 +305,19 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
                               subtitle: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text("Location: $city"),
+                                  Text(
+                                    context.tr(
+                                      "Location: {location}",
+                                      args: {"location": city},
+                                    ),
+                                  ),
                                   const SizedBox(height: 8),
                                   Wrap(
                                     spacing: 8,
                                     runSpacing: 8,
                                     children: [
                                       ChoiceChip(
-                                        label: const Text("Present"),
+                                        label: Text(context.tr("Present")),
                                         selected: selectedStatus == "present",
                                         onSelected: volunteerId <= 0
                                             ? null
@@ -299,7 +329,7 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
                                               },
                                       ),
                                       ChoiceChip(
-                                        label: const Text("Absent"),
+                                        label: Text(context.tr("Absent")),
                                         selected: selectedStatus == "absent",
                                         onSelected: volunteerId <= 0
                                             ? null
@@ -326,10 +356,11 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
                             controller: summaryController,
                             maxLines: 3,
                             maxLength: 1000,
-                            decoration: const InputDecoration(
-                              labelText: "Optional note",
-                              hintText:
-                                  "Example: volunteer informed late / unreachable / left early",
+                            decoration: InputDecoration(
+                              labelText: context.tr("Optional note"),
+                              hintText: context.tr(
+                                "Example: volunteer informed late / unreachable / left early",
+                              ),
                               border: OutlineInputBorder(),
                             ),
                           ),
@@ -351,8 +382,8 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
                                   : const Icon(Icons.save_outlined),
                               label: Text(
                                 submitting
-                                    ? "Saving..."
-                                    : "Save Attendance",
+                                    ? context.tr("Saving...")
+                                    : context.tr("Save Attendance"),
                               ),
                             ),
                           ),

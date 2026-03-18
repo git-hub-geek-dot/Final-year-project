@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
 import '../../config/api_config.dart';
+import '../../localization/localization_extensions.dart';
 import '../../services/event_service.dart';
 import '../../services/token_service.dart';
 import '../../services/verification_service.dart';
@@ -67,12 +68,64 @@ class _OrganiserGetVerifiedScreenState
     }
   }
 
+  Future<void> _pickAndUpload({
+    required ImageSource source,
+    required ValueSetter<XFile?> setImage,
+    required ValueSetter<String?> setUrl,
+    required String uploadingKey,
+    required String successKey,
+  }) async {
+    final picked = await _picker.pickImage(
+      source: source,
+      imageQuality: 80,
+      maxWidth: 1600,
+    );
+    if (picked == null) return;
+
+    final size = await picked.length();
+    const maxBytes = 5 * 1024 * 1024;
+    if (size > maxBytes) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr("File too large (max 5MB)"))),
+      );
+      return;
+    }
+
+    setState(() => setImage(picked));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(context.tr(uploadingKey))),
+    );
+
+    try {
+      final url = await EventService.uploadImage(picked);
+      if (!mounted) return;
+      setState(() => setUrl(url));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr(successKey))),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        setImage(null);
+        setUrl(null);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context.tr("Upload failed: {error}", args: {"error": e.toString()}),
+          ),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final status = (_verificationStatus ?? "").toLowerCase();
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Get Verified")),
+      appBar: AppBar(title: Text(context.tr("Get Verified"))),
       body: _checkingStatus
           ? const Center(child: CircularProgressIndicator())
           : status == "approved"
@@ -96,23 +149,23 @@ class _OrganiserGetVerifiedScreenState
               size: 72,
             ),
             const SizedBox(height: 16),
-            const Text(
-              "Your account is already verified.",
-              style: TextStyle(
+            Text(
+              context.tr("Your account is already verified."),
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
-            const Text(
-              "You do not need to submit verification again.",
+            Text(
+              context.tr("You do not need to submit verification again."),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text("Back to Profile"),
+              child: Text(context.tr("Back to Profile")),
             ),
           ],
         ),
@@ -133,23 +186,25 @@ class _OrganiserGetVerifiedScreenState
               size: 72,
             ),
             const SizedBox(height: 16),
-            const Text(
-              "Your verification request is under review.",
-              style: TextStyle(
+            Text(
+              context.tr("Your verification request is under review."),
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
-            const Text(
-              "You cannot submit another request until the current one is reviewed.",
+            Text(
+              context.tr(
+                "You cannot submit another request until the current one is reviewed.",
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text("Back to Profile"),
+              child: Text(context.tr("Back to Profile")),
             ),
           ],
         ),
@@ -174,46 +229,57 @@ class _OrganiserGetVerifiedScreenState
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.red.shade100),
                 ),
-                child: const Text(
-                  "Your previous verification request was rejected. Please review your details and submit again.",
-                  style: TextStyle(color: Colors.redAccent),
+                child: Text(
+                  context.tr(
+                    "Your previous verification request was rejected. Please review your details and submit again.",
+                  ),
+                  style: const TextStyle(color: Colors.redAccent),
                 ),
               ),
               const SizedBox(height: 16),
             ],
-            const Text(
-              "Organiser Verification",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            Text(
+              context.tr("Organiser Verification"),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
               initialValue: _idType,
-              decoration: const InputDecoration(
-                labelText: "ID Type",
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: context.tr("ID Type"),
+                border: const OutlineInputBorder(),
               ),
-              items: const [
-                DropdownMenuItem(value: "aadhaar", child: Text("Aadhaar")),
-                DropdownMenuItem(value: "pan", child: Text("PAN Card")),
-                DropdownMenuItem(value: "passport", child: Text("Passport")),
+              items: [
+                DropdownMenuItem(
+                  value: "aadhaar",
+                  child: Text(context.tr("Aadhaar")),
+                ),
+                DropdownMenuItem(
+                  value: "pan",
+                  child: Text(context.tr("PAN Card")),
+                ),
+                DropdownMenuItem(
+                  value: "passport",
+                  child: Text(context.tr("Passport")),
+                ),
               ],
               onChanged: (value) => setState(() => _idType = value),
               validator: (value) =>
-                  value == null ? "Please select ID type" : null,
+                  value == null ? context.tr("Please select ID type") : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _idNumberController,
-              decoration: const InputDecoration(
-                labelText: "ID Number",
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: context.tr("ID Number"),
+                border: const OutlineInputBorder(),
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return "Enter ID number";
+                  return context.tr("Enter ID number");
                 }
                 if (value.length < 5) {
-                  return "Invalid ID number";
+                  return context.tr("Invalid ID number");
                 }
                 return null;
               },
@@ -225,50 +291,17 @@ class _OrganiserGetVerifiedScreenState
                   child: OutlinedButton.icon(
                     icon: const Icon(Icons.upload_file),
                     label: Text(
-                      _idImage == null ? "Upload ID Proof *" : "ID Selected",
+                      _idImage == null
+                          ? context.tr("Upload ID Proof *")
+                          : context.tr("ID Selected"),
                     ),
-                    onPressed: () async {
-                      final picked = await _picker.pickImage(
-                        source: ImageSource.gallery,
-                        imageQuality: 80,
-                        maxWidth: 1600,
-                      );
-                      if (picked == null) return;
-
-                      final size = await picked.length();
-                      const maxBytes = 5 * 1024 * 1024;
-                      if (size > maxBytes) {
-                        if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text("File too large (max 5MB)"),
-                          ),
-                        );
-                        return;
-                      }
-
-                      setState(() => _idImage = picked);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Uploading ID proof...")),
-                      );
-                      try {
-                        final url = await EventService.uploadImage(picked);
-                        if (!mounted) return;
-                        setState(() => _idDocumentUrl = url);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("ID proof uploaded")),
-                        );
-                      } catch (e) {
-                        if (!mounted) return;
-                        setState(() {
-                          _idImage = null;
-                          _idDocumentUrl = null;
-                        });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("Upload failed: $e")),
-                        );
-                      }
-                    },
+                    onPressed: () => _pickAndUpload(
+                      source: ImageSource.gallery,
+                      setImage: (value) => _idImage = value,
+                      setUrl: (value) => _idDocumentUrl = value,
+                      uploadingKey: "Uploading ID proof...",
+                      successKey: "ID proof uploaded",
+                    ),
                   ),
                 ),
                 if (_idDocumentUrl != null) const SizedBox(width: 8),
@@ -284,57 +317,25 @@ class _OrganiserGetVerifiedScreenState
                     icon: const Icon(Icons.camera_alt),
                     label: Text(
                       _selfieImage == null
-                          ? "Upload Selfie with ID *"
-                          : "Selfie Selected",
+                          ? context.tr("Upload Selfie with ID *")
+                          : context.tr("Selfie Selected"),
                     ),
                     onPressed: () async {
-                      XFile? picked;
                       try {
-                        picked = await _picker.pickImage(
+                        await _pickAndUpload(
                           source: ImageSource.camera,
-                          imageQuality: 80,
-                          maxWidth: 1600,
+                          setImage: (value) => _selfieImage = value,
+                          setUrl: (value) => _selfieUrl = value,
+                          uploadingKey: "Uploading selfie...",
+                          successKey: "Selfie uploaded",
                         );
                       } catch (_) {
-                        picked = await _picker.pickImage(
+                        await _pickAndUpload(
                           source: ImageSource.gallery,
-                          imageQuality: 80,
-                          maxWidth: 1600,
-                        );
-                      }
-                      if (picked == null) return;
-
-                      final size = await picked.length();
-                      const maxBytes = 5 * 1024 * 1024;
-                      if (size > maxBytes) {
-                        if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text("File too large (max 5MB)"),
-                          ),
-                        );
-                        return;
-                      }
-
-                      setState(() => _selfieImage = picked);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Uploading selfie...")),
-                      );
-                      try {
-                        final url = await EventService.uploadImage(picked);
-                        if (!mounted) return;
-                        setState(() => _selfieUrl = url);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("Selfie uploaded")),
-                        );
-                      } catch (e) {
-                        if (!mounted) return;
-                        setState(() {
-                          _selfieImage = null;
-                          _selfieUrl = null;
-                        });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("Upload failed: $e")),
+                          setImage: (value) => _selfieImage = value,
+                          setUrl: (value) => _selfieUrl = value,
+                          uploadingKey: "Uploading selfie...",
+                          successKey: "Selfie uploaded",
                         );
                       }
                     },
@@ -346,19 +347,19 @@ class _OrganiserGetVerifiedScreenState
               ],
             ),
             const SizedBox(height: 20),
-            const Text(
-              "Organisation Details",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            Text(
+              context.tr("Organisation Details"),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
             TextFormField(
               controller: _orgNameController,
-              decoration: const InputDecoration(
-                labelText: "Organisation Name",
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: context.tr("Organisation Name"),
+                border: const OutlineInputBorder(),
               ),
               validator: (value) => value == null || value.isEmpty
-                  ? "Enter organisation name"
+                  ? context.tr("Enter organisation name")
                   : null,
             ),
             const SizedBox(height: 16),
@@ -369,53 +370,16 @@ class _OrganiserGetVerifiedScreenState
                     icon: const Icon(Icons.event),
                     label: Text(
                       _eventProofImage == null
-                          ? "Upload Event Proof / Certificate"
-                          : "Proof Selected",
+                          ? context.tr("Upload Event Proof / Certificate")
+                          : context.tr("Proof Selected"),
                     ),
-                    onPressed: () async {
-                      final picked = await _picker.pickImage(
-                        source: ImageSource.gallery,
-                        imageQuality: 80,
-                        maxWidth: 1600,
-                      );
-                      if (picked == null) return;
-
-                      final size = await picked.length();
-                      const maxBytes = 5 * 1024 * 1024;
-                      if (size > maxBytes) {
-                        if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text("File too large (max 5MB)"),
-                          ),
-                        );
-                        return;
-                      }
-
-                      setState(() => _eventProofImage = picked);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("Uploading event proof..."),
-                        ),
-                      );
-                      try {
-                        final url = await EventService.uploadImage(picked);
-                        if (!mounted) return;
-                        setState(() => _eventProofUrl = url);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("Event proof uploaded")),
-                        );
-                      } catch (e) {
-                        if (!mounted) return;
-                        setState(() {
-                          _eventProofImage = null;
-                          _eventProofUrl = null;
-                        });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("Upload failed: $e")),
-                        );
-                      }
-                    },
+                    onPressed: () => _pickAndUpload(
+                      source: ImageSource.gallery,
+                      setImage: (value) => _eventProofImage = value,
+                      setUrl: (value) => _eventProofUrl = value,
+                      uploadingKey: "Uploading event proof...",
+                      successKey: "Event proof uploaded",
+                    ),
                   ),
                 ),
                 if (_eventProofUrl != null) const SizedBox(width: 8),
@@ -426,9 +390,9 @@ class _OrganiserGetVerifiedScreenState
             const SizedBox(height: 16),
             TextFormField(
               controller: _linkController,
-              decoration: const InputDecoration(
-                labelText: "Website / Social Link",
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: context.tr("Website / Social Link"),
+                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 30),
@@ -442,16 +406,18 @@ class _OrganiserGetVerifiedScreenState
 
                         if (_idDocumentUrl == null) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text("Please upload ID proof"),
+                            SnackBar(
+                              content: Text(context.tr("Please upload ID proof")),
                             ),
                           );
                           return;
                         }
                         if (_selfieUrl == null) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text("Please upload selfie with ID"),
+                            SnackBar(
+                              content: Text(
+                                context.tr("Please upload selfie with ID"),
+                              ),
                             ),
                           );
                           return;
@@ -463,7 +429,9 @@ class _OrganiserGetVerifiedScreenState
                         if (token == null || token.isEmpty) {
                           if (!mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Please login again")),
+                            SnackBar(
+                              content: Text(context.tr("Please login again")),
+                            ),
                           );
                           setState(() => loading = false);
                           return;
@@ -492,15 +460,18 @@ class _OrganiserGetVerifiedScreenState
 
                           if (res.statusCode == 201 || res.statusCode == 200) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text("Verification request submitted"),
+                              SnackBar(
+                                content: Text(
+                                  context.tr("Verification request submitted"),
+                                ),
                               ),
                             );
                             Navigator.pop(context);
                           } else {
                             final data = jsonDecode(res.body);
                             final message =
-                                (data["message"] ?? "Submission failed")
+                                (data["message"] ??
+                                        context.tr("Submission failed"))
                                     .toString();
                             if (message.toLowerCase().contains(
                               "already verified",
@@ -518,7 +489,14 @@ class _OrganiserGetVerifiedScreenState
                         } catch (e) {
                           if (!mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text("Error: $e")),
+                            SnackBar(
+                              content: Text(
+                                context.tr(
+                                  "Error: {error}",
+                                  args: {"error": e.toString()},
+                                ),
+                              ),
+                            ),
                           );
                         } finally {
                           if (mounted) {
@@ -528,7 +506,7 @@ class _OrganiserGetVerifiedScreenState
                       },
                 child: loading
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text("Submit for Verification"),
+                    : Text(context.tr("Submit for Verification")),
               ),
             ),
           ],

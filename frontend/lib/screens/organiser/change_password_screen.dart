@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../localization/localization_extensions.dart';
+
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
 
@@ -40,8 +42,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Password updated successfully"),
+      SnackBar(
+        content: Text(context.tr("Password updated successfully")),
         backgroundColor: Colors.green,
       ),
     );
@@ -53,7 +55,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Change Password"),
+        title: Text(context.tr("Change Password")),
         backgroundColor: const Color(0xFF3B82F6),
       ),
       body: SingleChildScrollView(
@@ -63,7 +65,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           child: Column(
             children: [
               _passwordField(
-                label: "Current Password",
+                label: context.tr("Current Password"),
                 controller: _currentPasswordController,
                 obscure: _obscureCurrent,
                 toggle: () =>
@@ -73,16 +75,16 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               const SizedBox(height: 16),
 
               _passwordField(
-                label: "New Password",
+                label: context.tr("New Password"),
                 controller: _newPasswordController,
                 obscure: _obscureNew,
                 toggle: () => setState(() => _obscureNew = !_obscureNew),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return "Enter new password";
+                    return context.tr("Enter new password");
                   }
                   if (value.length < 6) {
-                    return "Password must be at least 6 characters";
+                    return context.tr("Password must be at least 6 characters");
                   }
                   return null;
                 },
@@ -91,14 +93,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               const SizedBox(height: 16),
 
               _passwordField(
-                label: "Confirm New Password",
+                label: context.tr("Confirm New Password"),
                 controller: _confirmPasswordController,
                 obscure: _obscureConfirm,
                 toggle: () =>
                     setState(() => _obscureConfirm = !_obscureConfirm),
                 validator: (value) {
                   if (value != _newPasswordController.text) {
-                    return "Passwords do not match";
+                    return context.tr("Passwords do not match");
                   }
                   return null;
                 },
@@ -119,8 +121,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                           color: Colors.white,
                           strokeWidth: 2,
                         )
-                      : const Text(
-                          "Update Password",
+                      : Text(
+                          context.tr("Update Password"),
                           style: TextStyle(fontSize: 16),
                         ),
                 ),
@@ -145,7 +147,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       obscureText: obscure,
       validator: validator ??
           (value) =>
-              value == null || value.isEmpty ? "Field cannot be empty" : null,
+              value == null || value.isEmpty
+                  ? context.tr("Field cannot be empty")
+                  : null,
       decoration: InputDecoration(
         labelText: label,
         border: OutlineInputBorder(

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../localization/localization_extensions.dart';
+
 class UpdatePhoneScreen extends StatefulWidget {
   const UpdatePhoneScreen({super.key});
 
@@ -39,8 +41,8 @@ class _UpdatePhoneScreenState extends State<UpdatePhoneScreen> {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("OTP sent to your phone number"),
+      SnackBar(
+        content: Text(context.tr("OTP sent to your phone number")),
         backgroundColor: Colors.green,
       ),
     );
@@ -49,8 +51,8 @@ class _UpdatePhoneScreenState extends State<UpdatePhoneScreen> {
   Future<void> _verifyOtp() async {
     if (_otpController.text.length != 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Enter a valid 6-digit OTP"),
+        SnackBar(
+          content: Text(context.tr("Enter a valid 6-digit OTP")),
           backgroundColor: Colors.red,
         ),
       );
@@ -67,8 +69,8 @@ class _UpdatePhoneScreenState extends State<UpdatePhoneScreen> {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Phone number updated successfully"),
+      SnackBar(
+        content: Text(context.tr("Phone number updated successfully")),
         backgroundColor: Colors.green,
       ),
     );
@@ -80,7 +82,7 @@ class _UpdatePhoneScreenState extends State<UpdatePhoneScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Update Phone Number"),
+        title: Text(context.tr("Update Phone Number")),
         backgroundColor: const Color(0xFF3B82F6),
       ),
       body: SingleChildScrollView(
@@ -94,15 +96,15 @@ class _UpdatePhoneScreenState extends State<UpdatePhoneScreen> {
                 keyboardType: TextInputType.phone,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return "Enter phone number";
+                    return context.tr("Enter phone number");
                   }
                   if (value.length < 10) {
-                    return "Enter a valid phone number";
+                    return context.tr("Enter a valid phone number");
                   }
                   return null;
                 },
                 decoration: InputDecoration(
-                  labelText: "Phone Number",
+                  labelText: context.tr("Phone Number"),
                   hintText: "9876543210",
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -118,7 +120,7 @@ class _UpdatePhoneScreenState extends State<UpdatePhoneScreen> {
                   keyboardType: TextInputType.number,
                   maxLength: 6,
                   decoration: InputDecoration(
-                    labelText: "Enter OTP",
+                    labelText: context.tr("Enter OTP"),
                     counterText: "",
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
@@ -146,7 +148,9 @@ class _UpdatePhoneScreenState extends State<UpdatePhoneScreen> {
                           strokeWidth: 2,
                         )
                       : Text(
-                          _isOtpSent ? "Verify OTP" : "Send OTP",
+                          _isOtpSent
+                              ? context.tr("Verify OTP")
+                              : context.tr("Send OTP"),
                           style: const TextStyle(fontSize: 16),
                         ),
                 ),

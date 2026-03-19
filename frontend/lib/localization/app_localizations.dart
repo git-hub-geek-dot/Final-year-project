@@ -57,6 +57,7 @@ class AppLocalizations {
       'Pending': 'Pending',
       'Approved': 'Approved',
       'Rejected': 'Rejected',
+      'Review Closed': 'Review Closed',
       'Cancelled': 'Cancelled',
       'Apply': 'Apply',
       'Home': 'Home',
@@ -406,6 +407,8 @@ class AppLocalizations {
       'Absent': 'Absent',
       'Add responsibility': 'Add responsibility',
       'Added to shortlist': 'Added to shortlist',
+      'Shortlist is closed for this event.':
+          'Shortlist is closed for this event.',
       'Announce': 'Announce',
       'Announcement sent. No volunteers to notify yet.': 'Announcement sent. No volunteers to notify yet.',
       'Application Deadline': 'Application Deadline',
@@ -671,6 +674,10 @@ class AppLocalizations {
       'Supporting document *': 'Supporting document *',
       'This application was cancelled.': 'This application was cancelled.',
       'This application was not approved.': 'This application was not approved.',
+      'This event ended before your application was reviewed.':
+          'This event ended before your application was reviewed.',
+      'This event ended before this application could be reviewed.':
+          'This event ended before this application could be reviewed.',
       'Unable to apply': 'Unable to apply',
       'Upload': 'Upload',
       'Verification Required': 'Verification Required',
@@ -715,6 +722,7 @@ class AppLocalizations {
       'Pending': 'à¤²à¤‚à¤¬à¤¿à¤¤',
       'Approved': 'à¤¸à¥à¤µà¥€à¤•à¥ƒà¤¤',
       'Rejected': 'à¤…à¤¸à¥à¤µà¥€à¤•à¥ƒà¤¤',
+      'Review Closed': 'à¤¸à¤®à¥€à¤•à¥à¤·à¤¾ à¤¬à¤‚à¤¦',
       'Cancelled': 'à¤°à¤¦à¥à¤¦',
       'Apply': 'à¤†à¤µà¥‡à¤¦à¤¨ à¤•à¤°à¥‡à¤‚',
       'Home': 'à¤¹à¥‹à¤®',
@@ -1065,6 +1073,8 @@ class AppLocalizations {
       'Absent': 'Absent',
       'Add responsibility': 'Add responsibility',
       'Added to shortlist': 'Added to shortlist',
+      'Shortlist is closed for this event.':
+          'à¤‡à¤¸ à¤•à¤¾à¤°à¥à¤¯à¤•à¥à¤°à¤® à¤•à¥‡ à¤²à¤¿à¤ à¤¶à¥‰à¤°à¥à¤Ÿà¤²à¤¿à¤¸à¥à¤Ÿ à¤…à¤¬ à¤¬à¤‚à¤¦ à¤¹à¥ˆà¥¤',
       'Announce': 'Announce',
       'Announcement sent. No volunteers to notify yet.': 'Announcement sent. No volunteers to notify yet.',
       'Application Deadline': 'Application Deadline',
@@ -1330,6 +1340,10 @@ class AppLocalizations {
       'Supporting document *': 'Supporting document *',
       'This application was cancelled.': 'This application was cancelled.',
       'This application was not approved.': 'This application was not approved.',
+      'This event ended before your application was reviewed.':
+          'à¤†à¤ªà¤•à¥‡ à¤†à¤µà¥‡à¤¦à¤¨ à¤•à¥€ à¤¸à¤®à¥€à¤•à¥à¤·à¤¾ à¤¹à¥‹à¤¨à¥‡ à¤¸à¥‡ à¤ªà¤¹à¤²à¥‡ à¤¯à¤¹ à¤•à¤¾à¤°à¥à¤¯à¤•à¥à¤°à¤® à¤¸à¤®à¤¾à¤ªà¥à¤¤ à¤¹à¥‹ à¤—à¤¯à¤¾à¥¤',
+      'This event ended before this application could be reviewed.':
+          'à¤‡à¤¸ à¤†à¤µà¥‡à¤¦à¤¨ à¤•à¥€ à¤¸à¤®à¥€à¤•à¥à¤·à¤¾ à¤¹à¥‹à¤¨à¥‡ à¤¸à¥‡ à¤ªà¤¹à¤²à¥‡ à¤¯à¤¹ à¤•à¤¾à¤°à¥à¤¯à¤•à¥à¤°à¤® à¤¸à¤®à¤¾à¤ªà¥à¤¤ à¤¹à¥‹ à¤—à¤¯à¤¾à¥¤',
       'Unable to apply': 'Unable to apply',
       'Upload': 'Upload',
       'Verification Required': 'Verification Required',

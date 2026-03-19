@@ -538,6 +538,7 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
                                   name: a["name"] ?? context.tr("Unknown"),
                                   location: a["city"] ?? "-",
                                   status: status,
+                                  reviewClosed: _asBool(a["review_closed"]),
                                   attendanceStatus: _normalizedAttendanceStatus(a),
                                   availabilityStatus:
                                       _normalizedAvailabilityStatus(a),
@@ -594,6 +595,7 @@ class ApplicationCard extends StatelessWidget {
   final String name;
   final String location;
   final String status;
+  final bool reviewClosed;
   final String attendanceStatus;
   final String availabilityStatus;
   final bool isShortlisted;
@@ -611,6 +613,7 @@ class ApplicationCard extends StatelessWidget {
     required this.name,
     required this.location,
     required this.status,
+    required this.reviewClosed,
     required this.attendanceStatus,
     required this.availabilityStatus,
     required this.isShortlisted,
@@ -669,6 +672,9 @@ class ApplicationCard extends StatelessWidget {
   }
 
   String get statusLabel {
+    if (reviewClosed) {
+      return "Review Closed";
+    }
     if (attendanceStatus == "absent") {
       return "Absent";
     }
@@ -676,6 +682,9 @@ class ApplicationCard extends StatelessWidget {
   }
 
   Color get statusColor {
+    if (reviewClosed) {
+      return Colors.redAccent;
+    }
     if (attendanceStatus == "absent") {
       return Colors.deepOrange;
     }
@@ -853,6 +862,19 @@ class ApplicationCard extends StatelessWidget {
                     ),
                   ),
                 ],
+                if (reviewClosed) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    context.tr(
+                      "This event ended before this application could be reviewed.",
+                    ),
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 4),
                 Text(
                   "📍 $location",
@@ -865,43 +887,49 @@ class ApplicationCard extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               InkWell(
-                onTap: () async {
-                  final nextValue = !isShortlisted;
-                  try {
-                    await EventService.updateShortlistStatus(
-                      applicationId: applicationId,
-                      shortlisted: nextValue,
-                    );
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            nextValue
-                                ? context.tr("Added to shortlist")
-                                : context.tr("Removed from shortlist"),
-                          ),
-                        ),
-                      );
-                    }
-                    onRefresh();
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            context.tr(
-                              "Shortlist update failed: {error}",
-                              args: {"error": e.toString()},
-                            ),
-                          ),
-                        ),
-                      );
-                    }
-                  }
-                },
+                onTap: reviewClosed
+                    ? null
+                    : () async {
+                        final nextValue = !isShortlisted;
+                        try {
+                          await EventService.updateShortlistStatus(
+                            applicationId: applicationId,
+                            shortlisted: nextValue,
+                          );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  nextValue
+                                      ? context.tr("Added to shortlist")
+                                      : context.tr("Removed from shortlist"),
+                                ),
+                              ),
+                            );
+                          }
+                          onRefresh();
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  context.tr(
+                                    "Shortlist update failed: {error}",
+                                    args: {"error": e.toString()},
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+                        }
+                      },
                 child: Icon(
                   isShortlisted ? Icons.star : Icons.star_border,
-                  color: isShortlisted ? const Color(0xFFF59E0B) : Colors.white,
+                  color: reviewClosed
+                      ? Colors.white54
+                      : isShortlisted
+                          ? const Color(0xFFF59E0B)
+                          : Colors.white,
                   size: 22,
                 ),
               ),

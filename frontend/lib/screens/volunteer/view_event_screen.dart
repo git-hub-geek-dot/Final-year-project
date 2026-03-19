@@ -40,6 +40,7 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
   String? verificationStatus;
   int? applicationId;
   bool isCancelling = false;
+  bool isReviewClosed = false;
   final ImagePicker _picker = ImagePicker();
 
   /// null | pending | approved | rejected
@@ -205,6 +206,7 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
                   ?.toString()
               : null;
           applicationId = resolvedApplicationId;
+          isReviewClosed = data["applied"] == true && data["reviewClosed"] == true;
           isLoadingStatus = false;
         });
 
@@ -790,10 +792,14 @@ ${context.tr("Join on VolunteerX")}
     final isApprovedState = _isApprovedStatus(currentStatus);
     final statusText = currentAttendance == "absent"
         ? context.tr("Attendance Absent")
-        : _statusText(currentStatus);
+        : isReviewClosed
+            ? context.tr("Review Closed")
+            : _statusText(currentStatus);
     final statusColor = currentAttendance == "absent"
         ? Colors.deepOrange
-        : _statusColor(currentStatus);
+        : isReviewClosed
+            ? Colors.redAccent
+            : _statusColor(currentStatus);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -802,6 +808,18 @@ ${context.tr("Join on VolunteerX")}
           statusText,
           statusColor,
         ),
+        if (isReviewClosed) ...[
+          const SizedBox(height: 10),
+          Text(
+            context.tr("This event ended before your application was reviewed."),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.grey.shade700,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
         if (isApprovedState && !isCompleted) ...[
           const SizedBox(height: 10),
           Row(
@@ -812,7 +830,7 @@ ${context.tr("Join on VolunteerX")}
                   icon: Icons.campaign_outlined,
                   color: const Color(0xFF2E6BE6),
                   onTap: () {
-                    final eventId = widget.event["id"] as int?;
+                    final eventId = _eventIdAsInt();
                     if (eventId == null) {
                       _snack(context.tr("Event not found"));
                       return;
@@ -838,7 +856,7 @@ ${context.tr("Join on VolunteerX")}
                   icon: Icons.groups_2_outlined,
                   color: const Color(0xFF2ECC71),
                   onTap: () {
-                    final eventId = widget.event["id"] as int?;
+                    final eventId = _eventIdAsInt();
                     if (eventId == null) {
                       _snack(context.tr("Event not found"));
                       return;
@@ -1329,10 +1347,31 @@ ${context.tr("Join on VolunteerX")}
     final parsed = IstDateTime.tryParse(relevantDateRaw);
     if (parsed == null) return false;
 
-    final eventDateOnly = IstDateTime.startOfDay(parsed);
-    final today = IstDateTime.startOfDay(IstDateTime.now());
+    final endTimeRaw = widget.event["end_time"]?.toString();
+    final endDateTime = (endTimeRaw == null || endTimeRaw.trim().isEmpty)
+        ? DateTime(parsed.year, parsed.month, parsed.day, 23, 59, 59)
+        : (() {
+            final parts = endTimeRaw.split(":");
+            final hour = parts.isNotEmpty ? int.tryParse(parts[0]) ?? 0 : 0;
+            final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+            final second = parts.length > 2 ? int.tryParse(parts[2]) ?? 0 : 0;
+            return DateTime(
+              parsed.year,
+              parsed.month,
+              parsed.day,
+              hour,
+              minute,
+              second,
+            );
+          })();
 
-    return eventDateOnly.isBefore(today);
+    return IstDateTime.now().isAfter(endDateTime);
+  }
+
+  int? _eventIdAsInt() {
+    final rawId = widget.event["id"];
+    if (rawId is int) return rawId;
+    return int.tryParse(rawId?.toString() ?? "");
   }
 
   String? _normalizeImageUrl(String? url) {

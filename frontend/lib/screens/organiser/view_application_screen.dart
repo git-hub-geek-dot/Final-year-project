@@ -284,7 +284,13 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
     return isActionableReviewStatus(status);
   }
 
-  String _finalStatusMessage(String status) {
+  String _finalStatusMessage(String status, {bool reviewClosed = false}) {
+    if (reviewClosed) {
+      return context.tr(
+        "This event ended before this application could be reviewed.",
+      );
+    }
+
     switch (normalizeApplicationStatus(status)) {
       case "approved":
         return context.tr("This application is already approved.");
@@ -890,7 +896,9 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
     final recentParticipation = _asMapList(app?["recent_participation"]);
     final status = app?["status"]?.toString() ?? "pending";
     final normalizedStatus = normalizeApplicationStatus(status);
-    final canReviewApplication = _isReviewActionable(normalizedStatus);
+    final reviewClosed = _asBool(app?["review_closed"]);
+    final canReviewApplication =
+        _isReviewActionable(normalizedStatus) && !reviewClosed;
     final approveBlockedByCapacity =
         canReviewApplication && _isApproveBlockedByCapacity();
     final attendanceStatus =
@@ -907,6 +915,10 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
     final ratingValue = _asDouble(app?["avg_rating"] ?? app?["rating"]);
     final reviewCount = _asInt(app?["review_count"]);
     final completionPercent = _asInt(app?["completion_percent"]);
+    final resolvedStatusColor =
+        reviewClosed ? Colors.redAccent : statusColor(status);
+    final resolvedStatusLabel =
+        reviewClosed ? context.tr("Review Closed") : statusLabel(status).toUpperCase();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
@@ -987,7 +999,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                             ],
                             const SizedBox(width: 6),
                             InkWell(
-                              onTap: shortlistLoading
+                              onTap: shortlistLoading || reviewClosed
                                   ? null
                                   : () => updateShortlist(!isShortlisted),
                               child: Icon(
@@ -1011,16 +1023,16 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                               vertical: statusVertical,
                             ),
                             decoration: BoxDecoration(
-                              color: statusColor(status).withOpacity(0.12),
+                              color: resolvedStatusColor.withOpacity(0.12),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: statusColor(status).withOpacity(0.35),
+                                color: resolvedStatusColor.withOpacity(0.35),
                               ),
                             ),
                             child: Text(
-                              statusLabel(status).toUpperCase(),
+                              resolvedStatusLabel,
                               style: TextStyle(
-                                color: statusColor(status),
+                                color: resolvedStatusColor,
                                 fontWeight: FontWeight.w700,
                                 fontSize: compact ? 16 : 18,
                               ),
@@ -1323,7 +1335,10 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                                     ),
                                   ),
                                   child: Text(
-                                    _finalStatusMessage(normalizedStatus),
+                                    _finalStatusMessage(
+                                      normalizedStatus,
+                                      reviewClosed: reviewClosed,
+                                    ),
                                     style: TextStyle(
                                       color: Colors.grey.shade700,
                                       fontSize: 13,

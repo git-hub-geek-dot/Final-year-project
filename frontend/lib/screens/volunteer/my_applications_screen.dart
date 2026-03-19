@@ -249,6 +249,17 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
         _normalizedStatus((app["status"] ?? "").toString()) == "completed";
   }
 
+  bool _isReviewClosed(Map app) {
+    if (app["review_closed"] == true) return true;
+
+    final status = _normalizedStatus((app["status"] ?? "").toString());
+    if (status != "pending" && status != "waitlisted") {
+      return false;
+    }
+
+    return _isEventCompleted(app);
+  }
+
   bool _canCancelApplication(Map app) {
     final status = (app["status"] ?? "pending").toString();
     return _isCancelableStatus(status) &&
@@ -325,6 +336,10 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
       if (attendanceStatus == "absent") {
         return context.tr("You were marked absent for this event.");
       }
+    }
+
+    if (_isReviewClosed(app)) {
+      return context.tr("This event ended before your application was reviewed.");
     }
 
     switch (status) {
@@ -410,6 +425,9 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
 
     if (_isEventCompleted(app)) {
       chips.add(_infoChip(context.tr("Event completed"), Colors.blueGrey));
+    }
+    if (_isReviewClosed(app)) {
+      chips.add(_infoChip(context.tr("Review closed"), Colors.redAccent));
     }
     if (attendanceStatus == "present") {
       chips.add(_infoChip(context.tr("Attendance present"), Colors.green));
@@ -934,12 +952,17 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                                  appealStatus == "none");
                          final infoChips = _buildInfoChips(app);
                          final statusDescription = _statusDescription(app);
+                         final isReviewClosed = _isReviewClosed(app);
                          final chipLabel = attendanceStatus == "absent"
                              ? context.tr("Attendance absent").toUpperCase()
-                             : statusLabel(status).toUpperCase();
+                             : isReviewClosed
+                                 ? context.tr("Review closed").toUpperCase()
+                                 : statusLabel(status).toUpperCase();
                          final chipColor = attendanceStatus == "absent"
                              ? Colors.deepOrange
-                             : statusColor(status);
+                             : isReviewClosed
+                                 ? Colors.redAccent
+                                 : statusColor(status);
 
                          return Card(
                            margin: const EdgeInsets.only(bottom: 12),

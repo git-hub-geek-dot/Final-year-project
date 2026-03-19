@@ -190,10 +190,45 @@ exports.getApplicationStatus = async (req, res) => {
 
     const result = await pool.query(
       `
-      SELECT id, status
-        , COALESCE(attendance_status, 'unmarked') AS attendance_status
-      FROM applications
-      WHERE event_id = $1 AND volunteer_id = $2
+      SELECT
+        a.id,
+        CASE
+          WHEN a.status = 'accepted' THEN 'approved'
+          WHEN a.status IN ('pending', 'waitlisted')
+            AND e.status NOT IN ('draft', 'deleted')
+            AND (
+              e.status = 'completed'
+              OR NOW() >= (
+                COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')
+              )
+            )
+            THEN 'rejected'
+          ELSE a.status
+        END AS status,
+        COALESCE(a.attendance_status, 'unmarked') AS attendance_status,
+        e.status AS event_status,
+        (
+          e.status NOT IN ('draft', 'deleted')
+          AND (
+            e.status = 'completed'
+            OR NOW() >= (
+              COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')
+            )
+          )
+        ) AS event_completed,
+        (
+          a.status IN ('pending', 'waitlisted')
+          AND e.status NOT IN ('draft', 'deleted')
+          AND (
+            e.status = 'completed'
+            OR NOW() >= (
+              COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')
+            )
+          )
+        ) AS review_closed
+      FROM applications a
+      JOIN events e ON e.id = a.event_id
+      WHERE a.event_id = $1 AND a.volunteer_id = $2
       `,
       [eventId, volunteerId]
     );
@@ -202,14 +237,14 @@ exports.getApplicationStatus = async (req, res) => {
       return res.json({ applied: false });
     }
 
-    const rawStatus = (result.rows[0].status || "").toString().toLowerCase();
-    const status = rawStatus === "accepted" ? "approved" : rawStatus;
-
     res.json({
       applied: true,
-      status,
+      status: result.rows[0].status,
       applicationId: result.rows[0].id,
       attendanceStatus: result.rows[0].attendance_status,
+      eventStatus: result.rows[0].event_status,
+      eventCompleted: result.rows[0].event_completed === true,
+      reviewClosed: result.rows[0].review_closed === true,
     });
   } catch (err) {
     console.error("STATUS ERROR:", err);
@@ -246,6 +281,15 @@ exports.getEventApplications = async (req, res) => {
         a.id,
         CASE
           WHEN a.status = 'accepted' THEN 'approved'
+          WHEN a.status IN ('pending', 'waitlisted')
+            AND e.status NOT IN ('draft', 'deleted')
+            AND (
+              e.status = 'completed'
+              OR NOW() >= (
+                COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')
+              )
+            )
+            THEN 'rejected'
           ELSE a.status
         END AS status,
         COALESCE(a.attendance_status, 'unmarked') AS attendance_status,
@@ -254,11 +298,32 @@ exports.getEventApplications = async (req, res) => {
         a.applied_at,
         a.volunteer_cancel_reason,
         a.volunteer_cancelled_at,
+        e.status AS event_status,
+        (
+          e.status NOT IN ('draft', 'deleted')
+          AND (
+            e.status = 'completed'
+            OR NOW() >= (
+              COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')
+            )
+          )
+        ) AS event_completed,
+        (
+          a.status IN ('pending', 'waitlisted')
+          AND e.status NOT IN ('draft', 'deleted')
+          AND (
+            e.status = 'completed'
+            OR NOW() >= (
+              COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')
+            )
+          )
+        ) AS review_closed,
         u.id AS volunteer_id,
         u.name,
         u.profile_picture_url,
         u.city
       FROM applications a
+      JOIN events e ON e.id = a.event_id
       JOIN users u ON u.id = a.volunteer_id
       WHERE a.event_id = $1
       ORDER BY a.applied_at DESC
@@ -290,6 +355,15 @@ exports.getMyApplications = async (req, res) => {
         a.id,
         CASE
           WHEN a.status = 'accepted' THEN 'approved'
+          WHEN a.status IN ('pending', 'waitlisted')
+            AND e.status NOT IN ('draft', 'deleted')
+            AND (
+              e.status = 'completed'
+              OR NOW() >= (
+                COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')
+              )
+            )
+            THEN 'rejected'
           ELSE a.status
         END AS status,
         a.admin_cancel_reason,
@@ -328,6 +402,16 @@ exports.getMyApplications = async (req, res) => {
             )
           )
         ) AS event_completed,
+        (
+          a.status IN ('pending', 'waitlisted')
+          AND e.status NOT IN ('draft', 'deleted')
+          AND (
+            e.status = 'completed'
+            OR NOW() >= (
+              COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')
+            )
+          )
+        ) AS review_closed,
         EXISTS (
           SELECT 1
           FROM ratings r
@@ -701,6 +785,15 @@ exports.getApplicationById = async (req, res) => {
         a.id,
         CASE
           WHEN a.status = 'accepted' THEN 'approved'
+          WHEN a.status IN ('pending', 'waitlisted')
+            AND e.status NOT IN ('draft', 'deleted')
+            AND (
+              e.status = 'completed'
+              OR NOW() >= (
+                COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')
+              )
+            )
+            THEN 'rejected'
           ELSE a.status
         END AS status,
         COALESCE(a.attendance_status, 'unmarked') AS attendance_status,
@@ -724,6 +817,16 @@ exports.getApplicationById = async (req, res) => {
             )
           )
         ) AS event_completed,
+        (
+          a.status IN ('pending', 'waitlisted')
+          AND e.status NOT IN ('draft', 'deleted')
+          AND (
+            e.status = 'completed'
+            OR NOW() >= (
+              COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')
+            )
+          )
+        ) AS review_closed,
         u.name,
         u.email,
         u.city,
@@ -899,7 +1002,16 @@ exports.updateApplicationStatus = async (req, res) => {
 
     const eventResult = await client.query(
       `
-      SELECT id, status, volunteers_required
+      SELECT
+        id,
+        status,
+        volunteers_required,
+        (
+          status NOT IN ('draft', 'deleted')
+          AND NOW() >= (
+            COALESCE(end_date, event_date) + COALESCE(end_time, TIME '23:59:59')
+          )
+        ) AS event_completed
       FROM events
       WHERE id = $1
       FOR UPDATE
@@ -913,7 +1025,8 @@ exports.updateApplicationStatus = async (req, res) => {
     }
 
     const eventStatus = (eventResult.rows[0].status || "").toString().toLowerCase();
-    if (eventStatus !== "open") {
+    const eventCompleted = eventResult.rows[0].event_completed === true;
+    if (eventStatus !== "open" || eventCompleted) {
       await client.query("ROLLBACK");
       return res.status(400).json({
         error: "Applications are closed for this event.",
@@ -1013,6 +1126,37 @@ exports.updateApplicationShortlist = async (req, res) => {
       return res.status(400).json({ error: "Invalid shortlisted value" });
     }
 
+    const existingResult = await pool.query(
+      `
+      SELECT
+        a.id,
+        e.status AS event_status,
+        (
+          e.status NOT IN ('draft', 'deleted')
+          AND NOW() >= (
+            COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')
+          )
+        ) AS event_completed
+      FROM applications a
+      JOIN events e ON e.id = a.event_id
+      WHERE a.id = $1
+        AND e.organiser_id = $2
+      `,
+      [applicationId, organiserId]
+    );
+
+    if (existingResult.rowCount === 0) {
+      return res.status(404).json({ error: "Application not found" });
+    }
+
+    const existing = existingResult.rows[0];
+    const eventStatus = (existing.event_status || "").toString().toLowerCase();
+    if (eventStatus !== "open" || existing.event_completed === true) {
+      return res.status(400).json({
+        error: "Shortlist is closed for this event.",
+      });
+    }
+
     const result = await pool.query(
       `
       UPDATE applications a
@@ -1025,10 +1169,6 @@ exports.updateApplicationShortlist = async (req, res) => {
       `,
       [shortlisted, applicationId, organiserId]
     );
-
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Application not found" });
-    }
 
     return res.status(200).json({
       success: true,

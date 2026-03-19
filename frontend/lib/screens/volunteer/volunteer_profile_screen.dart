@@ -381,10 +381,18 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
   }
 
   Future<void> loadVerificationStatus() async {
-    final status = await VerificationService.getStatus();
-    setState(() {
-      verificationStatus = status;
-    });
+    try {
+      final status = await VerificationService.getStatus();
+      if (!mounted) return;
+      setState(() {
+        verificationStatus = status;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        verificationStatus = null;
+      });
+    }
   }
 
   Future<void> fetchDashboard() async {
@@ -402,6 +410,8 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
           "Content-Type": "application/json",
         },
       );
+
+      if (!mounted) return;
 
       if (response.statusCode == 401) {
         await _handleUnauthorized();
@@ -427,6 +437,7 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
       if (userId == null) return;
 
       final data = await RatingService.fetchSummary(userId);
+      if (!mounted) return;
       setState(() {
         _impactRating = data["rating"]?.toString() ?? _impactRating;
         _ratingCount = data["review_count"]?.toString() ?? _ratingCount;
@@ -447,6 +458,7 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
       final token = await TokenService.getToken();
 
       if (token == null || token.isEmpty) {
+        if (!mounted) return;
         setState(() {
           loading = false;
           errorMessage = context.tr("Token not found. Please login again.");
@@ -463,6 +475,8 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
           "Content-Type": "application/json",
         },
       );
+
+      if (!mounted) return;
 
       if (response.statusCode == 401) {
         await _handleUnauthorized();
@@ -508,6 +522,7 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         loading = false;
         errorMessage = context.tr(

@@ -777,14 +777,19 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     }
 
     final upcoming = events
-        .where((e) {
-          if (_isPastEventDate(e["event_date"]?.toString())) {
+        .whereType<Map>()
+        .map((raw) => Map<String, dynamic>.from(raw))
+        .where((event) {
+          final startDate = _parseEventDate(event["event_date"]?.toString());
+          if (startDate == null) {
             return false;
           }
-          final status = statusByEventId[e["id"]?.toString() ?? ""] ?? "";
+          if (_hasEventEndedForRecommendation(event)) {
+            return false;
+          }
+          final status = statusByEventId[event["id"]?.toString() ?? ""] ?? "";
           return status.isEmpty; // only unapplied events
         })
-        .map((e) => Map<String, dynamic>.from(e))
         .toList();
 
     // Priority sorting: Categories > Distance > Date
@@ -1322,9 +1327,21 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
   }
 
   String _formatTime(dynamic rawTime) {
-    final text = rawTime?.toString() ?? "";
+    final text = rawTime?.toString().trim() ?? "";
     if (text.isEmpty) return "";
-    return text.substring(0, 5);
+
+    final parts = text.split(":");
+    if (parts.length >= 2) {
+      final hour = int.tryParse(parts[0]);
+      final minute = int.tryParse(parts[1]);
+      if (hour != null && minute != null) {
+        final hh = hour.toString().padLeft(2, "0");
+        final mm = minute.toString().padLeft(2, "0");
+        return "$hh:$mm";
+      }
+    }
+
+    return text.length >= 5 ? text.substring(0, 5) : text;
   }
 
   Widget _timelineSegment({
@@ -1384,16 +1401,17 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     );
   }
 
-  bool _isPastEventDate(String? rawDate) {
-    if (rawDate == null || rawDate.isEmpty) return false;
+  bool _hasEventEndedForRecommendation(Map<String, dynamic> event) {
+    final startDate = _parseEventDate(event["event_date"]?.toString());
+    if (startDate == null) return false;
 
-    final parsed = IstDateTime.tryParse(rawDate);
-    if (parsed == null) return false;
+    final endDate = _parseEventDate(event["end_date"]?.toString()) ?? startDate;
+    final endTime = event["end_time"]?.toString() ?? "";
+    final endDateTime = endTime.trim().isEmpty
+        ? DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59)
+        : _dateWithTime(endDate, endTime);
 
-    final eventDateOnly = IstDateTime.startOfDay(parsed);
-    final today = IstDateTime.startOfDay(IstDateTime.now());
-
-    return eventDateOnly.isBefore(today);
+    return IstDateTime.now().isAfter(endDateTime);
   }
 
   // ================= MAIN BUILD =================

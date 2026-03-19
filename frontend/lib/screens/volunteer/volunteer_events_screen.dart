@@ -481,11 +481,12 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
                   "")
               .toString()
               .toLowerCase();
+      final reviewClosed = _isReviewClosedForEvent(event);
       final isApproved = appStatus == "approved" ||
           appStatus == "accepted" ||
           appStatus == "completed";
       final isHistoryEligible =
-          isApproved || appStatus == "cancelled";
+          isApproved || appStatus == "cancelled" || reviewClosed;
 
       final matchesTab = selectedTab == "all"
           ? !_isPastStatus(eventStatus) && appStatus != "rejected"
@@ -568,18 +569,48 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
       return "deleted_by_admin";
     }
     if (raw.isEmpty || raw == "open" || raw == "draft") {
+      final now = IstDateTime.now();
+      final startDate = IstDateTime.tryParse(event["event_date"]?.toString() ?? "");
+      if (startDate != null) {
+        final startDateTime = _dateWithTime(startDate, event["start_time"]?.toString());
+        final endDate = IstDateTime.tryParse(event["end_date"]?.toString() ?? "") ?? startDate;
+        var endDateTime = _dateWithTime(endDate, event["end_time"]?.toString());
+
+        if (endDateTime.isBefore(startDateTime)) {
+          endDateTime = startDateTime;
+        }
+
+        if (now.isBefore(startDateTime)) return "upcoming";
+        if (!now.isAfter(endDateTime)) return "ongoing";
+        return "completed";
+      }
+
       final fallbackDate = dateOnly ??
           IstDateTime.startOfDay(
             IstDateTime.tryParse(event["end_date"]?.toString() ?? "") ??
                 IstDateTime.tryParse(event["event_date"]?.toString() ?? "") ??
-                IstDateTime.now(),
+                now,
           );
-      final today = IstDateTime.startOfDay(IstDateTime.now());
+      final today = IstDateTime.startOfDay(now);
       if (fallbackDate.isBefore(today)) return "completed";
       if (fallbackDate.isAtSameMomentAs(today)) return "ongoing";
       return "upcoming";
     }
     return raw;
+  }
+
+  DateTime _dateWithTime(DateTime date, String? rawTime) {
+    final text = rawTime?.toString() ?? "";
+    if (text.isEmpty) {
+      return DateTime(date.year, date.month, date.day);
+    }
+
+    final parts = text.split(":");
+    final hour = parts.isNotEmpty ? int.tryParse(parts[0]) ?? 0 : 0;
+    final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+    final second = parts.length > 2 ? int.tryParse(parts[2]) ?? 0 : 0;
+
+    return DateTime(date.year, date.month, date.day, hour, minute, second);
   }
 
   bool _isPastStatus(String status) {
@@ -927,6 +958,23 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
     return null;
   }
 
+  bool _isReviewClosedForEvent(Map<String, dynamic> event) {
+    final eventId = event["id"]?.toString();
+    if (eventId == null || eventId.isEmpty) return false;
+
+    for (final app in widget.myApplications) {
+      final appEventId = app["event_id"]?.toString() ??
+          app["eventId"]?.toString() ??
+          app["event"]?["id"]?.toString() ??
+          app["event"]?["event_id"]?.toString();
+      if (appEventId == eventId) {
+        return app["review_closed"] == true;
+      }
+    }
+
+    return false;
+  }
+
   Widget _statusPill(String label, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -1040,9 +1088,21 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
   }
 
   String _formatTime(dynamic rawTime) {
-    final text = rawTime?.toString() ?? "";
+    final text = rawTime?.toString().trim() ?? "";
     if (text.isEmpty) return "";
-    return text.substring(0, 5);
+
+    final parts = text.split(":");
+    if (parts.length >= 2) {
+      final hour = int.tryParse(parts[0]);
+      final minute = int.tryParse(parts[1]);
+      if (hour != null && minute != null) {
+        final hh = hour.toString().padLeft(2, "0");
+        final mm = minute.toString().padLeft(2, "0");
+        return "$hh:$mm";
+      }
+    }
+
+    return text.length >= 5 ? text.substring(0, 5) : text;
   }
 
 }

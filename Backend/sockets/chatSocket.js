@@ -75,60 +75,25 @@ const isTokenExpired = (socket) => {
 };
 
 const initChatSocket = (io) => {
-  console.log("[CHAT SOCKET] init");
   io.use(async (socket, next) => {
     try {
-      const authToken = socket.handshake.auth?.token;
-      const queryTokenRaw = socket.handshake.query?.token;
-      const queryToken = Array.isArray(queryTokenRaw)
-        ? queryTokenRaw[0]
-        : queryTokenRaw;
-      const token = authToken || queryToken;
-      console.log("[CHAT SOCKET] Auth attempt", {
-        socketId: socket.id,
-        hasToken: Boolean(token),
-      });
+      const token = socket.handshake.auth?.token;
       if (!token) {
-        console.warn("[CHAT SOCKET] Missing token", { socketId: socket.id });
         return next(new Error("Unauthorized"));
       }
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const status = await ensureActiveUser(decoded.id);
       if (!status.ok) {
-        console.warn("[CHAT SOCKET] Inactive user", {
-          socketId: socket.id,
-          userId: decoded.id,
-          reason: status.reason,
-        });
         return next(new Error("Unauthorized"));
       }
       socket.user = decoded;
-      console.log("[CHAT SOCKET] Auth success", {
-        socketId: socket.id,
-        userId: decoded.id,
-      });
       return next();
     } catch (err) {
-      console.warn("[CHAT SOCKET] Auth error", {
-        socketId: socket.id,
-        message: err?.message,
-      });
       return next(new Error("Unauthorized"));
     }
   });
 
   io.on("connection", (socket) => {
-    console.log("[CHAT SOCKET] Connected", {
-      socketId: socket.id,
-      userId: socket.user?.id,
-    });
-    socket.on("disconnect", (reason) => {
-      console.log("[CHAT SOCKET] Disconnected", {
-        socketId: socket.id,
-        userId: socket.user?.id,
-        reason,
-      });
-    });
     socket.on("joinThread", async ({ threadId }) => {
       try {
         if (isTokenExpired(socket)) {

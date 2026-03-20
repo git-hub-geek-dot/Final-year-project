@@ -140,7 +140,9 @@ class _ChatScreenState extends State<ChatScreen> {
     final socket = io.io(
       ChatService.socketUrl(),
       io.OptionBuilder()
-          .setTransports(['polling', 'websocket'])
+          // Try websocket-only to isolate polling handshake issues on emulator.
+          .setTransports(['websocket'])
+          .setTimeout(20000)
           .setAuth({"token": token})
           .enableReconnection()
           .enableForceNew()
@@ -510,6 +512,39 @@ class _ChatScreenState extends State<ChatScreen> {
     return const SizedBox.shrink();
   }
 
+  Widget _connectionStatusPill() {
+    final isConnected = _isSocketConnected;
+    final color = isConnected ? Colors.green : Colors.orange;
+    final text = isConnected ? "Connected" : "Connecting";
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.6)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isConnected ? Icons.wifi : Icons.wifi_off,
+            size: 12,
+            color: color,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 11,
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<String> _connectionErrorMessage() async {
     final baseUrl = ChatService.socketUrl();
     try {
@@ -628,7 +663,14 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
+      appBar: AppBar(
+        title: Row(
+          children: [
+            Expanded(child: Text(widget.title)),
+            _connectionStatusPill(),
+          ],
+        ),
+      ),
       body: Column(
         children: [
           if (!_isSocketConnected)

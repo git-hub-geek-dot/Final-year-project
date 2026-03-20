@@ -77,7 +77,12 @@ const isTokenExpired = (socket) => {
 const initChatSocket = (io) => {
   io.use(async (socket, next) => {
     try {
-      const token = socket.handshake.auth?.token;
+      const authToken = socket.handshake.auth?.token;
+      const queryTokenRaw = socket.handshake.query?.token;
+      const queryToken = Array.isArray(queryTokenRaw)
+        ? queryTokenRaw[0]
+        : queryTokenRaw;
+      const token = authToken || queryToken;
       console.log("[CHAT SOCKET] Auth attempt", {
         socketId: socket.id,
         hasToken: Boolean(token),

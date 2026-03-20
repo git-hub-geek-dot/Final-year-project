@@ -63,6 +63,7 @@ const io = new Server(server, {
     origin: "*",
     methods: ["GET", "POST"],
   },
+  allowEIO3: true,
 });
 
 io.engine.on("connection", (rawSocket) => {

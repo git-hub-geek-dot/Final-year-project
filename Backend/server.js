@@ -65,6 +65,21 @@ const io = new Server(server, {
   },
 });
 
+io.engine.on("connection", (rawSocket) => {
+  console.log("[SOCKET.IO] Engine connection", {
+    id: rawSocket.id,
+    transport: rawSocket.transport?.name,
+  });
+});
+
+io.engine.on("connection_error", (err) => {
+  console.warn("[SOCKET.IO] Engine connection error", {
+    code: err.code,
+    message: err.message,
+    context: err.context,
+  });
+});
+
 initChatSocket(io);
 
 const runEventStatusSync = async () => {

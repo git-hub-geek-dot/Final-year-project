@@ -75,6 +75,7 @@ const isTokenExpired = (socket) => {
 };
 
 const initChatSocket = (io) => {
+  console.log("[CHAT SOCKET] init");
   io.use(async (socket, next) => {
     try {
       const authToken = socket.handshake.auth?.token;

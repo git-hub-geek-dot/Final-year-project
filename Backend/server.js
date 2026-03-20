@@ -71,6 +71,18 @@ io.engine.on("connection", (rawSocket) => {
     id: rawSocket.id,
     transport: rawSocket.transport?.name,
   });
+
+  let packetCount = 0;
+  rawSocket.on("packet", (packet) => {
+    if (packetCount < 5) {
+      console.log("[SOCKET.IO] Engine packet", {
+        id: rawSocket.id,
+        type: packet.type,
+        data: typeof packet.data === "string" ? packet.data.slice(0, 200) : null,
+      });
+    }
+    packetCount += 1;
+  });
 });
 
 io.engine.on("connection_error", (err) => {

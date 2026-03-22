@@ -180,7 +180,7 @@ class _VolunteerGetVerifiedScreenState
                         const SizedBox(height: 20),
                         ElevatedButton(
                           onPressed: () => Navigator.pop(context),
-                          child: Text(context.tr("Back to Profile")),
+                          child: Text(context.tr("Back")),
                         ),
                       ],
                     ),
@@ -219,7 +219,7 @@ class _VolunteerGetVerifiedScreenState
                             const SizedBox(height: 20),
                             ElevatedButton(
                               onPressed: () => Navigator.pop(context),
-                              child: Text(context.tr("Back to Profile")),
+                              child: Text(context.tr("Back")),
                             ),
                           ],
                         ),
@@ -239,7 +239,8 @@ class _VolunteerGetVerifiedScreenState
                                 decoration: BoxDecoration(
                                   color: Colors.red.shade50,
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.red.shade100),
+                                  border:
+                                      Border.all(color: Colors.red.shade100),
                                 ),
                                 child: Text(
                                   context.tr(
@@ -352,15 +353,14 @@ class _VolunteerGetVerifiedScreenState
                                           ScaffoldMessenger.of(context)
                                               .showSnackBar(
                                             SnackBar(
-                                                content:
-                                                    Text(
-                                                  context.tr(
-                                                    "Upload failed: {error}",
-                                                    args: {
-                                                      "error": e.toString(),
-                                                    },
-                                                  ),
-                                                )),
+                                                content: Text(
+                                              context.tr(
+                                                "Upload failed: {error}",
+                                                args: {
+                                                  "error": e.toString(),
+                                                },
+                                              ),
+                                            )),
                                           );
                                         }
                                       }
@@ -437,8 +437,8 @@ class _VolunteerGetVerifiedScreenState
                                           ScaffoldMessenger.of(context)
                                               .showSnackBar(
                                             SnackBar(
-                                              content:
-                                                  Text(context.tr("Selfie uploaded")),
+                                              content: Text(context
+                                                  .tr("Selfie uploaded")),
                                             ),
                                           );
                                         } catch (e) {
@@ -449,15 +449,14 @@ class _VolunteerGetVerifiedScreenState
                                           ScaffoldMessenger.of(context)
                                               .showSnackBar(
                                             SnackBar(
-                                                content:
-                                                    Text(
-                                                  context.tr(
-                                                    "Upload failed: {error}",
-                                                    args: {
-                                                      "error": e.toString(),
-                                                    },
-                                                  ),
-                                                )),
+                                                content: Text(
+                                              context.tr(
+                                                "Upload failed: {error}",
+                                                args: {
+                                                  "error": e.toString(),
+                                                },
+                                              ),
+                                            )),
                                           );
                                         }
                                       }
@@ -506,7 +505,8 @@ class _VolunteerGetVerifiedScreenState
                                 child: loading
                                     ? const CircularProgressIndicator(
                                         color: Colors.white)
-                                    : Text(context.tr("Submit for Verification")),
+                                    : Text(
+                                        context.tr("Submit for Verification")),
                               ),
                             ),
                           ],

@@ -311,13 +311,15 @@ exports.login = async (req, res) => {
       });
     }
 
+    const normalizedEmail = normalizeIdentifier(email);
+
     const result = await pool.query(
       `
       SELECT id, name, email, password, role, status, suspended_until, suspension_reason
       FROM users
       WHERE email = $1
       `,
-      [email]
+      [normalizedEmail]
     );
 
     if (result.rows.length === 0) {

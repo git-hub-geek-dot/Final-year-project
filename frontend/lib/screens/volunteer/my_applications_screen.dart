@@ -179,7 +179,64 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
   }
 
   bool _isCancelableStatus(String status) {
+    final normalized = _normalizedStatus(status);
+    return normalized == "approved" ||
+        normalized == "pending" ||
+        normalized == "waitlisted";
+  }
+
+  bool _isApprovedStatus(String status) {
     return _normalizedStatus(status) == "approved";
+  }
+
+  String _cancelActionLabel(String status, {bool isLocked = false}) {
+    final base = _isApprovedStatus(status)
+        ? context.tr("Cancel participation")
+        : context.tr("Withdraw application");
+
+    if (!isLocked) return base;
+
+    return _isApprovedStatus(status)
+        ? context.tr("Cancel participation (Locked)")
+        : context.tr("Withdraw application (Locked)");
+  }
+
+  String _cancelDialogTitle(String status) {
+    return _isApprovedStatus(status)
+        ? context.tr("Cancel Participation")
+        : context.tr("Withdraw Application");
+  }
+
+  String _confirmCancelLabel(String status) {
+    return _isApprovedStatus(status)
+        ? context.tr("Confirm Cancel")
+        : context.tr("Confirm Withdraw");
+  }
+
+  String _cancellationSuccessMessage({
+    required String status,
+    required bool strikeIssued,
+    required bool warningIssued,
+  }) {
+    if (strikeIssued) {
+      return _isApprovedStatus(status)
+          ? context.tr("Participation cancelled. A strike was applied.")
+          : context.tr("Application withdrawn. A strike was applied.");
+    }
+
+    if (warningIssued) {
+      return _isApprovedStatus(status)
+          ? context.tr(
+              "Participation cancelled. Warning issued for 48-72 hour window.",
+            )
+          : context.tr(
+              "Application withdrawn. Warning issued for 48-72 hour window.",
+            );
+    }
+
+    return _isApprovedStatus(status)
+        ? context.tr("Participation cancelled.")
+        : context.tr("Application withdrawn.");
   }
 
   String _normalizedAttendanceStatus(String status) {
@@ -466,6 +523,8 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
     final appId =
         appIdRaw is int ? appIdRaw : int.tryParse(appIdRaw.toString());
     if (appId == null) return;
+    final currentStatus = _normalizedStatus((app["status"] ?? "").toString());
+    final isApprovedApplication = _isApprovedStatus(currentStatus);
 
     if (_isEventCompleted(app) || _hasEventStarted(app)) {
       if (!mounted) return;
@@ -498,24 +557,33 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
           builder: (context, setLocalState) {
             String policyText;
             if (isWithinLockWindow) {
-              policyText =
-                  context.tr(
-                    "This event starts in less than 48 hours. Cancelling now applies an immediate strike. Supporting document upload is mandatory to continue.",
-                  );
+              policyText = isApprovedApplication
+                  ? context.tr(
+                      "This event starts in less than 48 hours. Cancelling now applies an immediate strike. Supporting document upload is mandatory to continue.",
+                    )
+                  : context.tr(
+                      "This event starts in less than 48 hours. Withdrawing now applies an immediate strike. Supporting document upload is mandatory to continue.",
+                    );
             } else if (hoursBefore != null && hoursBefore <= 72) {
-              policyText =
-                  context.tr(
-                    "This cancellation is within 48-72 hours before the event. You will receive a warning. Repeated cancellations without a reason may lead to a strike.",
-                  );
+              policyText = isApprovedApplication
+                  ? context.tr(
+                      "This cancellation is within 48-72 hours before the event. You will receive a warning. Repeated cancellations without a reason may lead to a strike.",
+                    )
+                  : context.tr(
+                      "This withdrawal is within 48-72 hours before the event. You will receive a warning. Repeated withdrawals without a reason may lead to a strike.",
+                    );
             } else {
-              policyText =
-                  context.tr(
-                    "This cancellation is outside the strike window. No strike will be applied.",
-                  );
+              policyText = isApprovedApplication
+                  ? context.tr(
+                      "This cancellation is outside the strike window. No strike will be applied.",
+                    )
+                  : context.tr(
+                      "This withdrawal is outside the strike window. No strike will be applied.",
+                    );
             }
 
             return AlertDialog(
-              title: Text(context.tr("Cancel Participation")),
+              title: Text(_cancelDialogTitle(currentStatus)),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -547,9 +615,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                             ? context.tr("Reason *")
                             : context.tr("Reason (optional but recommended)"),
                         helperText: isWithinLockWindow
-                            ? context.tr(
-                                "Mandatory for cancellations within 48 hours",
-                              )
+                            ? context.tr("Mandatory within 48 hours")
                             : null,
                         errorText: reasonError,
                         border: const OutlineInputBorder(),
@@ -572,9 +638,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                               child: Text(
                                 documentUrl == null
                                     ? (isWithinLockWindow
-                                        ? context.tr(
-                                            "Mandatory for cancellations within 48 hours",
-                                          )
+                                        ? context.tr("Mandatory within 48 hours")
                                         : context.tr(
                                             "No supporting document uploaded",
                                           ))
@@ -679,7 +743,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                     }
                     Navigator.pop(context, true);
                   },
-                  child: Text(context.tr("Confirm Cancel")),
+                  child: Text(_confirmCancelLabel(currentStatus)),
                 ),
               ],
             );
@@ -703,14 +767,11 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
       if (!mounted) return;
       final strikeIssued = response["strikeIssued"] == true;
       final warningIssued = response["warningIssued"] == true;
-
-    final message = strikeIssued
-          ? context.tr("Participation cancelled. A strike was applied.")
-          : warningIssued
-              ? context.tr(
-                  "Participation cancelled. Warning issued for 48-72 hour window.",
-                )
-              : context.tr("Participation cancelled.");
+      final message = _cancellationSuccessMessage(
+        status: currentStatus,
+        strikeIssued: strikeIssued,
+        warningIssued: warningIssued,
+      );
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
@@ -942,6 +1003,10 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                          final isCancelling = appId != null &&
                              cancellingApplicationId != null &&
                              appId == cancellingApplicationId;
+                         final cancelLabel = _cancelActionLabel(
+                           status,
+                           isLocked: isWithinLockWindow,
+                         );
                          final strikeIssued = app["strike_issued"] == true;
                          final appealStatus =
                              (app["strike_appeal_status"] ?? "none")
@@ -1071,15 +1136,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                                                        strokeWidth: 2,
                                                      ),
                                                    )
-                                                 : Text(
-                                                     isWithinLockWindow
-                                                         ? context.tr(
-                                                             "Cancel participation",
-                                                           )
-                                                         : context.tr(
-                                                             "Cancel",
-                                                           ),
-                                                   ),
+                                                 : Text(cancelLabel),
                                            ),
                                         if (canAppeal)
                                           TextButton(

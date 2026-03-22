@@ -8,6 +8,7 @@ import '../../services/event_service.dart';
 import '../../services/verification_service.dart';
 import '../../utils/ist_date_time.dart';
 import '../../widgets/organiser_bottom_nav.dart';
+import 'get_verified_screen.dart';
 import 'my_events_screen.dart';
 
 class CreateEventScreen extends StatefulWidget {
@@ -92,6 +93,15 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  Future<void> _openOrganiserVerificationFlow() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const OrganiserGetVerifiedScreen(),
+      ),
+    );
+  }
+
   Future<bool> _ensureVerifiedOrganiser() async {
     final status = (await VerificationService.getStatus())?.toLowerCase();
 
@@ -99,29 +109,64 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       return true;
     }
 
+    if (!mounted) return false;
+
     String message;
+    String actionText;
+    VoidCallback? action;
+
     switch (status) {
       case "pending":
         message = context.tr(
           "Your verification is under review. You can create events after approval.",
         );
+        actionText = context.tr("OK");
+        action = () => Navigator.pop(context);
         break;
       case "rejected":
         message = context.tr(
           "Your verification was rejected. Please submit verification again to create events.",
         );
+        actionText = context.tr("Get Verified");
+        action = () async {
+          Navigator.pop(context);
+          await _openOrganiserVerificationFlow();
+        };
         break;
       case "not_requested":
         message = context.tr("You need to be verified before creating events.");
+        actionText = context.tr("Get Verified");
+        action = () async {
+          Navigator.pop(context);
+          await _openOrganiserVerificationFlow();
+        };
         break;
       default:
         message = context.tr(
           "Unable to verify your account right now. Please try again.",
         );
+        actionText = context.tr("OK");
+        action = () => Navigator.pop(context);
         break;
     }
 
-    _toast(message);
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(context.tr("Verification Required")),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(context.tr("Cancel")),
+          ),
+          TextButton(
+            onPressed: action,
+            child: Text(actionText),
+          ),
+        ],
+      ),
+    );
     return false;
   }
 
@@ -172,8 +217,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
   Future<void> pickPaymentClearanceDate() async {
     final today = IstDateTime.startOfDay(IstDateTime.now());
-    final firstDate =
-        eventEndDate != null && eventEndDate!.isAfter(today) ? eventEndDate! : today;
+    final firstDate = eventEndDate != null && eventEndDate!.isAfter(today)
+        ? eventEndDate!
+        : today;
     final initialDate = paymentClearanceDate != null &&
             !paymentClearanceDate!.isBefore(firstDate)
         ? paymentClearanceDate!
@@ -308,9 +354,11 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         _toast(context.tr("Select payment clearance date"));
         return;
       }
-      if (eventEndDate != null && paymentClearanceDate!.isBefore(eventEndDate!)) {
+      if (eventEndDate != null &&
+          paymentClearanceDate!.isBefore(eventEndDate!)) {
         _toast(
-          context.tr("Payment clearance date cannot be before the event end date"),
+          context
+              .tr("Payment clearance date cannot be before the event end date"),
         );
         return;
       }
@@ -342,9 +390,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             ? double.tryParse(paymentController.text)
             : null,
         paymentRateType: eventType == "paid" ? paymentRateType : null,
-        paymentClearanceDate: eventType == "paid" && paymentClearanceDate != null
-            ? _fmtDate(paymentClearanceDate!)
-            : null,
+        paymentClearanceDate:
+            eventType == "paid" && paymentClearanceDate != null
+                ? _fmtDate(paymentClearanceDate!)
+                : null,
         bannerUrl: bannerUrl,
         categories: selectedCategories,
         responsibilities: responsibilities,
@@ -395,35 +444,36 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           _sectionCard(context.tr("Basic Details"), [
             _input(context.tr("Event Title"), titleController),
             _input(context.tr("Location"), locationController),
-            _input(context.tr("Description"), descriptionController, maxLines: 4),
+            _input(context.tr("Description"), descriptionController,
+                maxLines: 4),
             _input(context.tr("Volunteers Required"), volunteersController,
                 keyboardType: TextInputType.number),
           ]),
           _sectionCard(context.tr("Schedule"), [
             Row(children: [
               Expanded(
-                child: _dateTile(
-                    context.tr("Start Date"), eventStartDate, () => pickDate(true)),
+                child: _dateTile(context.tr("Start Date"), eventStartDate,
+                    () => pickDate(true)),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child:
-                    _dateTile(context.tr("End Date"), eventEndDate, () => pickDate(false)),
+                child: _dateTile(context.tr("End Date"), eventEndDate,
+                    () => pickDate(false)),
               ),
             ]),
             Row(children: [
               Expanded(
-                child: _timeTile(
-                    context.tr("Start Time"), eventStartTime, () => pickTime(true)),
+                child: _timeTile(context.tr("Start Time"), eventStartTime,
+                    () => pickTime(true)),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child:
-                    _timeTile(context.tr("End Time"), eventEndTime, () => pickTime(false)),
+                child: _timeTile(context.tr("End Time"), eventEndTime,
+                    () => pickTime(false)),
               ),
             ]),
-            _dateTile(
-                context.tr("Application Deadline"), applicationDeadline, pickDeadline),
+            _dateTile(context.tr("Application Deadline"), applicationDeadline,
+                pickDeadline),
           ]),
           // Daily Schedules Section for Multi-day Events
           if (eventStartDate != null &&
@@ -461,7 +511,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                                   context.tr(
                                     "Day {number}: {date}",
                                     args: {
-                                      "number": schedule['dayNumber'].toString(),
+                                      "number":
+                                          schedule['dayNumber'].toString(),
                                       "date": schedule['date'].toString(),
                                     },
                                   ),
@@ -496,8 +547,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                                         context.tr(
                                           "Start: {time}",
                                           args: {
-                                            "time":
-                                                schedule['start_time'].substring(0, 5),
+                                            "time": schedule['start_time']
+                                                .substring(0, 5),
                                           },
                                         ),
                                         style: const TextStyle(fontSize: 13),
@@ -520,8 +571,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                                         context.tr(
                                           "End: {time}",
                                           args: {
-                                            "time":
-                                                schedule['end_time'].substring(0, 5),
+                                            "time": schedule['end_time']
+                                                .substring(0, 5),
                                           },
                                         ),
                                         style: const TextStyle(fontSize: 13),
@@ -549,7 +600,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 ),
                 child: bannerImage == null
                     ? Center(
-                        child: Text(context.tr("Upload Event Banner (Optional)")))
+                        child:
+                            Text(context.tr("Upload Event Banner (Optional)")))
                     : ClipRRect(
                         borderRadius: BorderRadius.circular(16),
                         child: kIsWeb

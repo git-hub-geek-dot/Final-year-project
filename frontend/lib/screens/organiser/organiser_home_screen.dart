@@ -9,6 +9,7 @@ import '../../utils/ist_date_time.dart';
 import '../../widgets/organiser_bottom_nav.dart';
 import '../../localization/localization_extensions.dart';
 import 'create_event_screen.dart';
+import 'get_verified_screen.dart';
 import 'review_application_screen.dart';
 import 'event_details_screen.dart';
 import '../chat/chat_inbox_screen.dart';
@@ -100,6 +101,15 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
     }
   }
 
+  Future<void> _openOrganiserVerificationFlow() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const OrganiserGetVerifiedScreen(),
+      ),
+    );
+  }
+
   Future<bool> _ensureVerifiedOrganiser() async {
     final status = (await VerificationService.getStatus())?.toLowerCase();
 
@@ -110,28 +120,59 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
     if (!mounted) return false;
 
     String message;
+    String actionText;
+    VoidCallback? action;
+
     switch (status) {
       case "pending":
         message = context.tr(
           "Your verification is under review. You can create events after approval.",
         );
+        actionText = context.tr("OK");
+        action = () => Navigator.pop(context);
         break;
       case "rejected":
         message = context.tr(
           "Your verification was rejected. Please submit verification again to create events.",
         );
+        actionText = context.tr("Get Verified");
+        action = () async {
+          Navigator.pop(context);
+          await _openOrganiserVerificationFlow();
+        };
         break;
       case "not_requested":
         message = context.tr("You need to be verified before creating events.");
+        actionText = context.tr("Get Verified");
+        action = () async {
+          Navigator.pop(context);
+          await _openOrganiserVerificationFlow();
+        };
         break;
       default:
-        message =
-            context.tr("Unable to verify your account right now. Please try again.");
+        message = context
+            .tr("Unable to verify your account right now. Please try again.");
+        actionText = context.tr("OK");
+        action = () => Navigator.pop(context);
         break;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(context.tr("Verification Required")),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(context.tr("Cancel")),
+          ),
+          TextButton(
+            onPressed: action,
+            child: Text(actionText),
+          ),
+        ],
+      ),
     );
     return false;
   }
@@ -310,13 +351,16 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
                     const SizedBox(width: 8),
                     _tabButton(context.tr('Ongoing'), 1, count: ongoing.length),
                     const SizedBox(width: 8),
-                    _tabButton(context.tr('Upcoming'), 2, count: upcoming.length),
+                    _tabButton(context.tr('Upcoming'), 2,
+                        count: upcoming.length),
                     const SizedBox(width: 8),
-                    _tabButton(context.tr('Completed'), 3, count: completed.length),
+                    _tabButton(context.tr('Completed'), 3,
+                        count: completed.length),
                     const SizedBox(width: 8),
                     _tabButton(context.tr('Draft'), 4, count: draft.length),
                     const SizedBox(width: 8),
-                    _tabButton(context.tr('Cancelled'), 5, count: cancelled.length),
+                    _tabButton(context.tr('Cancelled'), 5,
+                        count: cancelled.length),
                   ],
                 ),
               ),
@@ -374,7 +418,8 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
                           _section(context.tr('Completed Events'), completed,
                               isCompleted: true)
                         else if (_selectedTab == 4)
-                          _section(context.tr('Draft Events'), draft, isDraft: true),
+                          _section(context.tr('Draft Events'), draft,
+                              isDraft: true),
                         if (_selectedTab == 5)
                           _section(context.tr('Cancelled Events'), cancelled),
                       ],
@@ -568,8 +613,8 @@ Widget eventCard(
                             fontWeight: FontWeight.bold,
                             color: statusColor,
                           ),
-                          ),
                         ),
+                      ),
                       if (urgency != null)
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -583,8 +628,7 @@ Widget eventCard(
                           child: Text(
                             context.tr(
                               urgency['text'] as String,
-                              args: (urgency['args']
-                                      as Map<String, String>?) ??
+                              args: (urgency['args'] as Map<String, String>?) ??
                                   const {},
                             ),
                             style: TextStyle(
@@ -622,8 +666,8 @@ Widget eventCard(
                   context.tr(
                     'Location: {location}',
                     args: {
-                      "location": (event['location'] ?? context.tr('N/A'))
-                          .toString()
+                      "location":
+                          (event['location'] ?? context.tr('N/A')).toString()
                     },
                   ),
                 ),
@@ -678,9 +722,9 @@ Widget eventCard(
                             child: Text(
                               context.tr(
                                 signal['key'] as String,
-                                args: (signal['args']
-                                        as Map<String, String>?) ??
-                                    const {},
+                                args:
+                                    (signal['args'] as Map<String, String>?) ??
+                                        const {},
                               ),
                               style: const TextStyle(
                                 fontSize: 10,

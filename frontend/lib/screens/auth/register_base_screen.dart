@@ -42,11 +42,19 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
   bool phoneOtpSent = false;
   bool phoneVerified = false;
   String? phoneVerificationId;
+  String? _emailOtpTarget;
   bool _obscurePassword = true;
   String? errorMessage;
 
   @override
+  void initState() {
+    super.initState();
+    emailController.addListener(_handleEmailChanged);
+  }
+
+  @override
   void dispose() {
+    emailController.removeListener(_handleEmailChanged);
     nameController.dispose();
     emailController.dispose();
     passwordController.dispose();
@@ -56,6 +64,23 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
     cityController.dispose();
     govIdController.dispose();
     super.dispose();
+  }
+
+  String _normalizeEmail(String value) => value.trim().toLowerCase();
+
+  void _handleEmailChanged() {
+    final currentEmail = _normalizeEmail(emailController.text);
+
+    if (_emailOtpTarget == null || _emailOtpTarget == currentEmail) {
+      return;
+    }
+
+    setState(() {
+      emailOtpSent = false;
+      emailVerified = false;
+      emailOtpController.clear();
+      _emailOtpTarget = null;
+    });
   }
 
   Future<void> register() async {
@@ -71,8 +96,7 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
       return;
     }
 
-    if (widget.role == "organiser" &&
-        contactController.text.trim().isEmpty) {
+    if (widget.role == "organiser" && contactController.text.trim().isEmpty) {
       showError("Contact number is required for organiser");
       return;
     }
@@ -152,24 +176,28 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
   }
 
   Future<void> sendEmailOtp() async {
-    if (emailController.text.trim().isEmpty) {
+    final email = emailController.text.trim();
+    if (email.isEmpty) {
       showError("Email is required");
       return;
     }
 
+    final normalizedEmail = _normalizeEmail(email);
+
     setState(() {
       sendingOtp = true;
       errorMessage = null;
+      emailVerified = false;
+      emailOtpSent = false;
+      emailOtpController.clear();
+      _emailOtpTarget = normalizedEmail;
     });
 
     try {
       final response = await http.post(
         Uri.parse("${ApiConfig.baseUrl}/auth/request-otp"),
         headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "identifier": emailController.text.trim(),
-          "channel": "email",
-        }),
+        body: jsonEncode({"identifier": email, "channel": "email"}),
       );
 
       if (response.statusCode == 200) {
@@ -191,6 +219,20 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
       return;
     }
 
+    final email = emailController.text.trim();
+    final normalizedEmail = _normalizeEmail(email);
+
+    if (_emailOtpTarget == null || _emailOtpTarget != normalizedEmail) {
+      setState(() {
+        emailOtpSent = false;
+        emailVerified = false;
+        emailOtpController.clear();
+        _emailOtpTarget = null;
+      });
+      showError("Email changed. Please send OTP again");
+      return;
+    }
+
     setState(() {
       verifyingOtp = true;
       errorMessage = null;
@@ -201,7 +243,7 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
         Uri.parse("${ApiConfig.baseUrl}/auth/verify-otp"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
-          "identifier": emailController.text.trim(),
+          "identifier": email,
           "channel": "email",
           "otp": emailOtpController.text.trim(),
         }),
@@ -322,14 +364,11 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
             Expanded(
               child: ElevatedButton(
                 onPressed: sendingPhoneOtp ? null : sendPhoneOtp,
-                child: Text(
-                  sendingPhoneOtp ? "Sending..." : "Send Phone OTP",
-                ),
+                child: Text(sendingPhoneOtp ? "Sending..." : "Send Phone OTP"),
               ),
             ),
             const SizedBox(width: 12),
-            if (phoneVerified)
-              const Icon(Icons.verified, color: Colors.green),
+            if (phoneVerified) const Icon(Icons.verified, color: Colors.green),
           ],
         ),
         if (phoneOtpSent) ...[
@@ -391,9 +430,7 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppColors.backgroundGradient,
-        ),
+        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
         child: Center(
           child: SingleChildScrollView(
             child: Container(
@@ -451,9 +488,7 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
                     ),
                     ElevatedButton(
                       onPressed: verifyingOtp ? null : verifyEmailOtp,
-                      child: Text(
-                        verifyingOtp ? "Verifying..." : "Verify OTP",
-                      ),
+                      child: Text(verifyingOtp ? "Verifying..." : "Verify OTP"),
                     ),
                   ],
                   inputField(

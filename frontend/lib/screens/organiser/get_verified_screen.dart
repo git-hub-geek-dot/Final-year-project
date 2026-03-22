@@ -165,7 +165,7 @@ class _OrganiserGetVerifiedScreenState
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () => Navigator.pop(context),
-              child: Text(context.tr("Back to Profile")),
+              child: Text(context.tr("Back")),
             ),
           ],
         ),
@@ -204,7 +204,7 @@ class _OrganiserGetVerifiedScreenState
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () => Navigator.pop(context),
-              child: Text(context.tr("Back to Profile")),
+              child: Text(context.tr("Back")),
             ),
           ],
         ),
@@ -407,7 +407,8 @@ class _OrganiserGetVerifiedScreenState
                         if (_idDocumentUrl == null) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text(context.tr("Please upload ID proof")),
+                              content:
+                                  Text(context.tr("Please upload ID proof")),
                             ),
                           );
                           return;
@@ -439,7 +440,8 @@ class _OrganiserGetVerifiedScreenState
 
                         try {
                           final res = await http.post(
-                            Uri.parse("${ApiConfig.baseUrl}/verification/request"),
+                            Uri.parse(
+                                "${ApiConfig.baseUrl}/verification/request"),
                             headers: {
                               "Content-Type": "application/json",
                               "Authorization": "Bearer $token",
@@ -450,7 +452,8 @@ class _OrganiserGetVerifiedScreenState
                               "idNumber": _idNumberController.text.trim(),
                               "idDocumentUrl": _idDocumentUrl,
                               "selfieUrl": _selfieUrl,
-                              "organisationName": _orgNameController.text.trim(),
+                              "organisationName":
+                                  _orgNameController.text.trim(),
                               "eventProofUrl": _eventProofUrl,
                               "websiteLink": _linkController.text.trim(),
                             }),
@@ -469,17 +472,16 @@ class _OrganiserGetVerifiedScreenState
                             Navigator.pop(context);
                           } else {
                             final data = jsonDecode(res.body);
-                            final message =
-                                (data["message"] ??
-                                        context.tr("Submission failed"))
-                                    .toString();
+                            final message = (data["message"] ??
+                                    context.tr("Submission failed"))
+                                .toString();
                             if (message.toLowerCase().contains(
-                              "already verified",
-                            )) {
+                                  "already verified",
+                                )) {
                               setState(() => _verificationStatus = "approved");
                             } else if (message.toLowerCase().contains(
-                              "under review",
-                            )) {
+                                  "under review",
+                                )) {
                               setState(() => _verificationStatus = "pending");
                             }
                             ScaffoldMessenger.of(context).showSnackBar(

@@ -7,6 +7,57 @@ const {
 
 const SAFE_WINDOW_HOURS = 72;
 const LOCK_WINDOW_HOURS = 48;
+const APPLICATION_DEADLINE_TIME_ZONE = "Asia/Kolkata";
+
+const normalizeDateOnlyValue = (value) => {
+  if (!value) return null;
+
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  const text = value.toString().trim();
+  if (!text) return null;
+
+  const directMatch = text.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (directMatch) {
+    return directMatch[1];
+  }
+
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed.toISOString().slice(0, 10);
+};
+
+const formatDateInTimeZone = (date, timeZone) => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+
+  const values = Object.fromEntries(
+    parts
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value])
+  );
+
+  return `${values.year}-${values.month}-${values.day}`;
+};
+
+const hasApplicationDeadlinePassed = (deadline, now = new Date()) => {
+  const deadlineDate = normalizeDateOnlyValue(deadline);
+  if (!deadlineDate) {
+    return false;
+  }
+
+  const today = formatDateInTimeZone(now, APPLICATION_DEADLINE_TIME_ZONE);
+  return today > deadlineDate;
+};
 
 const buildEventStartDate = (event) => {
   if (!event?.event_date) return null;
@@ -107,7 +158,7 @@ exports.applyToEvent = async (req, res) => {
 
     const eventResult = await pool.query(
       `
-      SELECT id, status, volunteers_required
+      SELECT id, status, volunteers_required, application_deadline
       FROM events
       WHERE id = $1
       `,
@@ -124,13 +175,8 @@ exports.applyToEvent = async (req, res) => {
     }
 
     // Check application deadline
-    if (event.application_deadline) {
-      const deadlineDate = new Date(event.application_deadline);
-      const now = new Date();
-      
-      if (now > deadlineDate) {
-        return res.status(400).json({ error: "Application deadline has passed" });
-      }
+    if (hasApplicationDeadlinePassed(event.application_deadline)) {
+      return res.status(400).json({ error: "Application deadline has passed" });
     }
 
     const volunteersRequired = Number(event.volunteers_required) || 0;
@@ -1179,4 +1225,3 @@ exports.updateApplicationShortlist = async (req, res) => {
     return res.status(500).json({ error: "Failed to update shortlist" });
   }
 };
-

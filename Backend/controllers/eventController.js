@@ -58,6 +58,24 @@ function normalizeAttendanceStatus(value) {
   return VALID_ATTENDANCE_STATUSES.has(normalized) ? normalized : "unmarked";
 }
 
+function hasMeaningfulText(value) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function hasSelectedCategoriesInput(categories) {
+  if (!Array.isArray(categories)) {
+    return false;
+  }
+
+  return categories.some((item) => {
+    if (typeof item === "number") {
+      return Number.isInteger(item);
+    }
+
+    return typeof item === "string" && item.trim().length > 0;
+  });
+}
+
 /*
 EVENTS TABLE (SOURCE OF TRUTH)
 
@@ -155,20 +173,25 @@ exports.createEvent = async (req, res) => {
       payment_clearance_date.toString().trim() !== "";
     const normalizedPaymentClearanceDate =
       normalizeDateOnly(payment_clearance_date);
+    const missingFields = [];
 
-    if (
-      !saveAsDraft &&
-      (!location ||
-        !event_date ||
-        !end_date ||
-        !hasVolunteersInput ||
-        !application_deadline ||
-        !event_type ||
-        !start_time ||
-        !end_time)
-    ) {
+    if (!saveAsDraft) {
+      if (!hasMeaningfulText(location)) missingFields.push("location");
+      if (!hasMeaningfulText(description)) missingFields.push("description");
+      if (!event_date) missingFields.push("event_date");
+      if (!end_date) missingFields.push("end_date");
+      if (!hasVolunteersInput) missingFields.push("volunteers_required");
+      if (!application_deadline) missingFields.push("application_deadline");
+      if (!event_type) missingFields.push("event_type");
+      if (!start_time) missingFields.push("start_time");
+      if (!end_time) missingFields.push("end_time");
+      if (!hasSelectedCategoriesInput(categories)) missingFields.push("categories");
+    }
+
+    if (missingFields.length > 0) {
       return res.status(400).json({
         error: "Missing required event fields",
+        missing_fields: missingFields,
       });
     }
 
@@ -503,6 +526,10 @@ exports.getAllEvents = async (req, res) => {
       LEFT JOIN categories c ON c.id = ec.category_id
       LEFT JOIN daily_schedules ds ON ds.event_id = e.id
       WHERE e.status = 'open'
+        AND (
+          e.application_deadline IS NULL
+          OR ((NOW() AT TIME ZONE 'Asia/Kolkata')::date <= e.application_deadline)
+        )
       GROUP BY e.id, u.name, u.profile_picture_url
       ORDER BY event_date ASC
     `);
@@ -704,6 +731,15 @@ exports.updateEvent = async (req, res) => {
       safeEventType === "paid" ? normalizedPaymentRateType : null;
     const safePaymentClearanceDate =
       safeEventType === "paid" ? normalizedPaymentClearanceDate : null;
+    const missingFields = [];
+
+    if (!hasMeaningfulText(description)) {
+      missingFields.push("description");
+    }
+
+    if (publishNow && !hasSelectedCategoriesInput(categories)) {
+      missingFields.push("categories");
+    }
 
     if (!hasValidVolunteers) {
       return res.status(400).json({
@@ -752,6 +788,13 @@ exports.updateEvent = async (req, res) => {
     ) {
       return res.status(400).json({
         error: "Payment clearance date cannot be before the event end date",
+      });
+    }
+
+    if (publishNow && missingFields.length > 0) {
+      return res.status(400).json({
+        error: "Complete required event fields before publishing",
+        missing_fields: missingFields,
       });
     }
 
@@ -1510,6 +1553,7 @@ exports.publishEvent = async (req, res) => {
       SELECT
         id,
         title,
+        description,
         location,
         event_date,
         end_date,
@@ -1521,7 +1565,12 @@ exports.publishEvent = async (req, res) => {
         payment_clearance_date,
         start_time,
         end_time,
-        status
+        status,
+        (
+          SELECT COUNT(*)::int
+          FROM event_categories ec
+          WHERE ec.event_id = events.id
+        ) AS category_count
       FROM events
       WHERE id = $1 AND organiser_id = $2
       `,
@@ -1540,6 +1589,9 @@ exports.publishEvent = async (req, res) => {
     }
 
     const missingFields = [];
+    if (!hasMeaningfulText(event.description)) {
+      missingFields.push("description");
+    }
     if (!event.location || event.location.toString().trim() === "") {
       missingFields.push("location");
     }
@@ -1559,6 +1611,9 @@ exports.publishEvent = async (req, res) => {
     }
     if (!event.start_time) missingFields.push("start_time");
     if (!event.end_time) missingFields.push("end_time");
+    if ((event.category_count ?? 0) < 1) {
+      missingFields.push("categories");
+    }
     if (
       event.event_type === "paid" &&
       (!event.payment_amount || Number(event.payment_amount) <= 0)

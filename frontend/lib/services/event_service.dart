@@ -104,10 +104,18 @@ class EventService {
 
     if (response.statusCode == 201 || response.statusCode == 200) {
       return true;
-    } else {
-      print("CREATE EVENT ERROR → ${response.body}");
-      return false;
     }
+
+    final decoded = _tryDecodeMap(response.body);
+    String message =
+        (decoded?["error"] ?? decoded?["message"] ?? "Failed to create event")
+            .toString();
+    final missing = decoded?["missing_fields"];
+    if (missing is List && missing.isNotEmpty) {
+      message = "$message: ${missing.join(', ')}";
+    }
+
+    throw Exception(message);
   }
 
   /// ================= MY EVENTS =================
@@ -356,7 +364,20 @@ class EventService {
       }),
     );
 
-    return response.statusCode == 200;
+    if (response.statusCode == 200) {
+      return true;
+    }
+
+    final decoded = _tryDecodeMap(response.body);
+    String message =
+        (decoded?["error"] ?? decoded?["message"] ?? "Failed to update event")
+            .toString();
+    final missing = decoded?["missing_fields"];
+    if (missing is List && missing.isNotEmpty) {
+      message = "$message: ${missing.join(', ')}";
+    }
+
+    throw Exception(message);
   }
 
   /// ================= CANCEL EVENT =================
@@ -468,9 +489,10 @@ class EventService {
       return decoded ?? <String, dynamic>{};
     }
 
-    final errorMessage =
-        (decoded?["error"] ?? decoded?["message"] ?? "Failed to submit attendance feedback")
-            .toString();
+    final errorMessage = (decoded?["error"] ??
+            decoded?["message"] ??
+            "Failed to submit attendance feedback")
+        .toString();
     throw Exception(errorMessage);
   }
 

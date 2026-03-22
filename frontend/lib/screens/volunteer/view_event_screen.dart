@@ -174,9 +174,7 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
     });
 
     _snack(
-      updated
-          ? context.tr("Saved event")
-          : context.tr("Removed from saved"),
+      updated ? context.tr("Saved event") : context.tr("Removed from saved"),
     );
   }
 
@@ -206,7 +204,8 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
                   ?.toString()
               : null;
           applicationId = resolvedApplicationId;
-          isReviewClosed = data["applied"] == true && data["reviewClosed"] == true;
+          isReviewClosed =
+              data["applied"] == true && data["reviewClosed"] == true;
           isLoadingStatus = false;
         });
 
@@ -270,6 +269,22 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
     }
   }
 
+  String _extractApiMessage(String responseBody, {required String fallback}) {
+    if (responseBody.trim().isEmpty) return fallback;
+
+    try {
+      final decoded = jsonDecode(responseBody);
+      if (decoded is Map) {
+        final parsed = decoded["error"] ?? decoded["message"];
+        if (parsed != null && parsed.toString().trim().isNotEmpty) {
+          return parsed.toString().trim();
+        }
+      }
+    } catch (_) {}
+
+    return fallback;
+  }
+
   // ================= APPLY =================
   Future<void> _applyToEvent({
     String? priorExperience,
@@ -309,31 +324,40 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
           applicationStatus = nextStatus;
           attendanceStatus = "unmarked";
           applicationId = data["application_id"] as int?;
+          isReviewClosed = false;
           isApplying = false;
         });
       } else if (response.statusCode == 403) {
-        // Verification required error from backend
-        final data = jsonDecode(response.body);
-        _snack(
-          data["message"] ?? context.tr("Verification required to apply"),
+        final message = _extractApiMessage(
+          response.body,
+          fallback: context.tr("Verification required to apply"),
         );
         setState(() {
           isApplying = false;
         });
-        // Redirect to get verified page
+        _snack(message);
         await Future.delayed(const Duration(milliseconds: 500));
         if (!mounted) return;
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const VolunteerGetVerifiedScreen(),
-          ),
-        );
+        await _openVolunteerVerificationFlow(context);
       } else {
-        _snack(context.tr("Unable to apply"));
+        final apiMessage = _extractApiMessage(
+          response.body,
+          fallback: context.tr("Unable to apply"),
+        );
         setState(() {
           isApplying = false;
         });
+
+        final friendlyMessage = apiMessage.toLowerCase() == "already applied"
+            ? context.tr("You have already applied to this event.")
+            : apiMessage;
+
+        _snack(friendlyMessage);
+
+        if (response.statusCode == 409 ||
+            apiMessage.toLowerCase() == "already applied") {
+          await _fetchApplicationStatus();
+        }
       }
     } catch (_) {
       if (!mounted) return;
@@ -503,7 +527,8 @@ ${context.tr("Join on VolunteerX")}
           if ((widget.event["computed_status"] == "completed") &&
               (_normalizedStatus(applicationStatus ?? "") == "approved" ||
                   _normalizedStatus(applicationStatus ?? "") == "completed") &&
-              _normalizedAttendanceStatus(attendanceStatus ?? "") != "absent") ...[
+              _normalizedAttendanceStatus(attendanceStatus ?? "") !=
+                  "absent") ...[
             const SizedBox(height: 12),
             if (isLoadingRating)
               const Center(child: CircularProgressIndicator())
@@ -771,15 +796,15 @@ ${context.tr("Join on VolunteerX")}
               borderRadius: BorderRadius.all(Radius.circular(30)),
             ),
             child: Center(
-                child: isApplying
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : Text(
-                        context.tr("Apply for this Event"),
-                        style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white),
-                      ),
+              child: isApplying
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : Text(
+                      context.tr("Apply for this Event"),
+                      style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white),
+                    ),
             ),
           ),
         ),
@@ -787,9 +812,14 @@ ${context.tr("Join on VolunteerX")}
     }
 
     final currentStatus = _normalizedStatus(applicationStatus!);
-    final currentAttendance = _normalizedAttendanceStatus(attendanceStatus ?? "");
+    final currentAttendance =
+        _normalizedAttendanceStatus(attendanceStatus ?? "");
     final canCancel = _isCancelableStatus(currentStatus) && !_hasEventStarted();
     final isApprovedState = _isApprovedStatus(currentStatus);
+    final cancelLabel = _cancelActionLabel(
+      currentStatus,
+      isLocked: _isWithinLockWindow(),
+    );
     final statusText = currentAttendance == "absent"
         ? context.tr("Attendance Absent")
         : isReviewClosed
@@ -811,7 +841,8 @@ ${context.tr("Join on VolunteerX")}
         if (isReviewClosed) ...[
           const SizedBox(height: 10),
           Text(
-            context.tr("This event ended before your application was reviewed."),
+            context
+                .tr("This event ended before your application was reviewed."),
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.grey.shade700,
@@ -891,11 +922,7 @@ ${context.tr("Join on VolunteerX")}
                       height: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : Text(
-                      _isWithinLockWindow()
-                          ? context.tr("Cancel Participation (Locked)")
-                          : context.tr("Cancel Participation"),
-                    ),
+                  : Text(cancelLabel),
             ),
           ),
         ],
@@ -904,11 +931,66 @@ ${context.tr("Join on VolunteerX")}
   }
 
   bool _isCancelableStatus(String status) {
-    return _normalizedStatus(status) == "approved";
+    final normalized = _normalizedStatus(status);
+    return normalized == "approved" ||
+        normalized == "pending" ||
+        normalized == "waitlisted";
   }
 
   bool _isApprovedStatus(String status) {
     return _normalizedStatus(status) == "approved";
+  }
+
+  String _cancelActionLabel(String status, {bool isLocked = false}) {
+    final base = _isApprovedStatus(status)
+        ? context.tr("Cancel participation")
+        : context.tr("Withdraw application");
+
+    if (!isLocked) return base;
+
+    return _isApprovedStatus(status)
+        ? context.tr("Cancel participation (Locked)")
+        : context.tr("Withdraw application (Locked)");
+  }
+
+  String _cancelDialogTitle(String status) {
+    return _isApprovedStatus(status)
+        ? context.tr("Cancel Participation")
+        : context.tr("Withdraw Application");
+  }
+
+  String _confirmCancelLabel(String status) {
+    return _isApprovedStatus(status)
+        ? context.tr("Confirm Cancel")
+        : context.tr("Confirm Withdraw");
+  }
+
+  String _cancellationSuccessMessage({
+    required String status,
+    required bool strikeIssued,
+    required bool warningIssued,
+  }) {
+    final cancelledLabel = _isApprovedStatus(status)
+        ? context.tr("Participation cancelled.")
+        : context.tr("Application withdrawn.");
+
+    if (strikeIssued) {
+      return _isApprovedStatus(status)
+          ? context.tr("Participation cancelled. A strike was applied.")
+          : context.tr("Application withdrawn. A strike was applied.");
+    }
+
+    if (warningIssued) {
+      return _isApprovedStatus(status)
+          ? context.tr(
+              "Participation cancelled. Warning issued for 48-72 hour window.",
+            )
+          : context.tr(
+              "Application withdrawn. Warning issued for 48-72 hour window.",
+            );
+    }
+
+    return cancelledLabel;
   }
 
   DateTime? _eventStartDateTime() {
@@ -964,15 +1046,21 @@ ${context.tr("Join on VolunteerX")}
 
   Future<void> _showCancelDialog() async {
     if (applicationId == null) {
-      _snack("Application not found for cancellation");
+      _snack(context.tr("Application not found for cancellation"));
       return;
     }
 
     if (_hasEventStarted()) {
-      _snack("This event has already started. Cancellation is no longer available.");
+      _snack(
+        context.tr(
+          "This event has already started. Cancellation is no longer available.",
+        ),
+      );
       return;
     }
 
+    final currentStatus = _normalizedStatus(applicationStatus ?? "");
+    final isApprovedApplication = _isApprovedStatus(currentStatus);
     final hoursBefore = _hoursBeforeEvent();
     final isWithinLockWindow = hoursBefore != null && hoursBefore <= 48;
     final title =
@@ -990,24 +1078,33 @@ ${context.tr("Join on VolunteerX")}
           builder: (context, setLocalState) {
             String policyText;
             if (isWithinLockWindow) {
-              policyText =
-                  context.tr(
-                    "This event starts in less than 48 hours. Cancelling now applies an immediate strike. Supporting document upload is mandatory to continue.",
-                  );
+              policyText = isApprovedApplication
+                  ? context.tr(
+                      "This event starts in less than 48 hours. Cancelling now applies an immediate strike. Supporting document upload is mandatory to continue.",
+                    )
+                  : context.tr(
+                      "This event starts in less than 48 hours. Withdrawing now applies an immediate strike. Supporting document upload is mandatory to continue.",
+                    );
             } else if (hoursBefore != null && hoursBefore <= 72) {
-              policyText =
-                  context.tr(
-                    "This cancellation is within 48-72 hours before the event. You will receive a warning. Repeated cancellations without a reason may lead to a strike.",
-                  );
+              policyText = isApprovedApplication
+                  ? context.tr(
+                      "This cancellation is within 48-72 hours before the event. You will receive a warning. Repeated cancellations without a reason may lead to a strike.",
+                    )
+                  : context.tr(
+                      "This withdrawal is within 48-72 hours before the event. You will receive a warning. Repeated withdrawals without a reason may lead to a strike.",
+                    );
             } else {
-              policyText =
-                  context.tr(
-                    "This cancellation is outside the strike window. No strike will be applied.",
-                  );
+              policyText = isApprovedApplication
+                  ? context.tr(
+                      "This cancellation is outside the strike window. No strike will be applied.",
+                    )
+                  : context.tr(
+                      "This withdrawal is outside the strike window. No strike will be applied.",
+                    );
             }
 
             return AlertDialog(
-              title: Text(context.tr("Cancel Participation")),
+              title: Text(_cancelDialogTitle(currentStatus)),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -1039,9 +1136,7 @@ ${context.tr("Join on VolunteerX")}
                             ? context.tr("Reason *")
                             : context.tr("Reason (optional but recommended)"),
                         helperText: isWithinLockWindow
-                            ? context.tr(
-                                "Mandatory for cancellations within 48 hours",
-                              )
+                            ? context.tr("Mandatory within 48 hours")
                             : null,
                         errorText: reasonError,
                         border: const OutlineInputBorder(),
@@ -1064,9 +1159,7 @@ ${context.tr("Join on VolunteerX")}
                               child: Text(
                                 documentUrl == null
                                     ? (isWithinLockWindow
-                                        ? context.tr(
-                                            "Mandatory for cancellations within 48 hours",
-                                          )
+                                        ? context.tr("Mandatory within 48 hours")
                                         : context.tr(
                                             "No supporting document uploaded",
                                           ))
@@ -1171,7 +1264,7 @@ ${context.tr("Join on VolunteerX")}
                     }
                     Navigator.pop(context, true);
                   },
-                  child: Text(context.tr("Confirm Cancel")),
+                  child: Text(_confirmCancelLabel(currentStatus)),
                 ),
               ],
             );
@@ -1195,28 +1288,26 @@ ${context.tr("Join on VolunteerX")}
       if (!mounted) return;
       final strikeIssued = response["strikeIssued"] == true;
       final warningIssued = response["warningIssued"] == true;
+      final message = _cancellationSuccessMessage(
+        status: currentStatus,
+        strikeIssued: strikeIssued,
+        warningIssued: warningIssued,
+      );
 
       setState(() {
         applicationStatus = "cancelled";
       });
 
-    final message = strikeIssued
-          ? context.tr("Participation cancelled. A strike was applied.")
-          : warningIssued
-              ? context.tr(
-                  "Participation cancelled. Warning issued for 48-72 hour window.",
-                )
-              : context.tr("Participation cancelled.");
-    _snack(message);
-  } catch (e) {
-    if (!mounted) return;
-    _snack(
-      context.tr(
-        "Failed to cancel: {error}",
-        args: {"error": e.toString()},
-      ),
-    );
-  } finally {
+      _snack(message);
+    } catch (e) {
+      if (!mounted) return;
+      _snack(
+        context.tr(
+          "Failed to cancel: {error}",
+          args: {"error": e.toString()},
+        ),
+      );
+    } finally {
       if (mounted) {
         setState(() => isCancelling = false);
       }
@@ -1453,7 +1544,8 @@ ${context.tr("Join on VolunteerX")}
     );
   }
 
-  String? _paymentClearanceText(dynamic eventType, dynamic paymentClearanceDate) {
+  String? _paymentClearanceText(
+      dynamic eventType, dynamic paymentClearanceDate) {
     final type = eventType?.toString().toLowerCase();
     if (type != "paid") {
       return null;
@@ -1654,11 +1746,21 @@ ${context.tr("Join on VolunteerX")}
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  Future<void> _openVolunteerVerificationFlow(BuildContext context) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const VolunteerGetVerifiedScreen(),
+      ),
+    );
+
+    if (!mounted) return;
+    await _loadVerificationStatus();
+  }
+
   // ================= TERMS =================
   Future<void> _showTerms(BuildContext context) async {
-    if (isLoadingVerification || verificationStatus == null) {
-      await _loadVerificationStatus();
-    }
+    await _loadVerificationStatus();
 
     if (!context.mounted) return;
 
@@ -1810,7 +1912,8 @@ ${context.tr("Join on VolunteerX")}
                     contentPadding: EdgeInsets.zero,
                     value: agreed,
                     onChanged: (v) => setState(() => agreed = v!),
-                    title: Text(context.tr("I agree to the Terms & Conditions")),
+                    title:
+                        Text(context.tr("I agree to the Terms & Conditions")),
                   ),
                   SizedBox(
                     width: double.infinity,
@@ -1844,27 +1947,20 @@ ${context.tr("Join on VolunteerX")}
 
     switch (verificationStatus) {
       case "pending":
-        message =
-            context.tr(
-              "Your verification is under review. You can apply for events after approval.",
-            );
+        message = context.tr(
+          "Your verification is under review. You can apply for events after approval.",
+        );
         actionText = context.tr("OK");
         action = () => Navigator.pop(context);
         break;
       case "rejected":
-        message =
-            context.tr(
-              "Your verification was rejected. Please submit verification again to apply for events.",
-            );
+        message = context.tr(
+          "Your verification was rejected. Please submit verification again to apply for events.",
+        );
         actionText = context.tr("Get Verified");
-        action = () {
+        action = () async {
           Navigator.pop(context);
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const VolunteerGetVerifiedScreen(),
-            ),
-          );
+          await _openVolunteerVerificationFlow(context);
         };
         break;
       default: // "not_requested" or null
@@ -1872,14 +1968,9 @@ ${context.tr("Join on VolunteerX")}
           "You need to be verified before applying for events.",
         );
         actionText = context.tr("Get Verified");
-        action = () {
+        action = () async {
           Navigator.pop(context);
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const VolunteerGetVerifiedScreen(),
-            ),
-          );
+          await _openVolunteerVerificationFlow(context);
         };
         break;
     }

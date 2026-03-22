@@ -312,7 +312,9 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              context.tr("This action is irreversible. All data will be lost."),
+              context.tr(
+                "This will mark the event as cancelled, notify affected volunteers, and cancel active applications.",
+              ),
               style: const TextStyle(color: Colors.redAccent),
             ),
           ],

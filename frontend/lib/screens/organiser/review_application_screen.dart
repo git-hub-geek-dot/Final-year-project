@@ -727,6 +727,8 @@ class ApplicationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final normalizedProfileUrl = _normalizeProfileImageUrl(profilePictureUrl);
+    final canShortlist = !reviewClosed && isActionableReviewStatus(status);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
@@ -887,9 +889,8 @@ class ApplicationCard extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               InkWell(
-                onTap: reviewClosed
-                    ? null
-                    : () async {
+                onTap: canShortlist
+                    ? () async {
                         final nextValue = !isShortlisted;
                         try {
                           await EventService.updateShortlistStatus(
@@ -922,11 +923,14 @@ class ApplicationCard extends StatelessWidget {
                             );
                           }
                         }
-                      },
+                      }
+                    : null,
                 child: Icon(
                   isShortlisted ? Icons.star : Icons.star_border,
-                  color: reviewClosed
-                      ? Colors.white54
+                  color: !canShortlist
+                      ? (isShortlisted
+                          ? const Color(0xFFF59E0B).withValues(alpha: 0.55)
+                          : Colors.white54)
                       : isShortlisted
                           ? const Color(0xFFF59E0B)
                           : Colors.white,

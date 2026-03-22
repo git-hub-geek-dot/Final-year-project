@@ -899,6 +899,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
     final reviewClosed = _asBool(app?["review_closed"]);
     final canReviewApplication =
         _isReviewActionable(normalizedStatus) && !reviewClosed;
+    final canShortlistApplication = canReviewApplication;
     final approveBlockedByCapacity =
         canReviewApplication && _isApproveBlockedByCapacity();
     final attendanceStatus =
@@ -999,16 +1000,23 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                             ],
                             const SizedBox(width: 6),
                             InkWell(
-                              onTap: shortlistLoading || reviewClosed
-                                  ? null
-                                  : () => updateShortlist(!isShortlisted),
+                              onTap:
+                                  shortlistLoading || !canShortlistApplication
+                                      ? null
+                                      : () => updateShortlist(!isShortlisted),
                               child: Icon(
                                 isShortlisted
                                     ? Icons.star
                                     : Icons.star_border,
-                                color: isShortlisted
-                                    ? const Color(0xFFF59E0B)
-                                    : Colors.grey.shade600,
+                                color: !canShortlistApplication
+                                    ? (isShortlisted
+                                        ? const Color(
+                                            0xFFF59E0B,
+                                          ).withValues(alpha: 0.55)
+                                        : Colors.grey.shade400)
+                                    : isShortlisted
+                                        ? const Color(0xFFF59E0B)
+                                        : Colors.grey.shade600,
                                 size: 22,
                               ),
                             ),

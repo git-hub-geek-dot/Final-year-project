@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -11,6 +12,7 @@ import '../../config/goa_cities.dart';
 import '../../services/saved_events_service.dart';
 import '../../services/token_service.dart';
 import '../../services/notification_api_service.dart';
+import '../../services/notification_service.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/ist_date_time.dart';
 import '../../localization/localization_extensions.dart';
@@ -25,7 +27,8 @@ class VolunteerHomeScreen extends StatefulWidget {
   State<VolunteerHomeScreen> createState() => _VolunteerHomeScreenState();
 }
 
-class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
+class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
+    with WidgetsBindingObserver {
   int selectedIndex = 0;
   String eventsTab = "all"; // all | upcoming | ongoing | past
   List events = [];
@@ -36,6 +39,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
   String? userName;
   String? userCity;
   int _unreadNotifications = 0;
+  StreamSubscription<Map<String, dynamic>>? _notificationSub;
 
   final GlobalKey _introKey = GlobalKey();
   final GlobalKey _upcomingHeaderKey = GlobalKey();
@@ -78,11 +82,50 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     fetchEvents();
     fetchMyApplications();
     _loadSavedEvents();
     _loadProfileName();
     _loadUnreadCount();
+    _notificationSub =
+        NotificationService.messageEvents.listen(_handleNotificationEvent);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _notificationSub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      fetchMyApplications();
+      _loadUnreadCount();
+    }
+  }
+
+  void _handleNotificationEvent(Map<String, dynamic> data) {
+    if (!mounted) return;
+
+    final type = (data["type"] ?? "").toString().trim().toLowerCase();
+    if (type == "application_status" ||
+        type == "application_cancelled" ||
+        type == "waitlist_promoted" ||
+        type == "attendance_updated" ||
+        type == "attendance_absent_strike") {
+      fetchMyApplications();
+      _loadUnreadCount();
+      return;
+    }
+
+    if (type == "event_cancelled" || type == "event_removed") {
+      fetchEvents();
+      fetchMyApplications();
+      _loadUnreadCount();
+    }
   }
 
   Future<void> _loadProfileName() async {
@@ -1196,6 +1239,13 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
     final normalized = status?.toLowerCase() ?? "";
     if (normalized == "pending") {
       return _ActionState(context.tr("Pending"), false, Colors.orange);
+    }
+    if (normalized == "waitlisted") {
+      return _ActionState(
+        context.tr("Waitlisted"),
+        false,
+        Colors.amber.shade700,
+      );
     }
     if (normalized == "accepted" || normalized == "approved") {
       return _ActionState(context.tr("Approved"), false, Colors.green);

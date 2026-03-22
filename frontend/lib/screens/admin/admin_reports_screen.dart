@@ -175,6 +175,37 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
     return "";
   }
 
+  String? _actionTargetLabel(Map report) {
+    final type = report["target_type"]?.toString() ?? "unknown";
+    if (type == "event") {
+      final organiser = report["organiser_name"]?.toString().trim() ?? "";
+      return organiser.isEmpty ? "Action target: organiser" : "Action target: organiser $organiser";
+    }
+    if (type == "chat_message") {
+      final sender = report["message_sender_name"]?.toString().trim() ?? "";
+      return sender.isEmpty ? "Action target: message sender" : "Action target: message sender $sender";
+    }
+    if (type == "user") {
+      final user = report["target_user_name"]?.toString().trim() ?? "";
+      return user.isEmpty ? "Action target: reported user" : "Action target: reported user $user";
+    }
+    return null;
+  }
+
+  String _strikeActionLabel(Map report) {
+    final type = report["target_type"]?.toString() ?? "unknown";
+    if (type == "event") return "Strike organiser";
+    if (type == "chat_message") return "Strike sender";
+    return "Strike user";
+  }
+
+  String _suspendActionLabel(Map report) {
+    final type = report["target_type"]?.toString() ?? "unknown";
+    if (type == "event") return "Suspend organiser";
+    if (type == "chat_message") return "Suspend sender";
+    return "Suspend user";
+  }
+
   Future<String?> _promptText({
     required String title,
     required String hint,
@@ -356,6 +387,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
     final canAct = status == "pending";
     final actionUserId = report["action_user_id"];
     final actionEventId = report["action_event_id"];
+    final actionTargetLabel = _actionTargetLabel(report);
 
     await showDialog(
       context: context,
@@ -378,6 +410,10 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
               const Divider(height: 18),
               Text("Target: ${_targetTitle(report)}"),
               Text(_targetSubtitle(report)),
+              if (actionTargetLabel != null) ...[
+                const SizedBox(height: 6),
+                Text(actionTargetLabel),
+              ],
               const SizedBox(height: 8),
               Text("Created: ${_formatDate(report["created_at"])}"),
               if (report["resolved_at"] != null)
@@ -408,7 +444,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                   note: note,
                 );
               },
-              child: const Text("Resolve"),
+              child: const Text("Resolve without action"),
             ),
           if (canAct)
             TextButton(
@@ -437,7 +473,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                   strikeReason: reason,
                 );
               },
-              child: const Text("Strike user"),
+              child: Text(_strikeActionLabel(report)),
             ),
           if (canAct && actionUserId != null)
             TextButton(
@@ -455,7 +491,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                   suspendReason: data["reason"] as String,
                 );
               },
-              child: const Text("Suspend user"),
+              child: Text(_suspendActionLabel(report)),
             ),
           if (canAct && actionEventId != null)
             TextButton(

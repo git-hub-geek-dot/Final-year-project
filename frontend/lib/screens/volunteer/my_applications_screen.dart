@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -5,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../config/api_config.dart';
 import '../../services/event_service.dart';
+import '../../services/notification_service.dart';
 import '../../services/token_service.dart';
 import '../../utils/ist_date_time.dart';
 import '../../localization/localization_extensions.dart';
@@ -17,17 +19,51 @@ class MyApplicationsScreen extends StatefulWidget {
   State<MyApplicationsScreen> createState() => _MyApplicationsScreenState();
 }
 
-class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
+class _MyApplicationsScreenState extends State<MyApplicationsScreen>
+    with WidgetsBindingObserver {
   bool loading = true;
   String? errorMessage;
   List applications = [];
   int? cancellingApplicationId;
   final ImagePicker _picker = ImagePicker();
+  StreamSubscription<Map<String, dynamic>>? _notificationSub;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     fetchMyApplications();
+    _notificationSub =
+        NotificationService.messageEvents.listen(_handleNotificationEvent);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _notificationSub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      fetchMyApplications();
+    }
+  }
+
+  void _handleNotificationEvent(Map<String, dynamic> data) {
+    if (!mounted) return;
+
+    final type = (data["type"] ?? "").toString().trim().toLowerCase();
+    if (type == "application_status" ||
+        type == "application_cancelled" ||
+        type == "waitlist_promoted" ||
+        type == "attendance_updated" ||
+        type == "attendance_absent_strike" ||
+        type == "event_cancelled" ||
+        type == "event_removed") {
+      fetchMyApplications();
+    }
   }
 
   Future<void> fetchMyApplications() async {
@@ -385,6 +421,8 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
         (app["admin_cancel_reason"] ?? "").toString().trim();
     final volunteerCancelReason =
         (app["volunteer_cancel_reason"] ?? "").toString().trim();
+    final cancellationSource =
+        (app["cancellation_source"] ?? "").toString().trim().toLowerCase();
 
     if (_isEventCompleted(app)) {
       if (attendanceStatus == "present") {
@@ -404,7 +442,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
         return context.tr("Your application is under review.");
       case "waitlisted":
         return context.tr(
-          "This event is full right now. You will be notified if a spot opens.",
+          "This event is full right now. The organiser can review and approve waitlisted applications if a spot opens.",
         );
       case "approved":
         if (_isEventCompleted(app)) {
@@ -417,6 +455,12 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
         return context.tr("This application was not approved.");
       case "cancelled":
         if (adminCancelReason.isNotEmpty) {
+          if (cancellationSource == "organiser") {
+            return context.tr(
+              "Cancelled because the organiser cancelled this event. Reason: {reason}",
+              args: {"reason": adminCancelReason},
+            );
+          }
           return context.tr(
             "Cancelled by admin. Reason: {reason}",
             args: {"reason": adminCancelReason},

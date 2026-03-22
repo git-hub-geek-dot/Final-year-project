@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -10,6 +11,12 @@ import 'notification_store.dart';
 import 'token_service.dart';
 
 class NotificationService {
+  static final StreamController<Map<String, dynamic>> _messageEvents =
+      StreamController<Map<String, dynamic>>.broadcast();
+
+  static Stream<Map<String, dynamic>> get messageEvents =>
+      _messageEvents.stream;
+
   static Future<void> init() async {
     if (kIsWeb) {
       return;
@@ -86,5 +93,7 @@ class NotificationService {
         receivedAt: IstDateTime.now(),
       ),
     );
+
+    _messageEvents.add(Map<String, dynamic>.from(message.data));
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -8,6 +9,7 @@ import '../../services/rating_service.dart';
 import '../../services/saved_events_service.dart';
 import '../../services/verification_service.dart';
 import '../../services/event_service.dart';
+import '../../services/notification_service.dart';
 import '../../utils/ist_date_time.dart';
 import '../../localization/localization_extensions.dart';
 import 'view_organiser_profile_screen.dart';
@@ -27,7 +29,8 @@ class ViewEventScreen extends StatefulWidget {
   State<ViewEventScreen> createState() => _ViewEventScreenState();
 }
 
-class _ViewEventScreenState extends State<ViewEventScreen> {
+class _ViewEventScreenState extends State<ViewEventScreen>
+    with WidgetsBindingObserver {
   bool isLoadingStatus = true;
   bool isLoadingVerification = true;
   bool isApplying = false;
@@ -39,9 +42,14 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
   String? ratingComment;
   String? verificationStatus;
   int? applicationId;
+  String? adminCancelReason;
+  String? volunteerCancelReason;
+  String? cancellationSource;
+  String? eventStatusOverride;
   bool isCancelling = false;
   bool isReviewClosed = false;
   final ImagePicker _picker = ImagePicker();
+  StreamSubscription<Map<String, dynamic>>? _notificationSub;
 
   /// null | pending | approved | rejected
   String? applicationStatus;
@@ -50,11 +58,68 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _fetchApplicationStatus();
     _loadSavedState();
     _loadOrganiserPhoto();
     _fetchMyRating();
     _loadVerificationStatus();
+    _notificationSub =
+        NotificationService.messageEvents.listen(_handleNotificationEvent);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _notificationSub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _fetchApplicationStatus();
+    }
+  }
+
+  void _handleNotificationEvent(Map<String, dynamic> data) {
+    if (!mounted) return;
+
+    final type = (data["type"] ?? "").toString().trim().toLowerCase();
+    if (type != "application_status" &&
+        type != "application_cancelled" &&
+        type != "waitlist_promoted" &&
+        type != "attendance_updated" &&
+        type != "attendance_absent_strike" &&
+        type != "event_cancelled" &&
+        type != "event_removed") {
+      return;
+    }
+
+    final rawEventId = data["eventId"] ?? data["event_id"];
+    if (rawEventId != null) {
+      final currentEventId = widget.event["id"];
+      final incomingEventId = int.tryParse(rawEventId.toString());
+      final normalizedCurrent = currentEventId is int
+          ? currentEventId
+          : int.tryParse(currentEventId?.toString() ?? "");
+      if (incomingEventId != null &&
+          normalizedCurrent != null &&
+          incomingEventId != normalizedCurrent) {
+        return;
+      }
+    }
+
+    if (type == "event_cancelled" || type == "event_removed") {
+      setState(() {
+        eventStatusOverride = type == "event_removed" ? "deleted" : "closed";
+        widget.event["status"] = eventStatusOverride;
+        widget.event["computed_status"] =
+            type == "event_removed" ? "deleted_by_admin" : "cancelled";
+      });
+    }
+
+    _fetchApplicationStatus();
   }
 
   Future<void> _loadVerificationStatus() async {
@@ -199,6 +264,16 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
             : null;
         setState(() {
           applicationStatus = data["applied"] == true ? data["status"] : null;
+          adminCancelReason = data["applied"] == true
+              ? data["adminCancelReason"]?.toString()
+              : null;
+          volunteerCancelReason = data["applied"] == true
+              ? data["volunteerCancelReason"]?.toString()
+              : null;
+          cancellationSource = data["applied"] == true
+              ? data["cancellationSource"]?.toString()
+              : null;
+          eventStatusOverride = data["eventStatus"]?.toString();
           attendanceStatus = data["applied"] == true
               ? (data["attendanceStatus"] ?? data["attendance_status"])
                   ?.toString()
@@ -253,13 +328,18 @@ class _ViewEventScreenState extends State<ViewEventScreen> {
             orElse: () => null,
           );
 
-      if (match is Map && match["id"] != null) {
+        if (match is Map && match["id"] != null) {
         final resolvedId = match["id"] is int
             ? match["id"] as int
             : int.tryParse(match["id"].toString());
         if (resolvedId != null && mounted) {
           setState(() {
             applicationId = resolvedId;
+            adminCancelReason = match["admin_cancel_reason"]?.toString();
+            volunteerCancelReason =
+                match["volunteer_cancel_reason"]?.toString();
+            cancellationSource = match["cancellation_source"]?.toString();
+            eventStatusOverride = match["event_status"]?.toString();
             attendanceStatus = match["attendance_status"]?.toString();
           });
         }
@@ -732,7 +812,8 @@ ${context.tr("Join on VolunteerX")}
 
     final rawComputed =
         widget.event["computed_status"]?.toString().toLowerCase();
-    final rawStatus = widget.event["status"]?.toString().toLowerCase();
+    final rawStatus =
+        (eventStatusOverride ?? widget.event["status"])?.toString().toLowerCase();
     var eventStatus = (rawComputed ?? "").trim();
     if (eventStatus.isEmpty) {
       eventStatus = (rawStatus ?? "").trim();
@@ -822,14 +903,21 @@ ${context.tr("Join on VolunteerX")}
     );
     final statusText = currentAttendance == "absent"
         ? context.tr("Attendance Absent")
+        : currentAttendance == "present"
+            ? context.tr("Attendance Present")
         : isReviewClosed
             ? context.tr("Review Closed")
             : _statusText(currentStatus);
     final statusColor = currentAttendance == "absent"
         ? Colors.deepOrange
-        : isReviewClosed
-            ? Colors.redAccent
-            : _statusColor(currentStatus);
+        : currentAttendance == "present"
+            ? Colors.green
+            : isReviewClosed
+                ? Colors.redAccent
+                : _statusColor(currentStatus);
+    final statusDescription = isReviewClosed
+        ? null
+        : _statusDescription(currentStatus);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -838,6 +926,18 @@ ${context.tr("Join on VolunteerX")}
           statusText,
           statusColor,
         ),
+        if (statusDescription != null) ...[
+          const SizedBox(height: 10),
+          Text(
+            statusDescription,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.grey.shade700,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
         if (isReviewClosed) ...[
           const SizedBox(height: 10),
           Text(
@@ -1702,6 +1802,63 @@ ${context.tr("Join on VolunteerX")}
       return normalized;
     }
     return "unmarked";
+  }
+
+  String? _statusDescription(String status) {
+    final currentAttendance =
+        _normalizedAttendanceStatus(attendanceStatus ?? "");
+    if (currentAttendance == "present") {
+      return context.tr("Your attendance was marked present for this event.");
+    }
+    if (currentAttendance == "absent") {
+      return context.tr("You were marked absent for this event.");
+    }
+
+    switch (_normalizedStatus(status)) {
+      case "pending":
+        return context.tr("Your application is under review.");
+      case "waitlisted":
+        return context.tr(
+          "This event is full right now. The organiser can review and approve waitlisted applications if a spot opens.",
+        );
+      case "approved":
+        if (_isPastEvent()) {
+          return context.tr(
+            "You were approved for this event. The event has now ended.",
+          );
+        }
+        return context.tr("You are confirmed for this event.");
+      case "rejected":
+        return context.tr("This application was not approved.");
+      case "cancelled":
+        final adminReason = (adminCancelReason ?? "").trim();
+        if (adminReason.isNotEmpty) {
+          if ((cancellationSource ?? "").trim().toLowerCase() == "organiser") {
+            return context.tr(
+              "Cancelled because the organiser cancelled this event. Reason: {reason}",
+              args: {"reason": adminReason},
+            );
+          }
+          return context.tr(
+            "Cancelled by admin. Reason: {reason}",
+            args: {"reason": adminReason},
+          );
+        }
+
+        final volunteerReason = (volunteerCancelReason ?? "").trim();
+        if (volunteerReason.isNotEmpty) {
+          return context.tr(
+            "You cancelled your participation. Reason: {reason}",
+            args: {"reason": volunteerReason},
+          );
+        }
+
+        return context.tr("This application was cancelled.");
+      case "completed":
+        return context.tr("Your participation for this event is completed.");
+      default:
+        return null;
+    }
   }
 
   Color _statusColor(String status) {

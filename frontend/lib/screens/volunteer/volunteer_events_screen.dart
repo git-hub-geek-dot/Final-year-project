@@ -924,6 +924,13 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
     if (status == "pending") {
       return _ActionState(context.tr("Pending"), false, Colors.orange);
     }
+    if (status == "waitlisted") {
+      return _ActionState(
+        context.tr("Waitlisted"),
+        false,
+        Colors.amber.shade700,
+      );
+    }
     if (status == "accepted" || status == "approved") {
       return _ActionState(context.tr("Approved"), false, Colors.green);
     }

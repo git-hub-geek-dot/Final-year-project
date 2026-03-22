@@ -16,6 +16,7 @@ import '../organiser/event_details_screen.dart';
 import '../organiser/organiser_profile_screen.dart';
 import '../volunteer/my_applications_screen.dart';
 import '../volunteer/event_announcements_screen.dart';
+import '../volunteer/payment_history_screen.dart';
 import '../volunteer/view_event_screen.dart';
 import '../volunteer/volunteer_profile_screen.dart';
 
@@ -370,7 +371,34 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       return;
     }
 
-    if (type == "application_status" || type == "application_cancelled") {
+    if (type == "attendance_updated") {
+      final raw = data["eventId"] ?? data["event_id"];
+      final eventId = int.tryParse(raw?.toString() ?? "");
+      if (eventId != null) {
+        await _openEventDetails(eventId);
+        return;
+      }
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const MyApplicationsScreen()),
+      );
+      return;
+    }
+
+    if (type == "payment_issue_update") {
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const CompensationStatusScreen()),
+      );
+      return;
+    }
+
+    if (
+        type == "application_status" ||
+        type == "application_cancelled" ||
+        type == "attendance_absent_strike") {
       if (!mounted) return;
       Navigator.push(
         context,

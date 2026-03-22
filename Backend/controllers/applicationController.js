@@ -59,6 +59,34 @@ const hasApplicationDeadlinePassed = (deadline, now = new Date()) => {
   return today > deadlineDate;
 };
 
+const normalizeStoredApplicationStatus = (status) => {
+  const normalized = (status || "pending").toString().trim().toLowerCase();
+  if (normalized === "accepted") {
+    return "approved";
+  }
+  return normalized;
+};
+
+const isReviewableApplicationStatus = (status) => {
+  const normalized = normalizeStoredApplicationStatus(status);
+  return normalized === "pending" || normalized === "waitlisted";
+};
+
+const finalizedReviewStatusMessage = (status) => {
+  switch (normalizeStoredApplicationStatus(status)) {
+    case "approved":
+      return "This application is already approved.";
+    case "rejected":
+      return "This application is already rejected.";
+    case "cancelled":
+      return "This application has been cancelled.";
+    case "completed":
+      return "This participation is already completed.";
+    default:
+      return "This application can no longer be reviewed.";
+  }
+};
+
 const buildEventStartDate = (event) => {
   if (!event?.event_date) return null;
 
@@ -78,38 +106,6 @@ const buildEventStartDate = (event) => {
   }
 
   return new Date(`${datePart}T${timePart}Z`);
-};
-
-const promoteWaitlistedVolunteer = async ({ client, eventId }) => {
-  const waitlisted = await client.query(
-    `
-    SELECT id, volunteer_id
-    FROM applications
-    WHERE event_id = $1
-      AND status = 'waitlisted'
-    ORDER BY applied_at ASC
-    LIMIT 1
-    FOR UPDATE
-    `,
-    [eventId]
-  );
-
-  if (waitlisted.rowCount === 0) {
-    return null;
-  }
-
-  const promotedApp = waitlisted.rows[0];
-
-  await client.query(
-    `
-    UPDATE applications
-    SET status = 'approved'
-    WHERE id = $1
-    `,
-    [promotedApp.id]
-  );
-
-  return promotedApp;
 };
 
 // ================= APPLY TO EVENT =================
@@ -251,6 +247,24 @@ exports.getApplicationStatus = async (req, res) => {
             THEN 'rejected'
           ELSE a.status
         END AS status,
+        a.admin_cancel_reason,
+        a.volunteer_cancel_reason,
+        CASE
+          WHEN a.status = 'cancelled'
+            AND a.volunteer_cancel_reason IS NOT NULL
+            AND BTRIM(a.volunteer_cancel_reason) <> ''
+            THEN 'volunteer'
+          WHEN a.status = 'cancelled'
+            AND a.admin_cancel_reason IS NOT NULL
+            AND BTRIM(a.admin_cancel_reason) <> ''
+            AND e.status = 'closed'
+            THEN 'organiser'
+          WHEN a.status = 'cancelled'
+            AND a.admin_cancel_reason IS NOT NULL
+            AND BTRIM(a.admin_cancel_reason) <> ''
+            THEN 'admin'
+          ELSE NULL
+        END AS cancellation_source,
         COALESCE(a.attendance_status, 'unmarked') AS attendance_status,
         e.status AS event_status,
         (
@@ -287,6 +301,9 @@ exports.getApplicationStatus = async (req, res) => {
       applied: true,
       status: result.rows[0].status,
       applicationId: result.rows[0].id,
+      adminCancelReason: result.rows[0].admin_cancel_reason,
+      volunteerCancelReason: result.rows[0].volunteer_cancel_reason,
+      cancellationSource: result.rows[0].cancellation_source,
       attendanceStatus: result.rows[0].attendance_status,
       eventStatus: result.rows[0].event_status,
       eventCompleted: result.rows[0].event_completed === true,
@@ -414,6 +431,22 @@ exports.getMyApplications = async (req, res) => {
         END AS status,
         a.admin_cancel_reason,
         a.volunteer_cancel_reason,
+        CASE
+          WHEN a.status = 'cancelled'
+            AND a.volunteer_cancel_reason IS NOT NULL
+            AND BTRIM(a.volunteer_cancel_reason) <> ''
+            THEN 'volunteer'
+          WHEN a.status = 'cancelled'
+            AND a.admin_cancel_reason IS NOT NULL
+            AND BTRIM(a.admin_cancel_reason) <> ''
+            AND e.status = 'closed'
+            THEN 'organiser'
+          WHEN a.status = 'cancelled'
+            AND a.admin_cancel_reason IS NOT NULL
+            AND BTRIM(a.admin_cancel_reason) <> ''
+            THEN 'admin'
+          ELSE NULL
+        END AS cancellation_source,
         a.cancellation_supporting_document_url,
         a.cancellation_window,
         a.strike_issued,
@@ -465,9 +498,19 @@ exports.getMyApplications = async (req, res) => {
             AND r.rater_id = a.volunteer_id
             AND r.ratee_id = e.organiser_id
         ) AS has_rated,
+        EXISTS (
+          SELECT 1
+          FROM reports rep
+          WHERE rep.reporter_id = a.volunteer_id
+            AND rep.target_type = 'event'
+            AND rep.target_id = e.id
+            AND LOWER(rep.reason) = 'unpaid compensation'
+            AND rep.status = 'pending'
+        ) AS unpaid_compensation_report_pending,
         e.event_type,
         e.payment_amount,
         e.payment_rate_type,
+        e.payment_clearance_date,
         COALESCE(
           array_agg(DISTINCT c.name) FILTER (WHERE c.name IS NOT NULL),
           '{}'
@@ -481,7 +524,7 @@ exports.getMyApplications = async (req, res) => {
            a.cancellation_window, a.strike_issued, a.warning_issued, a.volunteer_cancelled_at,
            a.strike_appeal_status, a.strike_appeal_submitted_at, a.attendance_status, a.attendance_marked_at,
             a.applied_at, a.compensation_status, e.id, e.organiser_id, e.title, e.location,
-                e.event_date, e.start_time, e.end_date, e.end_time, e.status, e.event_type, e.payment_amount, e.payment_rate_type
+                e.event_date, e.start_time, e.end_date, e.end_time, e.status, e.event_type, e.payment_amount, e.payment_rate_type, e.payment_clearance_date
        ORDER BY a.applied_at DESC
        `,
       [volunteerId]
@@ -657,11 +700,6 @@ exports.cancelMyApplication = async (req, res) => {
       ]
     );
 
-    const promoted = await promoteWaitlistedVolunteer({
-      client,
-      eventId: app.event_id,
-    });
-
     await client.query("COMMIT");
 
     res.json({
@@ -672,21 +710,10 @@ exports.cancelMyApplication = async (req, res) => {
       strikeIssued,
       strikeAction,
       strikeCount,
-      waitlistPromoted: Boolean(promoted),
+      waitlistPromoted: false,
     });
 
     try {
-      if (promoted?.volunteer_id) {
-        await notifyUser(promoted.volunteer_id, {
-          title: "Spot available",
-          body: `You were moved from waiting list to approved for ${app.title}.`,
-          data: {
-            type: "waitlist_promoted",
-            eventId: String(app.event_id),
-          },
-        });
-      }
-
       if (app.organiser_id) {
         await notifyUser(app.organiser_id, {
           title: "Volunteer cancelled",
@@ -1042,9 +1069,18 @@ exports.updateApplicationStatus = async (req, res) => {
     }
 
     const currentApplication = applicationResult.rows[0];
-    const wasAlreadyApproved =
-      currentApplication.status === "approved" ||
-      currentApplication.status === "accepted";
+    const currentStatus = normalizeStoredApplicationStatus(
+      currentApplication.status
+    );
+    const wasAlreadyApproved = currentStatus === "approved";
+
+    if (!isReviewableApplicationStatus(currentStatus)) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        error: finalizedReviewStatusMessage(currentStatus),
+        current_status: currentStatus,
+      });
+    }
 
     const eventResult = await client.query(
       `
@@ -1136,7 +1172,12 @@ exports.updateApplicationStatus = async (req, res) => {
       await notifyUser(app.volunteer_id, {
         title: "Application update",
         body: `Your application for ${eventTitle} was ${statusLabel}.`,
-        data: { type: "application_status", status: app.status },
+        data: {
+          type: "application_status",
+          status: app.status,
+          eventId: String(app.event_id),
+          applicationId: String(app.id),
+        },
       });
     } catch (notifyErr) {
       console.error("APPLICATION STATUS NOTIFY ERROR:", notifyErr);
@@ -1176,6 +1217,7 @@ exports.updateApplicationShortlist = async (req, res) => {
       `
       SELECT
         a.id,
+        a.status,
         e.status AS event_status,
         (
           e.status NOT IN ('draft', 'deleted')
@@ -1196,10 +1238,18 @@ exports.updateApplicationShortlist = async (req, res) => {
     }
 
     const existing = existingResult.rows[0];
+    const currentStatus = normalizeStoredApplicationStatus(existing.status);
     const eventStatus = (existing.event_status || "").toString().toLowerCase();
     if (eventStatus !== "open" || existing.event_completed === true) {
       return res.status(400).json({
         error: "Shortlist is closed for this event.",
+      });
+    }
+
+    if (!isReviewableApplicationStatus(currentStatus)) {
+      return res.status(400).json({
+        error: "Only pending or waitlisted applications can be shortlisted.",
+        current_status: currentStatus,
       });
     }
 

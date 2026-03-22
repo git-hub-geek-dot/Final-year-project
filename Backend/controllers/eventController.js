@@ -1350,6 +1350,7 @@ exports.submitAttendanceFeedback = async (req, res) => {
     const approvedVolunteersResult = await pool.query(
       `
       SELECT
+        a.id AS application_id,
         a.volunteer_id,
         u.name,
         COALESCE(a.attendance_status, 'unmarked') AS attendance_status,
@@ -1370,6 +1371,15 @@ exports.submitAttendanceFeedback = async (req, res) => {
         absent_count: 0,
         present_count: 0,
         updated: 0,
+      });
+    }
+
+    if (
+      event.status === "completed" &&
+      approvedRows.some((row) => row.attendance_marked_at != null)
+    ) {
+      return res.status(400).json({
+        error: "Attendance is locked once it has been finalised for a completed event",
       });
     }
 
@@ -1446,6 +1456,32 @@ exports.submitAttendanceFeedback = async (req, res) => {
       });
     }
 
+    const attendanceNotifications = approvedRows
+      .map((row) => {
+        const volunteerId = Number(row.volunteer_id);
+        const applicationId = Number(row.application_id);
+        const previousStatus = normalizeAttendanceStatus(row.attendance_status);
+        const nextStatus = attendanceMap.get(volunteerId);
+
+        if (
+          !Number.isInteger(volunteerId) ||
+          volunteerId <= 0 ||
+          !Number.isInteger(applicationId) ||
+          applicationId <= 0 ||
+          !["present", "absent"].includes(nextStatus) ||
+          previousStatus === nextStatus
+        ) {
+          return null;
+        }
+
+        return {
+          volunteerId,
+          applicationId,
+          status: nextStatus,
+        };
+      })
+      .filter(Boolean);
+
     await client.query("BEGIN");
 
     const caseStatusParts = [];
@@ -1485,16 +1521,31 @@ exports.submitAttendanceFeedback = async (req, res) => {
       });
     }
 
-    if (
-      event.status === "completed" &&
-      approvedRows.some((row) => row.attendance_marked_at != null)
-    ) {
-      return res.status(400).json({
-        error: "Attendance is locked once it has been finalised for a completed event",
-      });
-    }
-
     await client.query("COMMIT");
+
+    for (const item of attendanceNotifications) {
+      if (event.status === "completed" && item.status === "absent") {
+        continue;
+      }
+
+      try {
+        await notifyUsers([item.volunteerId], {
+          title: "Attendance updated",
+          body:
+            item.status === "present"
+              ? `Your attendance for ${event.title} was marked present.`
+              : `Your attendance for ${event.title} was marked absent.`,
+          data: {
+            type: "attendance_updated",
+            eventId: String(eventId),
+            applicationId: String(item.applicationId),
+            attendanceStatus: item.status,
+          },
+        });
+      } catch (notifyErr) {
+        console.error("ATTENDANCE UPDATE NOTIFY ERROR:", notifyErr);
+      }
+    }
 
     for (const item of absentNotifications) {
       try {

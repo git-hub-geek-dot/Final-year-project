@@ -6,6 +6,33 @@ const {
   recalculateUserStrikeState,
 } = require("../services/strikeService");
 
+function buildPaymentIssueUpdateBody({ actionTaken, note, eventTitle }) {
+  const resolvedEventTitle =
+    typeof eventTitle === "string" && eventTitle.trim().length > 0
+      ? eventTitle.trim()
+      : "this event";
+
+  let baseMessage;
+  if (actionTaken === "dismissed") {
+    baseMessage = `Your unpaid compensation report for ${resolvedEventTitle} was dismissed after review.`;
+  } else if (actionTaken === "cancel_event") {
+    baseMessage = `Your unpaid compensation report for ${resolvedEventTitle} was resolved. The event was removed.`;
+  } else if (
+    typeof actionTaken === "string" &&
+    (actionTaken.startsWith("strike_") || actionTaken.startsWith("suspend_"))
+  ) {
+    baseMessage = `Your unpaid compensation report for ${resolvedEventTitle} was resolved. Action was taken against the organiser.`;
+  } else {
+    baseMessage = `Your unpaid compensation report for ${resolvedEventTitle} was resolved after review.`;
+  }
+
+  if (!note) {
+    return baseMessage;
+  }
+
+  return `${baseMessage} Admin note: ${note}`;
+}
+
 // ================= GET ALL USERS =================
 const getUsers = async (req, res) => {
   try {
@@ -771,7 +798,7 @@ const unsuspendUser = async (req, res) => {
       `UPDATE applications
        SET status = 'cancelled', admin_cancel_reason = $1
        WHERE id = $2
-       RETURNING id, volunteer_id`,
+       RETURNING id, volunteer_id, event_id`,
       [reason, appId]
     );
 
@@ -783,11 +810,17 @@ const unsuspendUser = async (req, res) => {
 
     try {
       const volunteerId = result.rows[0]?.volunteer_id;
+      const eventId = result.rows[0]?.event_id;
       if (volunteerId) {
         await notifyUser(volunteerId, {
           title: "Application update",
           body: `Your application was cancelled by admin. Reason: ${reason}`,
-          data: { type: "application_cancelled", reason },
+          data: {
+            type: "application_cancelled",
+            reason,
+            eventId: eventId != null ? String(eventId) : null,
+            applicationId: String(appId),
+          },
         });
       }
     } catch (notifyErr) {
@@ -1509,7 +1542,7 @@ const dismissReport = async (req, res) => {
           resolved_at = NOW(),
           updated_at = NOW()
       WHERE id = $3 AND status = 'pending'
-      RETURNING id
+      RETURNING id, reporter_id, target_type, target_id, reason, admin_note
       `,
       [note || null, adminId, reportId]
     );
@@ -1519,6 +1552,40 @@ const dismissReport = async (req, res) => {
     }
 
     res.json({ message: "Report dismissed" });
+
+    const updatedReport = result.rows[0];
+    if (
+      updatedReport?.reporter_id &&
+      updatedReport?.target_type === "event" &&
+      (updatedReport?.reason || "").toString().trim().toLowerCase() ===
+        "unpaid compensation"
+    ) {
+      try {
+        await notifyUser(updatedReport.reporter_id, {
+          title: "Payment issue update",
+          body: buildPaymentIssueUpdateBody({
+            actionTaken: "dismissed",
+            note: updatedReport.admin_note,
+          }),
+          data: {
+            type: "payment_issue_update",
+            status: "dismissed",
+            reportId: String(updatedReport.id),
+            reason: "unpaid compensation",
+            eventId:
+              updatedReport.target_id != null
+                ? String(updatedReport.target_id)
+                : null,
+            message: buildPaymentIssueUpdateBody({
+              actionTaken: "dismissed",
+              note: updatedReport.admin_note,
+            }),
+          },
+        });
+      } catch (notifyErr) {
+        console.error("DISMISS REPORTER NOTIFY ERROR:", notifyErr);
+      }
+    }
   } catch (err) {
     console.error("DISMISS REPORT ERROR:", err);
     res.status(500).json({ error: "Failed to dismiss report" });
@@ -1552,10 +1619,13 @@ const resolveReport = async (req, res) => {
       SELECT
         r.id,
         r.status,
+        r.reporter_id,
+        r.reason,
         r.target_type,
         r.target_id,
         m.sender_id AS message_sender_id,
-        e.organiser_id AS organiser_id
+        e.organiser_id AS organiser_id,
+        e.title AS event_title
       FROM reports r
       LEFT JOIN chat_messages m ON r.target_type = 'chat_message' AND r.target_id = m.id
       LEFT JOIN events e ON r.target_type = 'event' AND r.target_id = e.id
@@ -1589,6 +1659,7 @@ const resolveReport = async (req, res) => {
 
     let actionTaken = action;
     let postCommitNotification = null;
+    let reporterNotification = null;
 
     if (action === "strike") {
       const strikeReason = (req.body?.strikeReason || note || "").toString().trim();
@@ -1748,6 +1819,40 @@ const resolveReport = async (req, res) => {
     await client.query("COMMIT");
     res.json({ message: "Report resolved", actionTaken });
 
+    if (
+      report.reporter_id &&
+      report.target_type === "event" &&
+      (report.reason || "").toString().trim().toLowerCase() ===
+        "unpaid compensation"
+    ) {
+      reporterNotification = {
+        userId: report.reporter_id,
+        errorLabel: "PAYMENT ISSUE REPORTER NOTIFY ERROR:",
+        payload: {
+          title: "Payment issue update",
+          body: buildPaymentIssueUpdateBody({
+            actionTaken,
+            note,
+            eventTitle: report.event_title,
+          }),
+          data: {
+            type: "payment_issue_update",
+            status: "resolved",
+            reportId: String(report.id),
+            reason: "unpaid compensation",
+            eventId:
+              report.target_id != null ? String(report.target_id) : null,
+            actionTaken,
+            message: buildPaymentIssueUpdateBody({
+              actionTaken,
+              note,
+              eventTitle: report.event_title,
+            }),
+          },
+        },
+      };
+    }
+
     if (postCommitNotification) {
       try {
         await notifyUser(
@@ -1756,6 +1861,17 @@ const resolveReport = async (req, res) => {
         );
       } catch (notifyErr) {
         console.error(postCommitNotification.errorLabel, notifyErr);
+      }
+    }
+
+    if (reporterNotification) {
+      try {
+        await notifyUser(
+          reporterNotification.userId,
+          reporterNotification.payload
+        );
+      } catch (notifyErr) {
+        console.error(reporterNotification.errorLabel, notifyErr);
       }
     }
   } catch (err) {

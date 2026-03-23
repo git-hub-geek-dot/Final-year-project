@@ -862,30 +862,44 @@ ${context.tr("Join on VolunteerX")}
       return SizedBox(
         height: 54,
         width: double.infinity,
-        child: ElevatedButton(
-          onPressed: isApplying ? null : () => _showTerms(context),
-          style: ElevatedButton.styleFrom(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-            padding: EdgeInsets.zero,
-          ),
-          child: Ink(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF2E6BE6), Color(0xFF2ECC71)],
-              ),
-              borderRadius: BorderRadius.all(Radius.circular(30)),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF2E6BE6), Color(0xFF2ECC71)],
             ),
-            child: Center(
-              child: isApplying
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : Text(
-                      context.tr("Apply for this Event"),
-                      style: const TextStyle(
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF2E6BE6).withValues(alpha: 0.25),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(30),
+              onTap: isApplying ? null : () => _showTerms(context),
+              child: Center(
+                child: isApplying
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2.2,
+                        ),
+                      )
+                    : Text(
+                        context.tr("Apply for this Event"),
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: Colors.white),
-                    ),
+                          color: Colors.white,
+                        ),
+                      ),
+              ),
             ),
           ),
         ),

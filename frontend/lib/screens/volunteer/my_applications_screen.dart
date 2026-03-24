@@ -603,18 +603,18 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen>
             if (isWithinLockWindow) {
               policyText = isApprovedApplication
                   ? context.tr(
-                      "This event starts in less than 48 hours. Cancelling now applies an immediate strike. Supporting document upload is mandatory to continue.",
+                      "This event starts in less than 48 hours. Cancelling now applies an immediate strike. Provide a reason or upload a supporting document to continue.",
                     )
                   : context.tr(
-                      "This event starts in less than 48 hours. Withdrawing now applies an immediate strike. Supporting document upload is mandatory to continue.",
+                      "This event starts in less than 48 hours. Withdrawing now applies an immediate strike. Provide a reason or upload a supporting document to continue.",
                     );
             } else if (hoursBefore != null && hoursBefore <= 72) {
               policyText = isApprovedApplication
                   ? context.tr(
-                      "This cancellation is within 48-72 hours before the event. You will receive a warning. Repeated cancellations without a reason may lead to a strike.",
+                      "This cancellation is within 48-72 hours before the event. You will receive a warning. Repeated cancellations without a reason or supporting document may lead to a strike.",
                     )
                   : context.tr(
-                      "This withdrawal is within 48-72 hours before the event. You will receive a warning. Repeated withdrawals without a reason may lead to a strike.",
+                      "This withdrawal is within 48-72 hours before the event. You will receive a warning. Repeated withdrawals without a reason or supporting document may lead to a strike.",
                     );
             } else {
               policyText = isApprovedApplication
@@ -648,19 +648,20 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen>
                     TextField(
                       controller: reasonController,
                       onChanged: (_) {
-                        if (reasonError != null) {
-                          setLocalState(() => reasonError = null);
+                        if (reasonError != null || documentError != null) {
+                          setLocalState(() {
+                            reasonError = null;
+                            documentError = null;
+                          });
                         }
                       },
                       minLines: 2,
                       maxLines: 4,
                       decoration: InputDecoration(
-                        labelText: isWithinLockWindow
-                            ? context.tr("Reason *")
-                            : context.tr("Reason (optional but recommended)"),
-                        helperText: isWithinLockWindow
-                            ? context.tr("Mandatory within 48 hours")
-                            : null,
+                        labelText: context.tr("Reason (optional)"),
+                        helperText: context.tr(
+                          "Provide reason or supporting document",
+                        ),
                         errorText: reasonError,
                         border: const OutlineInputBorder(),
                       ),
@@ -670,9 +671,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          isWithinLockWindow
-                              ? context.tr("Supporting document *")
-                              : context.tr("Supporting document"),
+                          context.tr("Supporting document (optional)"),
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 6),
@@ -681,11 +680,9 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen>
                             Expanded(
                               child: Text(
                                 documentUrl == null
-                                    ? (isWithinLockWindow
-                                        ? context.tr("Mandatory within 48 hours")
-                                        : context.tr(
-                                            "No supporting document uploaded",
-                                          ))
+                                    ? context.tr(
+                                        "No supporting document uploaded",
+                                      )
                                     : context.tr(
                                         "Supporting document attached",
                                       ),
@@ -768,22 +765,18 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen>
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    if (isWithinLockWindow) {
-                      final trimmedReason = reasonController.text.trim();
+                    final trimmedReason = reasonController.text.trim();
+                    final hasReason = trimmedReason.isNotEmpty;
+                    final hasDocument = documentUrl != null;
+                    if (!hasReason && !hasDocument) {
+                      final error = context.tr(
+                        "Please provide a reason or upload a supporting document",
+                      );
                       setLocalState(() {
-                        reasonError = trimmedReason.isEmpty
-                            ? context.tr("Reason is mandatory within 48 hours")
-                            : null;
-                        documentError = documentUrl == null
-                            ? context.tr(
-                                "Supporting document is mandatory within 48 hours",
-                              )
-                            : null;
+                        reasonError = error;
+                        documentError = error;
                       });
-
-                      if (trimmedReason.isEmpty || documentUrl == null) {
-                        return;
-                      }
+                      return;
                     }
                     Navigator.pop(context, true);
                   },

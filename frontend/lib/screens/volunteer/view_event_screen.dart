@@ -478,31 +478,38 @@ ${context.tr("Join on VolunteerX")}
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-            child: Column(
-              children: [
-                _eventBanner(),
-                const SizedBox(height: 16),
-                _eventHeaderCard(),
-                const SizedBox(height: 16),
-                _aboutCard(),
-                const SizedBox(height: 16),
-                _responsibilitiesCard(),
-                const SizedBox(height: 16),
-                _organiserCard(),
-              ],
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+        child: Column(
+          children: [
+            _eventBanner(),
+            const SizedBox(height: 16),
+            _eventHeaderCard(),
+            const SizedBox(height: 16),
+            _aboutCard(),
+            const SizedBox(height: 16),
+            _responsibilitiesCard(),
+            const SizedBox(height: 16),
+            _organiserCard(),
+          ],
+        ),
+      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F6FA),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 12,
+              offset: const Offset(0, -3),
             ),
-          ),
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: 16,
-            child: _buildApplySection(),
-          ),
-        ],
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          minimum: const EdgeInsets.fromLTRB(16, 10, 16, 22),
+          child: _buildApplySection(),
+        ),
       ),
     );
   }
@@ -1194,18 +1201,18 @@ ${context.tr("Join on VolunteerX")}
             if (isWithinLockWindow) {
               policyText = isApprovedApplication
                   ? context.tr(
-                      "This event starts in less than 48 hours. Cancelling now applies an immediate strike. Supporting document upload is mandatory to continue.",
+                      "This event starts in less than 48 hours. Cancelling now applies an immediate strike. Provide a reason or upload a supporting document to continue.",
                     )
                   : context.tr(
-                      "This event starts in less than 48 hours. Withdrawing now applies an immediate strike. Supporting document upload is mandatory to continue.",
+                      "This event starts in less than 48 hours. Withdrawing now applies an immediate strike. Provide a reason or upload a supporting document to continue.",
                     );
             } else if (hoursBefore != null && hoursBefore <= 72) {
               policyText = isApprovedApplication
                   ? context.tr(
-                      "This cancellation is within 48-72 hours before the event. You will receive a warning. Repeated cancellations without a reason may lead to a strike.",
+                      "This cancellation is within 48-72 hours before the event. You will receive a warning. Repeated cancellations without a reason or supporting document may lead to a strike.",
                     )
                   : context.tr(
-                      "This withdrawal is within 48-72 hours before the event. You will receive a warning. Repeated withdrawals without a reason may lead to a strike.",
+                      "This withdrawal is within 48-72 hours before the event. You will receive a warning. Repeated withdrawals without a reason or supporting document may lead to a strike.",
                     );
             } else {
               policyText = isApprovedApplication
@@ -1239,19 +1246,20 @@ ${context.tr("Join on VolunteerX")}
                     TextField(
                       controller: reasonController,
                       onChanged: (_) {
-                        if (reasonError != null) {
-                          setLocalState(() => reasonError = null);
+                        if (reasonError != null || documentError != null) {
+                          setLocalState(() {
+                            reasonError = null;
+                            documentError = null;
+                          });
                         }
                       },
                       minLines: 2,
                       maxLines: 4,
                       decoration: InputDecoration(
-                        labelText: isWithinLockWindow
-                            ? context.tr("Reason *")
-                            : context.tr("Reason (optional but recommended)"),
-                        helperText: isWithinLockWindow
-                            ? context.tr("Mandatory within 48 hours")
-                            : null,
+                        labelText: context.tr("Reason (optional)"),
+                        helperText: context.tr(
+                          "Provide reason or supporting document",
+                        ),
                         errorText: reasonError,
                         border: const OutlineInputBorder(),
                       ),
@@ -1261,9 +1269,7 @@ ${context.tr("Join on VolunteerX")}
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          isWithinLockWindow
-                              ? context.tr("Supporting document *")
-                              : context.tr("Supporting document"),
+                          context.tr("Supporting document (optional)"),
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 6),
@@ -1272,11 +1278,9 @@ ${context.tr("Join on VolunteerX")}
                             Expanded(
                               child: Text(
                                 documentUrl == null
-                                    ? (isWithinLockWindow
-                                        ? context.tr("Mandatory within 48 hours")
-                                        : context.tr(
-                                            "No supporting document uploaded",
-                                          ))
+                                    ? context.tr(
+                                        "No supporting document uploaded",
+                                      )
                                     : context.tr(
                                         "Supporting document attached",
                                       ),
@@ -1359,22 +1363,18 @@ ${context.tr("Join on VolunteerX")}
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    if (isWithinLockWindow) {
-                      final trimmedReason = reasonController.text.trim();
+                    final trimmedReason = reasonController.text.trim();
+                    final hasReason = trimmedReason.isNotEmpty;
+                    final hasDocument = documentUrl != null;
+                    if (!hasReason && !hasDocument) {
+                      final error = context.tr(
+                        "Please provide a reason or upload a supporting document",
+                      );
                       setLocalState(() {
-                        reasonError = trimmedReason.isEmpty
-                            ? context.tr("Reason is mandatory within 48 hours")
-                            : null;
-                        documentError = documentUrl == null
-                            ? context.tr(
-                                "Supporting document is mandatory within 48 hours",
-                              )
-                            : null;
+                        reasonError = error;
+                        documentError = error;
                       });
-
-                      if (trimmedReason.isEmpty || documentUrl == null) {
-                        return;
-                      }
+                      return;
                     }
                     Navigator.pop(context, true);
                   },
@@ -1951,6 +1951,7 @@ ${context.tr("Join on VolunteerX")}
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -1961,14 +1962,23 @@ ${context.tr("Join on VolunteerX")}
 
         return StatefulBuilder(
           builder: (context, setState) {
-            return Padding(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                16,
-                16,
-                MediaQuery.of(context).viewInsets.bottom + 16,
-              ),
-              child: Column(
+            final media = MediaQuery.of(context);
+            return AnimatedPadding(
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOut,
+              padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: media.size.height - media.padding.top - 12,
+                ),
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    16,
+                    16,
+                    media.padding.bottom + 16,
+                  ),
+                  child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -2103,6 +2113,8 @@ ${context.tr("Join on VolunteerX")}
                     ),
                   ),
                 ],
+              ),
+                ),
               ),
             );
           },

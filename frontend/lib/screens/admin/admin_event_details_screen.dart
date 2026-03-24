@@ -420,8 +420,8 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
                       _detailRow(
                           "Location", event["location"] ?? "No location"),
                       _detailRow("Event Date", _formatEventDateRange(event)),
-                      _detailRow("Start Time", _fmtTime(event["start_time"])),
-                      _detailRow("End Time", _fmtTime(event["end_time"])),
+                      _detailRow("Start Time", _eventStartTime(event)),
+                      _detailRow("End Time", _eventEndTime(event)),
                       _detailRow(
                         "Max Volunteers",
                         (event["volunteers_required"] ??
@@ -612,6 +612,42 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
 
   static String _fmtTime(dynamic value) {
     return IstDateTime.formatTime(value);
+  }
+
+  static String _eventStartTime(Map event) {
+    final direct = _timeOrNull(event["start_time"] ?? event["startTime"]);
+    if (direct != null) return direct;
+
+    final fromSchedules =
+        _timeFromFirstSchedule(event, "start_time", "startTime");
+    return fromSchedules ?? "-";
+  }
+
+  static String _eventEndTime(Map event) {
+    final direct = _timeOrNull(event["end_time"] ?? event["endTime"]);
+    if (direct != null) return direct;
+
+    final fromSchedules = _timeFromFirstSchedule(event, "end_time", "endTime");
+    return fromSchedules ?? "-";
+  }
+
+  static String? _timeFromFirstSchedule(
+    Map event,
+    String snakeKey,
+    String camelKey,
+  ) {
+    final schedules = event["daily_schedules"];
+    if (schedules is! List || schedules.isEmpty) return null;
+
+    final first = schedules.first;
+    if (first is! Map) return null;
+    return _timeOrNull(first[snakeKey] ?? first[camelKey]);
+  }
+
+  static String? _timeOrNull(dynamic value) {
+    final formatted = IstDateTime.formatTime(value);
+    if (formatted == "-" || formatted.trim().isEmpty) return null;
+    return formatted;
   }
 
   int? _toInt(dynamic value) {

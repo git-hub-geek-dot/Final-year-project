@@ -14,23 +14,6 @@ class AccountSettingsScreen extends StatefulWidget {
 }
 
 class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
-  bool newApplications = true;
-  bool eventUpdates = true;
-  bool promotions = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadPreferences();
-  }
-
-  Future<void> _loadPreferences() async {
-    newApplications = await PreferencesService.getNewApplications();
-    eventUpdates = await PreferencesService.getEventUpdates();
-    promotions = await PreferencesService.getPromotions();
-    setState(() {});
-  }
-
   /// 🔥 DELETE ACCOUNT LOGIC
   Future<void> _deleteAccount(BuildContext context) async {
     // Simulate API delay
@@ -102,44 +85,6 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                   builder: (_) => const UpdatePhoneScreen(),
                 ),
               );
-            },
-          ),
-
-          const SizedBox(height: 30),
-
-          Text(
-            context.tr("Preferences"),
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          SwitchListTile(
-            title: Text(context.tr("New Volunteer Applications")),
-            value: newApplications,
-            onChanged: (val) async {
-              setState(() => newApplications = val);
-              await PreferencesService.setNewApplications(val);
-            },
-          ),
-
-          SwitchListTile(
-            title: Text(context.tr("Event Updates")),
-            value: eventUpdates,
-            onChanged: (val) async {
-              setState(() => eventUpdates = val);
-              await PreferencesService.setEventUpdates(val);
-            },
-          ),
-
-          SwitchListTile(
-            title: Text(context.tr("Promotional Notifications")),
-            value: promotions,
-            onChanged: (val) async {
-              setState(() => promotions = val);
-              await PreferencesService.setPromotions(val);
             },
           ),
 

@@ -331,6 +331,21 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
                                                       ),
                                                     ],
                                                   ),
+                                                  const SizedBox(height: 4),
+                                                  Row(
+                                                    children: [
+                                                      Icon(Icons.access_time,
+                                                          size: 16,
+                                                          color: Colors.grey),
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        _formatEventTimeRange(
+                                                            event),
+                                                        style: const TextStyle(
+                                                            color: Colors.grey),
+                                                      ),
+                                                    ],
+                                                  ),
 
                                                   // Actions Row
                                                   const SizedBox(height: 12),
@@ -390,12 +405,41 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
     final eventDate = IstDateTime.startOfDay(date);
 
     if (eventDate == today) {
-      return "Today, ${date.hour}:${date.minute.toString().padLeft(2, '0')}";
+      return "Today";
     } else if (eventDate == today.add(const Duration(days: 1))) {
-      return "Tomorrow, ${date.hour}:${date.minute.toString().padLeft(2, '0')}";
+      return "Tomorrow";
     } else {
-      return "${date.day}/${date.month}/${date.year}, ${date.hour}:${date.minute.toString().padLeft(2, '0')}";
+      return "${date.day}/${date.month}/${date.year}";
     }
+  }
+
+  String _formatEventTimeRange(Map event) {
+    final directStart = _timeOrNull(event["start_time"] ?? event["startTime"]);
+    final directEnd = _timeOrNull(event["end_time"] ?? event["endTime"]);
+    if (directStart != null && directEnd != null) {
+      return "$directStart-$directEnd";
+    }
+
+    final schedules = event["daily_schedules"];
+    if (schedules is List && schedules.isNotEmpty) {
+      final first = schedules.first;
+      if (first is Map) {
+        final scheduleStart =
+            _timeOrNull(first["start_time"] ?? first["startTime"]);
+        final scheduleEnd = _timeOrNull(first["end_time"] ?? first["endTime"]);
+        if (scheduleStart != null && scheduleEnd != null) {
+          return "$scheduleStart-$scheduleEnd";
+        }
+      }
+    }
+
+    return "Time TBA";
+  }
+
+  String? _timeOrNull(dynamic raw) {
+    final formatted = IstDateTime.formatTime(raw);
+    if (formatted == "-" || formatted.trim().isEmpty) return null;
+    return formatted;
   }
 
   String _normalizedEventStatus(Map event) {

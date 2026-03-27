@@ -68,7 +68,6 @@ router.post(
   "/profile/picture/upload",
   (req, res, next) => {
     console.log("📍 POST /profile/picture/upload - Request received");
-    console.log("Headers:", req.headers);
     next();
   },
   authMiddleware,

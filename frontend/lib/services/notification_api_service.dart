@@ -8,16 +8,25 @@ class NotificationApiService {
   static Future<Map<String, dynamic>> fetchNotifications({
     int page = 1,
     int limit = 20,
+    String? type,
+    int? eventId,
   }) async {
     final token = await TokenService.getToken();
     if (token == null || token.isEmpty) {
       throw Exception("Token not found");
     }
 
+    final query = Uri.parse("${ApiConfig.baseUrl}/notifications").replace(
+      queryParameters: {
+        "page": page.toString(),
+        "limit": limit.toString(),
+        if (type != null && type.trim().isNotEmpty) "type": type.trim(),
+        if (eventId != null) "eventId": eventId.toString(),
+      },
+    );
+
     final res = await http.get(
-      Uri.parse(
-        "${ApiConfig.baseUrl}/notifications?page=$page&limit=$limit",
-      ),
+      query,
       headers: {
         "Authorization": "Bearer $token",
         "Content-Type": "application/json",

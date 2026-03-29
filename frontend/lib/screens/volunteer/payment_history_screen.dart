@@ -199,7 +199,11 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
     }
   }
 
-  Color _statusColor(String status) {
+  Color _statusColor(String status, {String? eventType}) {
+    final resolvedType = (eventType ?? "").toLowerCase();
+    if (resolvedType.isNotEmpty && resolvedType != "paid") {
+      return Colors.grey;
+    }
     switch (status.toLowerCase()) {
       case "received":
         return Colors.green;
@@ -210,7 +214,11 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
     }
   }
 
-  String _statusLabel(String status) {
+  String _statusLabel(String status, {String? eventType}) {
+    final resolvedType = (eventType ?? "").toLowerCase();
+    if (resolvedType.isNotEmpty && resolvedType != "paid") {
+      return context.tr("Not applicable");
+    }
     switch (status.toLowerCase()) {
       case "received":
         return context.tr("Received");
@@ -548,11 +556,18 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
                                 title: Text(title),
                                 subtitle: Text(subtitle),
                                 trailing: Chip(
-                                  label: Text(_statusLabel(status)),
+                                  label: Text(
+                                    _statusLabel(status, eventType: eventType),
+                                  ),
                                   backgroundColor:
-                                      _statusColor(status).withOpacity(0.15),
-                                  labelStyle:
-                                      TextStyle(color: _statusColor(status)),
+                                      _statusColor(status, eventType: eventType)
+                                          .withOpacity(0.15),
+                                  labelStyle: TextStyle(
+                                    color: _statusColor(
+                                      status,
+                                      eventType: eventType,
+                                    ),
+                                  ),
                                 ),
                                 onTap: !isPaid
                                     ? null

@@ -4,7 +4,7 @@ const { notifyUsers } = require("../services/notificationService");
 const canAccessEventGroupChat = async ({ eventId, userId, role }) => {
   if (role === "organiser") {
     const organiserEvent = await pool.query(
-      "SELECT id, title, organiser_id FROM events WHERE id = $1 AND organiser_id = $2",
+      "SELECT id, title, organiser_id FROM events WHERE id = $1 AND organiser_id = $2 AND status != 'deleted'",
       [eventId, userId]
     );
     if (organiserEvent.rowCount > 0) {
@@ -20,6 +20,7 @@ const canAccessEventGroupChat = async ({ eventId, userId, role }) => {
     WHERE e.id = $1
       AND a.volunteer_id = $2
       AND a.status IN ('approved', 'accepted', 'completed')
+      AND e.status != 'deleted'
     LIMIT 1
     `,
     [eventId, userId]
@@ -140,6 +141,7 @@ exports.sendEventGroupMessage = async (req, res) => {
           data: {
             type: "event_group_chat",
             eventId: String(eventId),
+            eventTitle: event.title,
           },
         });
       } catch (notifyErr) {

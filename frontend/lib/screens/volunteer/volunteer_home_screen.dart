@@ -107,8 +107,10 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
     }
   }
 
-  void _handleNotificationEvent(Map<String, dynamic> data) {
+  Future<void> _handleNotificationEvent(Map<String, dynamic> data) async {
     if (!mounted) return;
+
+    await _loadUnreadCount();
 
     final type = (data["type"] ?? "").toString().trim().toLowerCase();
     if (type == "application_status" ||
@@ -117,15 +119,66 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
         type == "attendance_updated" ||
         type == "attendance_absent_strike") {
       fetchMyApplications();
-      _loadUnreadCount();
       return;
     }
 
-    if (type == "event_cancelled" || type == "event_removed") {
+    if (type == "event_removed" || type == "event_deleted") {
+      final rawEventId = data["eventId"] ?? data["event_id"];
+      final eventId = rawEventId?.toString();
+      if (eventId != null && eventId.trim().isNotEmpty) {
+        await SavedEventsService.removeEvent(eventId);
+        if (!mounted) return;
+        await _loadSavedEvents();
+      }
+    }
+
+    if (type == "event_cancelled" ||
+        type == "event_removed" ||
+        type == "event_deleted" ||
+        type == "event_update" ||
+        type == "event_broadcast") {
+      final rawEventId = data["eventId"] ?? data["event_id"];
+      final eventId = rawEventId?.toString();
+      if ((type == "event_update" || type == "event_broadcast") &&
+          eventId != null &&
+          savedEventIds.contains(eventId)) {
+        await _refreshSavedEvent(eventId);
+      }
       fetchEvents();
       fetchMyApplications();
-      _loadUnreadCount();
     }
+  }
+
+  Future<void> _refreshSavedEvent(String eventId) async {
+    http.Response? response;
+    try {
+      response = await http.get(
+        Uri.parse("${ApiConfig.baseUrl}/events/$eventId"),
+      );
+    } catch (_) {
+      response = null;
+    }
+
+    if (!mounted || response == null) return;
+
+    if (response.statusCode == 404) {
+      await SavedEventsService.removeEvent(eventId);
+      if (!mounted) return;
+      await _loadSavedEvents();
+      return;
+    }
+
+    if (response.statusCode != 200) {
+      return;
+    }
+
+    final decoded = jsonDecode(response.body);
+    final freshEvent = decoded is Map<String, dynamic>
+        ? decoded
+        : Map<String, dynamic>.from(decoded as Map);
+    await SavedEventsService.saveEvent(freshEvent);
+    if (!mounted) return;
+    await _loadSavedEvents();
   }
 
   Future<void> _loadProfileName() async {

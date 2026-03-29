@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -5,6 +6,7 @@ import '../../services/event_service.dart';
 import '../../services/token_service.dart';
 import '../../services/verification_service.dart';
 import '../../services/notification_api_service.dart';
+import '../../services/notification_service.dart';
 import '../../utils/ist_date_time.dart';
 import '../../widgets/organiser_bottom_nav.dart';
 import '../../localization/localization_extensions.dart';
@@ -32,6 +34,7 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
       0; // 0: All, 1: Ongoing, 2: Upcoming, 3: Completed, 4: Draft, 5: Cancelled
   String? loadError;
   int _unreadNotifications = 0;
+  StreamSubscription<Map<String, dynamic>>? _notificationSub;
 
   @override
   void initState() {
@@ -39,6 +42,27 @@ class _OrganiserHomeScreenState extends State<OrganiserHomeScreen> {
     _loadCachedEvents();
     loadEvents();
     _loadUnreadCount();
+    _notificationSub =
+        NotificationService.messageEvents.listen(_handleNotificationEvent);
+  }
+
+  @override
+  void dispose() {
+    _notificationSub?.cancel();
+    super.dispose();
+  }
+
+  void _handleNotificationEvent(Map<String, dynamic> data) {
+    if (!mounted) return;
+
+    _loadUnreadCount();
+
+    final type = (data["type"] ?? "").toString().trim().toLowerCase();
+    if (type == "event_removed" ||
+        type == "event_deleted" ||
+        type == "volunteer_cancelled") {
+      loadEvents();
+    }
   }
 
   Future<void> _loadCachedEvents() async {

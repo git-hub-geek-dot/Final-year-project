@@ -40,6 +40,8 @@ class _EventAnnouncementsScreenState extends State<EventAnnouncementsScreen> {
       final response = await NotificationApiService.fetchNotifications(
         page: 1,
         limit: 100,
+        type: "event_announcement",
+        eventId: widget.eventId,
       );
       final rows = (response["items"] as List?) ?? [];
 

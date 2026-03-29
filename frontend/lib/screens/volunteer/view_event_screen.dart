@@ -82,7 +82,7 @@ class _ViewEventScreenState extends State<ViewEventScreen>
     }
   }
 
-  void _handleNotificationEvent(Map<String, dynamic> data) {
+  Future<void> _handleNotificationEvent(Map<String, dynamic> data) async {
     if (!mounted) return;
 
     final type = (data["type"] ?? "").toString().trim().toLowerCase();
@@ -92,7 +92,10 @@ class _ViewEventScreenState extends State<ViewEventScreen>
         type != "attendance_updated" &&
         type != "attendance_absent_strike" &&
         type != "event_cancelled" &&
-        type != "event_removed") {
+        type != "event_removed" &&
+        type != "event_deleted" &&
+        type != "event_update" &&
+        type != "event_broadcast") {
       return;
     }
 
@@ -110,16 +113,80 @@ class _ViewEventScreenState extends State<ViewEventScreen>
       }
     }
 
-    if (type == "event_cancelled" || type == "event_removed") {
+    if (type == "event_cancelled" ||
+        type == "event_removed" ||
+        type == "event_deleted") {
+      final removedByAdmin =
+          type == "event_removed" || type == "event_deleted";
       setState(() {
-        eventStatusOverride = type == "event_removed" ? "deleted" : "closed";
+        eventStatusOverride = removedByAdmin ? "deleted" : "closed";
         widget.event["status"] = eventStatusOverride;
         widget.event["computed_status"] =
-            type == "event_removed" ? "deleted_by_admin" : "cancelled";
+            removedByAdmin ? "deleted_by_admin" : "cancelled";
       });
+      if (removedByAdmin) {
+        final eventId = _eventIdAsInt();
+        if (eventId != null) {
+          await SavedEventsService.removeEvent(eventId.toString());
+          if (!mounted) return;
+          setState(() {
+            isSaved = false;
+          });
+        }
+      }
+    }
+
+    if (type == "event_update" || type == "event_broadcast") {
+      final rawEventId = data["eventId"] ?? data["event_id"];
+      if (rawEventId != null) {
+        final currentEventId = widget.event["id"];
+        final incomingEventId = int.tryParse(rawEventId.toString());
+        final normalizedCurrent = currentEventId is int
+            ? currentEventId
+            : int.tryParse(currentEventId?.toString() ?? "");
+        if (incomingEventId != null &&
+            normalizedCurrent != null &&
+            incomingEventId != normalizedCurrent) {
+          return;
+        }
+      }
+      await _refreshEventDetails();
+    }
+
+    if (type == "verification") {
+      final status = (data["status"] ?? "").toString().toLowerCase().trim();
+      if (status.isNotEmpty) {
+        setState(() {
+          verificationStatus = status;
+          isLoadingVerification = false;
+        });
+      } else {
+        _loadVerificationStatus();
+      }
+      return;
     }
 
     _fetchApplicationStatus();
+  }
+
+  Future<void> _refreshEventDetails() async {
+    final eventId = _eventIdAsInt();
+    if (eventId == null) return;
+
+    try {
+      final fresh = await EventService.fetchEventById(eventId);
+      if (!mounted) return;
+      setState(() {
+        widget.event
+          ..clear()
+          ..addAll(fresh);
+        eventStatusOverride = fresh["status"]?.toString();
+      });
+      await _loadOrganiserPhoto();
+    } catch (_) {
+      if (!mounted) return;
+      _snack(context.tr("Unable to refresh event details."));
+    }
   }
 
   Future<void> _loadVerificationStatus() async {
@@ -916,29 +983,45 @@ ${context.tr("Join on VolunteerX")}
     final currentStatus = _normalizedStatus(applicationStatus!);
     final currentAttendance =
         _normalizedAttendanceStatus(attendanceStatus ?? "");
-    final canCancel = _isCancelableStatus(currentStatus) && !_hasEventStarted();
+    final isEventInactive = isCancelled || isRemoved;
+    final canCancel = _isCancelableStatus(currentStatus) &&
+        !_hasEventStarted() &&
+        !isEventInactive;
     final isApprovedState = _isApprovedStatus(currentStatus);
     final cancelLabel = _cancelActionLabel(
       currentStatus,
       isLocked: _isWithinLockWindow(),
     );
-    final statusText = currentAttendance == "absent"
+    var statusText = currentAttendance == "absent"
         ? context.tr("Attendance Absent")
         : currentAttendance == "present"
             ? context.tr("Attendance Present")
-        : isReviewClosed
-            ? context.tr("Review Closed")
-            : _statusText(currentStatus);
-    final statusColor = currentAttendance == "absent"
+            : isReviewClosed
+                ? context.tr("Review Closed")
+                : _statusText(currentStatus);
+    var statusColor = currentAttendance == "absent"
         ? Colors.deepOrange
         : currentAttendance == "present"
             ? Colors.green
             : isReviewClosed
                 ? Colors.redAccent
                 : _statusColor(currentStatus);
-    final statusDescription = isReviewClosed
+    var statusDescription = isReviewClosed
         ? null
         : _statusDescription(currentStatus);
+    final showReviewClosed = isReviewClosed && !isEventInactive;
+
+    if (isRemoved) {
+      statusText = context.tr("Event removed");
+      statusColor = Colors.grey;
+      statusDescription = context.tr(
+        "This event was removed by admin. Details are no longer available.",
+      );
+    } else if (isCancelled) {
+      statusText = context.tr("Event cancelled");
+      statusColor = Colors.redAccent;
+      statusDescription ??= context.tr("This event was cancelled.");
+    }
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -959,7 +1042,7 @@ ${context.tr("Join on VolunteerX")}
             ),
           ),
         ],
-        if (isReviewClosed) ...[
+        if (showReviewClosed) ...[
           const SizedBox(height: 10),
           Text(
             context
@@ -972,7 +1055,7 @@ ${context.tr("Join on VolunteerX")}
             ),
           ),
         ],
-        if (isApprovedState && !isCompleted) ...[
+        if (isApprovedState && !isCompleted && !isEventInactive) ...[
           const SizedBox(height: 10),
           Row(
             children: [
@@ -1366,7 +1449,8 @@ ${context.tr("Join on VolunteerX")}
                     final trimmedReason = reasonController.text.trim();
                     final hasReason = trimmedReason.isNotEmpty;
                     final hasDocument = documentUrl != null;
-                    if (!hasReason && !hasDocument) {
+                    final requiresJustification = isWithinLockWindow;
+                    if (requiresJustification && !hasReason && !hasDocument) {
                       final error = context.tr(
                         "Please provide a reason or upload a supporting document",
                       );

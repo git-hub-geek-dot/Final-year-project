@@ -833,6 +833,27 @@ exports.updateEvent = async (req, res) => {
       });
     }
 
+    const approvedCountResult = await client.query(
+      `
+      SELECT COUNT(*)::int AS approved_count
+      FROM applications
+      WHERE event_id = $1
+        AND status IN ('approved', 'accepted')
+      `,
+      [eventId]
+    );
+    const approvedCount = approvedCountResult.rows[0]?.approved_count ?? 0;
+
+    if (parsedVolunteers < approvedCount) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        error:
+          "volunteers_required cannot be less than approved volunteers",
+        approved_count: approvedCount,
+        volunteers_required: parsedVolunteers,
+      });
+    }
+
     const result = await client.query(
       `
       UPDATE events
@@ -1246,7 +1267,7 @@ exports.announceEvent = async (req, res) => {
       SELECT DISTINCT volunteer_id
       FROM applications
       WHERE event_id = $1
-        AND status IN ('pending', 'approved', 'accepted', 'waitlisted', 'completed')
+        AND status IN ('approved', 'accepted', 'completed')
       `,
       [eventId]
     );
@@ -1261,6 +1282,7 @@ exports.announceEvent = async (req, res) => {
       data: {
         type: "event_announcement",
         eventId: String(eventId),
+        eventTitle: event.title,
       },
     });
 

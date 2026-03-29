@@ -881,6 +881,16 @@ exports.getApplicationById = async (req, res) => {
         e.event_date,
         e.end_date,
         e.end_time,
+        e.volunteers_required,
+        COALESCE(
+          (
+            SELECT COUNT(*)::int
+            FROM applications a2
+            WHERE a2.event_id = e.id
+              AND a2.status IN ('approved', 'accepted')
+          ),
+          0
+        ) AS approved_count,
         (
           e.status NOT IN ('draft', 'deleted')
           AND (
@@ -1072,6 +1082,7 @@ exports.updateApplicationStatus = async (req, res) => {
     const currentStatus = normalizeStoredApplicationStatus(
       currentApplication.status
     );
+    const wasWaitlisted = currentStatus === "waitlisted";
     const wasAlreadyApproved = currentStatus === "approved";
 
     if (!isReviewableApplicationStatus(currentStatus)) {
@@ -1168,13 +1179,25 @@ exports.updateApplicationStatus = async (req, res) => {
       );
       const eventTitle = eventResult.rows[0]?.title || "your event";
       const statusLabel = app.status;
+      const promotedFromWaitlist =
+        wasWaitlisted && statusLabel?.toString().toLowerCase() === "approved";
+      const notificationType = promotedFromWaitlist
+        ? "waitlist_promoted"
+        : "application_status";
+      const notificationTitle = promotedFromWaitlist
+        ? "Waitlist update"
+        : "Application update";
+      const notificationBody = promotedFromWaitlist
+        ? `Good news! You're off the waitlist for ${eventTitle}.`
+        : `Your application for ${eventTitle} was ${statusLabel}.`;
 
       await notifyUser(app.volunteer_id, {
-        title: "Application update",
-        body: `Your application for ${eventTitle} was ${statusLabel}.`,
+        title: notificationTitle,
+        body: notificationBody,
         data: {
-          type: "application_status",
+          type: notificationType,
           status: app.status,
+          previousStatus: currentStatus,
           eventId: String(app.event_id),
           applicationId: String(app.id),
         },

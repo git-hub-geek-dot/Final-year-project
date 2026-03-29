@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../localization/localization_extensions.dart';
 import '../../services/event_service.dart';
+import '../../services/notification_service.dart';
 import '../../services/token_service.dart';
 import '../../utils/application_status.dart';
 import '../../utils/ist_date_time.dart';
@@ -33,6 +35,7 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
   int volunteersRequired = 0;
   int approvedCount = 0;
   final Map<int, String> _profilePictureUrlByApplicationId = {};
+  StreamSubscription<Map<String, dynamic>>? _notificationSub;
 
   bool get isSlotsFull =>
       volunteersRequired > 0 && approvedCount >= volunteersRequired;
@@ -40,6 +43,31 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
   @override
   void initState() {
     super.initState();
+    loadApplications();
+    _notificationSub =
+        NotificationService.messageEvents.listen(_handleNotificationEvent);
+  }
+
+  @override
+  void dispose() {
+    _notificationSub?.cancel();
+    super.dispose();
+  }
+
+  void _handleNotificationEvent(Map<String, dynamic> data) {
+    if (!mounted) return;
+
+    final type = (data["type"] ?? "").toString().trim().toLowerCase();
+    if (type != "volunteer_cancelled") return;
+
+    final rawEventId = data["eventId"] ?? data["event_id"];
+    if (rawEventId != null) {
+      final eventId = int.tryParse(rawEventId.toString());
+      if (eventId != null && eventId != widget.eventId) {
+        return;
+      }
+    }
+
     loadApplications();
   }
 
@@ -521,6 +549,13 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
                                 final hydratedProfileUrl =
                                     _profilePictureUrlByApplicationId[applicationId];
                                 final status = _normalizedStatus(a);
+                                final eventStatus =
+                                    (a["event_status"] ?? "")
+                                        .toString()
+                                        .toLowerCase();
+                                final reviewClosed = _asBool(a["review_closed"]) ||
+                                    (eventStatus.isNotEmpty &&
+                                        eventStatus != "open");
 
                                 String? cancellationInfo;
                                 if (status == "cancelled" &&
@@ -538,7 +573,7 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
                                   name: a["name"] ?? context.tr("Unknown"),
                                   location: a["city"] ?? "-",
                                   status: status,
-                                  reviewClosed: _asBool(a["review_closed"]),
+                                  reviewClosed: reviewClosed,
                                   attendanceStatus: _normalizedAttendanceStatus(a),
                                   availabilityStatus:
                                       _normalizedAvailabilityStatus(a),

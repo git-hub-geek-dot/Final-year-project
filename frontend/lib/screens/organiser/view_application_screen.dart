@@ -82,8 +82,15 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
             ? data["application"]
             : data;
 
+        final appMap = Map<String, dynamic>.from(app);
         setState(() {
-          application = Map<String, dynamic>.from(app);
+          application = appMap;
+          if (appMap.containsKey("approved_count")) {
+            approvedCount = _asInt(appMap["approved_count"]);
+          }
+          if (appMap.containsKey("volunteers_required")) {
+            volunteersRequired = _asInt(appMap["volunteers_required"]);
+          }
           loading = false;
         });
       } else {
@@ -284,8 +291,31 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
     return isActionableReviewStatus(status);
   }
 
-  String _finalStatusMessage(String status, {bool reviewClosed = false}) {
+  String _finalStatusMessage(
+    String status, {
+    bool reviewClosed = false,
+    String? eventStatus,
+  }) {
     if (reviewClosed) {
+      final normalized = (eventStatus ?? "").toLowerCase();
+      if (normalized == "deleted") {
+        return context.tr(
+          "This event was removed by admin. Applications can no longer be reviewed.",
+        );
+      }
+      if (normalized == "closed") {
+        return context.tr(
+          "This event was cancelled, so applications can no longer be reviewed.",
+        );
+      }
+      if (normalized == "completed") {
+        return context.tr(
+          "This event ended before this application could be reviewed.",
+        );
+      }
+      if (normalized.isNotEmpty && normalized != "open") {
+        return context.tr("Review is closed for this event.");
+      }
       return context.tr(
         "This event ended before this application could be reviewed.",
       );
@@ -896,7 +926,10 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
     final recentParticipation = _asMapList(app?["recent_participation"]);
     final status = app?["status"]?.toString() ?? "pending";
     final normalizedStatus = normalizeApplicationStatus(status);
-    final reviewClosed = _asBool(app?["review_closed"]);
+    final eventStatus =
+        (app?["event_status"] ?? "").toString().toLowerCase();
+    final isEventOpen = eventStatus.isEmpty || eventStatus == "open";
+    final reviewClosed = _asBool(app?["review_closed"]) || !isEventOpen;
     final canReviewApplication =
         _isReviewActionable(normalizedStatus) && !reviewClosed;
     final canShortlistApplication = canReviewApplication;
@@ -919,7 +952,13 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
     final resolvedStatusColor =
         reviewClosed ? Colors.redAccent : statusColor(status);
     final resolvedStatusLabel =
-        reviewClosed ? context.tr("Review Closed") : statusLabel(status).toUpperCase();
+        reviewClosed
+            ? eventStatus == "deleted"
+                ? context.tr("Event removed")
+                : eventStatus == "closed"
+                    ? context.tr("Event cancelled")
+                    : context.tr("Review Closed")
+            : statusLabel(status).toUpperCase();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
@@ -1346,6 +1385,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                                     _finalStatusMessage(
                                       normalizedStatus,
                                       reviewClosed: reviewClosed,
+                                      eventStatus: eventStatus,
                                     ),
                                     style: TextStyle(
                                       color: Colors.grey.shade700,

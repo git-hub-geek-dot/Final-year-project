@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:frontend/config/api_config.dart';
+import '../../services/notification_service.dart';
 import '../../services/token_service.dart';
 import '../../services/verification_service.dart';
 import '../../services/rating_service.dart';
@@ -354,6 +356,7 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
 
   late AnimationController _avatarSuccessController;
   late Animation<double> _avatarGlow;
+  StreamSubscription<Map<String, dynamic>>? _notificationSub;
 
   @override
   void initState() {
@@ -372,12 +375,32 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
     loadVerificationStatus();
     fetchDashboard();
     loadRatingSummary();
+    _notificationSub =
+        NotificationService.messageEvents.listen(_handleNotificationEvent);
   }
 
   @override
   void dispose() {
+    _notificationSub?.cancel();
     _avatarSuccessController.dispose();
     super.dispose();
+  }
+
+  void _handleNotificationEvent(Map<String, dynamic> data) {
+    if (!mounted) return;
+
+    final type = (data["type"] ?? "").toString().trim().toLowerCase();
+    if (type != "verification") return;
+
+    final status = (data["status"] ?? "").toString().toLowerCase().trim();
+    if (status.isNotEmpty) {
+      setState(() {
+        verificationStatus = status;
+      });
+      return;
+    }
+
+    loadVerificationStatus();
   }
 
   Future<void> loadVerificationStatus() async {

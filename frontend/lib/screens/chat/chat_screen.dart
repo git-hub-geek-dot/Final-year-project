@@ -31,6 +31,8 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<Map<String, dynamic>> _messages = [];
   final Map<String, Timer> _ackTimers = {};
   bool _loading = true;
+  String? _loadError;
+  bool _threadUnavailable = false;
   bool _isSocketConnected = false;
   io.Socket? _socket;
   int? _userId;
@@ -84,6 +86,13 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _loadMessages() async {
     try {
+      if (mounted) {
+        setState(() {
+          _loading = true;
+          _loadError = null;
+          _threadUnavailable = false;
+        });
+      }
       final userId = await TokenService.getUserId();
       final data = await ChatService.fetchMessages(widget.threadId);
       final pendingLocal = _messages
@@ -126,10 +135,22 @@ class _ChatScreenState extends State<ChatScreen> {
           ..clear()
           ..addAll(messages);
         _loading = false;
+        _loadError = null;
+        _threadUnavailable = false;
       });
       await _saveCachedMessages();
-    } catch (_) {
-      setState(() => _loading = false);
+    } catch (e) {
+      if (!mounted) return;
+      final raw = e.toString().replaceFirst("Exception: ", "").trim();
+      final lower = raw.toLowerCase();
+      final unavailable = lower.contains("not found") ||
+          lower.contains("not allowed") ||
+          lower.contains("no longer available");
+      setState(() {
+        _loading = false;
+        _loadError = raw.isEmpty ? "Failed to load messages" : raw;
+        _threadUnavailable = unavailable;
+      });
     }
   }
 
@@ -240,6 +261,13 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _sendMessage() async {
+    if (_threadUnavailable) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("This chat is no longer available.")),
+      );
+      return;
+    }
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
@@ -662,6 +690,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final inputDisabled = _threadUnavailable;
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -673,6 +702,29 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(
         children: [
+          if (_loadError != null)
+            Container(
+              width: double.infinity,
+              color: Colors.orange.shade100,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline,
+                      size: 16, color: Colors.orange),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _loadError!,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _loadMessages,
+                    child: const Text("Retry"),
+                  ),
+                ],
+              ),
+            ),
           if (!_isSocketConnected)
             Container(
               width: double.infinity,
@@ -763,6 +815,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   Expanded(
                     child: TextField(
                       controller: _messageController,
+                      enabled: !inputDisabled,
                       decoration: const InputDecoration(
                         hintText: "Type a message...",
                         border: OutlineInputBorder(),
@@ -772,7 +825,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   const SizedBox(width: 8),
                   IconButton(
                     icon: const Icon(Icons.send),
-                    onPressed: _sendMessage,
+                    onPressed: inputDisabled ? null : _sendMessage,
                   ),
                 ],
               ),

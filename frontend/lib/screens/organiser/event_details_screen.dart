@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../services/event_service.dart';
+import '../../services/notification_service.dart';
 import '../../utils/application_status.dart';
 import '../../utils/ist_date_time.dart';
 import '../../utils/payment_format.dart';
@@ -27,6 +30,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
   bool publishingDraft = false;
   bool cancellingEvent = false;
   bool announcingEvent = false;
+  StreamSubscription<Map<String, dynamic>>? _notificationSub;
 
   int applied = 0;
   int approved = 0;
@@ -37,6 +41,39 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
   void initState() {
     super.initState();
     loadStats();
+    _notificationSub =
+        NotificationService.messageEvents.listen(_handleNotificationEvent);
+  }
+
+  @override
+  void dispose() {
+    _notificationSub?.cancel();
+    super.dispose();
+  }
+
+  void _handleNotificationEvent(Map<String, dynamic> data) {
+    if (!mounted) return;
+
+    final type = (data["type"] ?? "").toString().trim().toLowerCase();
+    if (type != "event_removed" && type != "event_deleted") {
+      return;
+    }
+
+    final rawEventId = data["eventId"] ?? data["event_id"];
+    final eventId = int.tryParse(rawEventId?.toString() ?? "");
+    final currentId = int.tryParse("${widget.event["id"]}");
+    if (eventId == null || currentId == null || eventId != currentId) {
+      return;
+    }
+
+    setState(() {
+      widget.event["status"] = "deleted";
+      widget.event["computed_status"] = "deleted_by_admin";
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(context.tr("This event was removed by admin."))),
+    );
   }
 
   Future<void> loadStats() async {
@@ -502,6 +539,10 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     final responsibilities =
         (event["responsibilities"] as List?)?.whereType<String>().toList() ??
             [];
+    final volunteersRequired =
+        int.tryParse(event["volunteers_required"]?.toString() ?? "") ?? 0;
+    final remainingSlots = volunteersRequired - approved;
+    final remainingSlotsLabel = remainingSlots < 0 ? 0 : remainingSlots;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FB),
@@ -618,9 +659,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                           context.tr(
                             "Slots Remaining: {count}",
                             args: {
-                              "count": ((event["volunteers_required"] ?? 0) -
-                                      approved)
-                                  .toString(),
+                              "count": remainingSlotsLabel.toString(),
                             },
                           ),
                         ),
@@ -725,6 +764,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
         final isCancelledEvent = _isCancelled(event);
         final isCompletedEvent = _isCompleted(event);
         final isOngoingEvent = _normalizedStatus(event) == "ongoing";
+        final isRemovedEvent = _normalizedStatus(event) == "deleted_by_admin";
 
         final viewVolunteersButton = ElevatedButton(
           onPressed: () async {
@@ -868,7 +908,9 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
             isCompletedEvent
                 ? context.tr("Event Completed")
                 : isCancelledEvent
-                    ? context.tr("Event Cancelled")
+                    ? isRemovedEvent
+                        ? context.tr("Event Removed")
+                        : context.tr("Event Cancelled")
                     : context.tr("Cancel Event"),
           ),
         );

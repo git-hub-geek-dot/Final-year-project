@@ -4,9 +4,10 @@ const { notifyUser } = require("../services/notificationService");
 const getThreadForUser = async (threadId, userId) => {
   const result = await pool.query(
     `
-    SELECT *
-    FROM chat_threads
-    WHERE id = $1 AND (organiser_id = $2 OR volunteer_id = $2)
+    SELECT ct.*, e.title AS event_title
+    FROM chat_threads ct
+    JOIN events e ON e.id = ct.event_id
+    WHERE ct.id = $1 AND (ct.organiser_id = $2 OR ct.volunteer_id = $2)
     `,
     [threadId, userId]
   );
@@ -224,7 +225,12 @@ exports.sendMessage = async (req, res) => {
       await notifyUser(recipientId, {
         title: "New message",
         body: text,
-        data: { type: "chat_message", threadId: String(threadId) },
+        data: {
+          type: "chat_message",
+          threadId: String(threadId),
+          eventId: thread?.event_id != null ? String(thread.event_id) : null,
+          eventTitle: thread?.event_title,
+        },
       });
     } catch (notifyErr) {
       console.error("CHAT NOTIFY ERROR:", notifyErr);

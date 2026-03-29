@@ -46,6 +46,21 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
     return (value ?? "").toString().toLowerCase().trim();
   }
 
+  bool _isEventCompleted() {
+    final status =
+        _normalizedStatus(event?["computed_status"] ?? event?["status"]);
+    return status == "completed";
+  }
+
+  bool _isEventInactive() {
+    final status =
+        _normalizedStatus(event?["computed_status"] ?? event?["status"]);
+    return status == "cancelled" ||
+        status == "closed" ||
+        status == "deleted" ||
+        status == "deleted_by_admin";
+  }
+
   bool _isAttendanceMarked(String status) {
     return status == "present" || status == "absent";
   }
@@ -173,6 +188,15 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
         .where((status) => status == "absent")
         .length;
     final unmarkedCount = totalCount - presentCount - absentCount;
+    final isCompletedEvent = _isEventCompleted();
+    final isInactiveEvent = _isEventInactive();
+    final attendanceNote = isCompletedEvent
+        ? context.tr(
+            "This event is completed. Absent volunteers will receive a strike as soon as you save attendance.",
+          )
+        : context.tr(
+            "Mark every approved volunteer as present or absent. Absent volunteers receive a strike only after the event is completed.",
+          );
 
     return Scaffold(
       appBar: AppBar(
@@ -250,9 +274,7 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              context.tr(
-                                "Mark every approved volunteer as present or absent. Absent volunteers receive a strike only after the event is completed.",
-                              ),
+                              attendanceNote,
                               style: TextStyle(
                                 color: Colors.grey.shade700,
                                 fontSize: 12,
@@ -319,7 +341,8 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
                                       ChoiceChip(
                                         label: Text(context.tr("Present")),
                                         selected: selectedStatus == "present",
-                                        onSelected: volunteerId <= 0
+                                        onSelected: volunteerId <= 0 ||
+                                                isInactiveEvent
                                             ? null
                                             : (_) {
                                                 setState(() {
@@ -331,7 +354,8 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
                                       ChoiceChip(
                                         label: Text(context.tr("Absent")),
                                         selected: selectedStatus == "absent",
-                                        onSelected: volunteerId <= 0
+                                        onSelected: volunteerId <= 0 ||
+                                                isInactiveEvent
                                             ? null
                                             : (_) {
                                                 setState(() {
@@ -369,7 +393,9 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
                             width: double.infinity,
                             height: 48,
                             child: ElevatedButton.icon(
-                              onPressed: submitting ? null : _submitFeedback,
+                              onPressed: submitting || isInactiveEvent
+                                  ? null
+                                  : _submitFeedback,
                               icon: submitting
                                   ? const SizedBox(
                                       width: 16,
@@ -390,6 +416,28 @@ class _AttendanceFeedbackScreenState extends State<AttendanceFeedbackScreen> {
                         ],
                       ),
                     ),
+                    if (isInactiveEvent)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF1F2),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFFDA4AF)),
+                          ),
+                          child: Text(
+                            context.tr(
+                              "Attendance is not available for cancelled or removed events.",
+                            ),
+                            style: const TextStyle(
+                              color: Color(0xFF9F1239),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
       bottomNavigationBar: const OrganiserBottomNav(

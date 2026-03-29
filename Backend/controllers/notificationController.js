@@ -56,29 +56,57 @@ exports.getNotifications = async (req, res) => {
     const limit = Math.max(parseInt(req.query.limit || "20", 10), 1);
     const offset = (page - 1) * limit;
     const hiddenType = "ongoing_attendance_update";
+    const typeFilter = (req.query.type || "").toString().trim().toLowerCase();
+    const eventIdFilter = (req.query.eventId || req.query.event_id || "")
+      .toString()
+      .trim();
+
+    const whereClauses = [
+      "user_id = $1",
+      "COALESCE(data ->> 'type', '') <> $2",
+    ];
+    const params = [userId, hiddenType];
+    let paramIndex = 3;
+
+    if (typeFilter) {
+      whereClauses.push(`LOWER(COALESCE(data ->> 'type', '')) = $${paramIndex}`);
+      params.push(typeFilter);
+      paramIndex += 1;
+    }
+
+    if (eventIdFilter) {
+      whereClauses.push(
+        `(data ->> 'eventId' = $${paramIndex} OR data ->> 'event_id' = $${paramIndex})`
+      );
+      params.push(eventIdFilter);
+      paramIndex += 1;
+    }
+
+    const whereClause = whereClauses.length
+      ? `WHERE ${whereClauses.join(" AND ")}`
+      : "";
 
     const countRes = await pool.query(
       `
       SELECT COUNT(*)
       FROM notifications
-      WHERE user_id = $1
-        AND COALESCE(data ->> 'type', '') <> $2
+      ${whereClause}
       `,
-      [userId, hiddenType]
+      params
     );
     const total = parseInt(countRes.rows[0].count, 10);
     const totalPages = Math.max(Math.ceil(total / limit), 1);
 
+    const listParams = [...params, limit, offset];
     const listRes = await pool.query(
       `
       SELECT id, title, body, data, created_at, read_at
       FROM notifications
-      WHERE user_id = $1
-        AND COALESCE(data ->> 'type', '') <> $4
+      ${whereClause}
       ORDER BY created_at DESC
-      LIMIT $2 OFFSET $3
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}
       `,
-      [userId, limit, offset, hiddenType]
+      listParams
     );
 
     res.json({

@@ -9,11 +9,13 @@ import '../../services/notification_api_service.dart';
 import '../../services/token_service.dart';
 import '../../utils/ist_date_time.dart';
 import '../../widgets/app_background.dart';
+import '../../localization/localization_extensions.dart';
 import '../chat/chat_screen.dart';
 import '../organiser/attendance_feedback_screen.dart';
 import '../chat/event_group_chat_screen.dart';
 import '../organiser/event_details_screen.dart';
 import '../organiser/organiser_profile_screen.dart';
+import '../organiser/review_application_screen.dart';
 import '../volunteer/my_applications_screen.dart';
 import '../volunteer/event_announcements_screen.dart';
 import '../volunteer/payment_history_screen.dart';
@@ -219,6 +221,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
       if (!mounted) return;
 
+      if (res.statusCode == 404) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              context.tr(
+                "This event was removed by admin. Details are no longer available.",
+              ),
+            ),
+          ),
+        );
+        return;
+      }
+
       if (res.statusCode != 200) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Failed to load event details")),
@@ -257,6 +272,53 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
+  Future<void> _openOrganiserEventDetails(int eventId) async {
+    try {
+      final res = await http.get(
+        Uri.parse("${ApiConfig.baseUrl}/events/$eventId"),
+      );
+
+      if (!mounted) return;
+
+      if (res.statusCode == 404) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              context.tr(
+                "This event was removed by admin. Details are no longer available.",
+              ),
+            ),
+          ),
+        );
+        return;
+      }
+
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body);
+        final event = decoded is Map<String, dynamic>
+            ? decoded
+            : Map<String, dynamic>.from(decoded as Map);
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => EventDetailsScreen(event: event),
+          ),
+        );
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr("Failed to open event details"))),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr("Failed to open event details"))),
+      );
+    }
+  }
+
   Future<void> _openProfile() async {
     final role = (await TokenService.getRole())?.toLowerCase();
     if (!mounted) return;
@@ -277,6 +339,25 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
+  String? _eventTitleFromNotification(NotificationItem item) {
+    final dataTitle = item.data["eventTitle"] ?? item.data["event_title"];
+    if (dataTitle != null) {
+      final parsed = dataTitle.toString().trim();
+      if (parsed.isNotEmpty) return parsed;
+    }
+
+    final title = item.title;
+    const prefixes = ["Event chat: ", "Announcement: "];
+    for (final prefix in prefixes) {
+      if (title.startsWith(prefix)) {
+        final parsed = title.substring(prefix.length).trim();
+        if (parsed.isNotEmpty) return parsed;
+      }
+    }
+
+    return null;
+  }
+
   Future<void> _handleTap(NotificationItem item) async {
     await _markRead(item);
 
@@ -287,13 +368,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       final raw = data["threadId"] ?? data["thread_id"];
       final threadId = int.tryParse(raw?.toString() ?? "");
       if (threadId != null) {
+        final title = _eventTitleFromNotification(item) ?? "Chat";
         if (!mounted) return;
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => ChatScreen(
               threadId: threadId,
-              title: "Chat",
+              title: title,
             ),
           ),
         );
@@ -326,13 +408,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       final raw = data["eventId"] ?? data["event_id"];
       final eventId = int.tryParse(raw?.toString() ?? "");
       if (eventId != null) {
+        final eventTitle = _eventTitleFromNotification(item) ?? "Event";
         if (!mounted) return;
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => EventGroupChatScreen(
               eventId: eventId,
-              eventTitle: "Event",
+              eventTitle: eventTitle,
             ),
           ),
         );
@@ -344,13 +427,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       final raw = data["eventId"] ?? data["event_id"];
       final eventId = int.tryParse(raw?.toString() ?? "");
       if (eventId != null) {
+        final eventTitle = _eventTitleFromNotification(item) ?? "Event";
         if (!mounted) return;
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => EventAnnouncementsScreen(
               eventId: eventId,
-              eventTitle: "Event",
+              eventTitle: eventTitle,
             ),
           ),
         );
@@ -358,9 +442,62 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       return;
     }
 
+    if (type == "payment_issue_reported") {
+      final raw = data["eventId"] ?? data["event_id"];
+      final eventId = int.tryParse(raw?.toString() ?? "");
+      if (eventId != null) {
+        final role = (await TokenService.getRole())?.toLowerCase();
+        if (!mounted) return;
+        if (role == "organiser") {
+          await _openOrganiserEventDetails(eventId);
+        } else {
+          await _openEventDetails(eventId);
+        }
+      }
+      return;
+    }
+
+    if (type == "broadcast" || type == "targeted") {
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(item.title),
+          content: Text(item.body.isNotEmpty
+              ? item.body
+              : context.tr("No additional details available.")),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(context.tr("Close")),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    if (type == "event_removed" || type == "event_deleted") {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context.tr(
+              "This event was removed by admin. Details are no longer available.",
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (type == "verification") {
+      await _openProfile();
+      return;
+    }
+
     if (type == "event_update" ||
         type == "event_broadcast" ||
-        type == "event_removed" ||
         type == "event_cancelled" ||
         type == "event_announcement") {
       final raw = data["eventId"] ?? data["event_id"];
@@ -395,10 +532,32 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       return;
     }
 
+    if (type == "volunteer_cancelled") {
+      final raw = data["eventId"] ?? data["event_id"];
+      final eventId = int.tryParse(raw?.toString() ?? "");
+      if (eventId != null) {
+        final role = (await TokenService.getRole())?.toLowerCase();
+        if (!mounted) return;
+        if (role == "organiser") {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ReviewApplicationsScreen(eventId: eventId),
+            ),
+          );
+        } else {
+          await _openEventDetails(eventId);
+        }
+      }
+      return;
+    }
+
     if (
         type == "application_status" ||
+        type == "waitlist_promoted" ||
         type == "application_cancelled" ||
-        type == "attendance_absent_strike") {
+        type == "attendance_absent_strike" ||
+        type == "strike_appeal_reviewed") {
       if (!mounted) return;
       Navigator.push(
         context,
@@ -409,7 +568,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     if (type == "account_status" ||
         type == "account_strike" ||
-        type == "account_suspension") {
+        type == "account_suspension" ||
+        type == "account_restored" ||
+        type == "account_unsuspended") {
       await _openProfile();
       return;
     }

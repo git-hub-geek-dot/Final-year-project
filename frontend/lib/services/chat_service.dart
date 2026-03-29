@@ -55,7 +55,18 @@ class ChatService {
       return (data["messages"] as List<dynamic>?) ?? [];
     }
 
-    throw Exception("Failed to fetch messages");
+    String messageText = "Failed to fetch messages";
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map) {
+        final parsed = decoded["error"] ?? decoded["message"];
+        if (parsed != null && parsed.toString().trim().isNotEmpty) {
+          messageText = parsed.toString();
+        }
+      }
+    } catch (_) {}
+
+    throw Exception(messageText);
   }
 
   static String socketUrl() {
@@ -87,6 +98,9 @@ class ChatService {
 
   static Future<Map<String, dynamic>> fetchEventGroupMessages(int eventId) async {
     final token = await TokenService.getToken();
+    if (token == null || token.isEmpty) {
+      throw Exception("Token not found");
+    }
 
     final response = await http.get(
       Uri.parse("${ApiConfig.baseUrl}/chat/group/$eventId/messages"),
@@ -102,7 +116,18 @@ class ChatService {
       throw Exception("Invalid event chat response");
     }
 
-    throw Exception("Failed to fetch event chat");
+    String messageText = "Failed to fetch event chat";
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map) {
+        final parsed = decoded["error"] ?? decoded["message"];
+        if (parsed != null && parsed.toString().trim().isNotEmpty) {
+          messageText = parsed.toString();
+        }
+      }
+    } catch (_) {}
+
+    throw Exception(messageText);
   }
 
   static Future<Map<String, dynamic>> sendEventGroupMessage({

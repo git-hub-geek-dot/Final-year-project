@@ -60,8 +60,12 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen>
         type == "waitlist_promoted" ||
         type == "attendance_updated" ||
         type == "attendance_absent_strike" ||
+        type == "strike_appeal_reviewed" ||
         type == "event_cancelled" ||
-        type == "event_removed") {
+        type == "event_removed" ||
+        type == "event_deleted" ||
+        type == "event_update" ||
+        type == "event_broadcast") {
       fetchMyApplications();
     }
   }
@@ -143,6 +147,20 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen>
       );
 
       if (!mounted) return;
+
+      if (response.statusCode == 404) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              context.tr(
+                "This event was removed by admin. Details are no longer available.",
+              ),
+            ),
+          ),
+        );
+        await fetchMyApplications();
+        return;
+      }
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -342,6 +360,11 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen>
         _normalizedStatus((app["status"] ?? "").toString()) == "completed";
   }
 
+  bool _isEventRemoved(Map app) {
+    final eventStatus = (app["event_status"] ?? "").toString().toLowerCase();
+    return eventStatus == "deleted" || eventStatus == "deleted_by_admin";
+  }
+
   bool _isReviewClosed(Map app) {
     if (app["review_closed"] == true) return true;
 
@@ -413,6 +436,12 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen>
   }
 
   String? _statusDescription(Map app) {
+    if (_isEventRemoved(app)) {
+      return context.tr(
+        "This event was removed by admin. Details are no longer available.",
+      );
+    }
+
     final status = _normalizedStatus((app["status"] ?? "pending").toString());
     final attendanceStatus = _normalizedAttendanceStatus(
       (app["attendance_status"] ?? "unmarked").toString(),
@@ -768,7 +797,8 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen>
                     final trimmedReason = reasonController.text.trim();
                     final hasReason = trimmedReason.isNotEmpty;
                     final hasDocument = documentUrl != null;
-                    if (!hasReason && !hasDocument) {
+                    final requiresJustification = isWithinLockWindow;
+                    if (requiresJustification && !hasReason && !hasDocument) {
                       final error = context.tr(
                         "Please provide a reason or upload a supporting document",
                       );
@@ -1031,11 +1061,13 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen>
                          final attendanceStatus = _normalizedAttendanceStatus(
                            (app["attendance_status"] ?? "unmarked").toString(),
                          );
+                         final isRemoved = _isEventRemoved(app);
                          final appIdRaw = app["id"];
                          final appId = appIdRaw is int
                              ? appIdRaw
                              : int.tryParse(appIdRaw.toString());
-                         final canCancel = _canCancelApplication(app);
+                         final canCancel =
+                             _canCancelApplication(app) && !isRemoved;
                          final isWithinLockWindow = _isWithinLockWindow(app);
                          final isCancelling = appId != null &&
                              cancellingApplicationId != null &&
@@ -1055,22 +1087,38 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen>
                          final infoChips = _buildInfoChips(app);
                          final statusDescription = _statusDescription(app);
                          final isReviewClosed = _isReviewClosed(app);
-                         final chipLabel = attendanceStatus == "absent"
-                             ? context.tr("Attendance absent").toUpperCase()
-                             : isReviewClosed
-                                 ? context.tr("Review closed").toUpperCase()
-                                 : statusLabel(status).toUpperCase();
-                         final chipColor = attendanceStatus == "absent"
-                             ? Colors.deepOrange
-                             : isReviewClosed
-                                 ? Colors.redAccent
-                                 : statusColor(status);
+                         final chipLabel = isRemoved
+                             ? context.tr("Event removed").toUpperCase()
+                             : attendanceStatus == "absent"
+                                 ? context.tr("Attendance absent").toUpperCase()
+                                 : isReviewClosed
+                                     ? context.tr("Review closed").toUpperCase()
+                                     : statusLabel(status).toUpperCase();
+                         final chipColor = isRemoved
+                             ? Colors.grey
+                             : attendanceStatus == "absent"
+                                 ? Colors.deepOrange
+                                 : isReviewClosed
+                                     ? Colors.redAccent
+                                     : statusColor(status);
 
                          return Card(
                            margin: const EdgeInsets.only(bottom: 12),
                            clipBehavior: Clip.antiAlias,
                            child: InkWell(
                              onTap: () async {
+                               if (isRemoved) {
+                                 ScaffoldMessenger.of(context).showSnackBar(
+                                   SnackBar(
+                                     content: Text(
+                                       context.tr(
+                                         "This event was removed by admin. Details are no longer available.",
+                                       ),
+                                     ),
+                                   ),
+                                 );
+                                 return;
+                               }
                                final raw = app["event_id"];
                                final eventId = raw is int
                                    ? raw

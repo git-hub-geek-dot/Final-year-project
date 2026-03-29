@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../services/chat_service.dart';
+import '../../services/notification_service.dart';
 import '../../services/token_service.dart';
 import '../../utils/ist_date_time.dart';
 import 'chat_screen.dart';
@@ -16,11 +19,20 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   bool loading = true;
   List<dynamic> threads = [];
   int? userId;
+  StreamSubscription<Map<String, dynamic>>? _notificationSub;
 
   @override
   void initState() {
     super.initState();
     loadThreads();
+    _notificationSub =
+        NotificationService.messageEvents.listen(_handleNotificationEvent);
+  }
+
+  @override
+  void dispose() {
+    _notificationSub?.cancel();
+    super.dispose();
   }
 
   Future<void> loadThreads() async {
@@ -35,6 +47,12 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
     } catch (_) {
       setState(() => loading = false);
     }
+  }
+
+  void _handleNotificationEvent(Map<String, dynamic> data) {
+    final type = (data["type"] ?? "").toString().trim().toLowerCase();
+    if (type != "chat_message") return;
+    loadThreads();
   }
 
   String _formatThreadTime(dynamic raw) {

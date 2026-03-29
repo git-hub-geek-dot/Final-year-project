@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../services/event_service.dart';
+import '../../services/notification_service.dart';
 import '../../utils/ist_date_time.dart';
 import 'event_details_screen.dart';
 import '../../localization/localization_extensions.dart';
@@ -18,11 +21,30 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
       0; // 0: All, 1: Draft, 2: Cancelled, 3: Upcoming, 4: Ongoing, 5: Completed
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = "";
+  StreamSubscription<Map<String, dynamic>>? _notificationSub;
 
   @override
   void initState() {
     super.initState();
     loadEvents();
+    _notificationSub =
+        NotificationService.messageEvents.listen(_handleNotificationEvent);
+  }
+
+  @override
+  void dispose() {
+    _notificationSub?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _handleNotificationEvent(Map<String, dynamic> data) {
+    if (!mounted) return;
+
+    final type = (data["type"] ?? "").toString().trim().toLowerCase();
+    if (type == "event_removed" || type == "event_deleted") {
+      loadEvents();
+    }
   }
 
   Future<void> loadEvents() async {
@@ -412,9 +434,4 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
     );
   }
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
 }

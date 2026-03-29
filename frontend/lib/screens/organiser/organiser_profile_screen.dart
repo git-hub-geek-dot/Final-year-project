@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../config/api_config.dart';
+import '../../services/notification_service.dart';
 import '../../services/token_service.dart';
 import '../../services/verification_service.dart';
 import '../../services/rating_service.dart';
@@ -288,11 +290,37 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
   String? verificationStatus;
   String _ratingValue = "0.0";
   String _ratingCount = "0";
+  StreamSubscription<Map<String, dynamic>>? _notificationSub;
 
   @override
   void initState() {
     super.initState();
     _refreshProfile();
+    _notificationSub =
+        NotificationService.messageEvents.listen(_handleNotificationEvent);
+  }
+
+  @override
+  void dispose() {
+    _notificationSub?.cancel();
+    super.dispose();
+  }
+
+  void _handleNotificationEvent(Map<String, dynamic> data) {
+    if (!mounted) return;
+
+    final type = (data["type"] ?? "").toString().trim().toLowerCase();
+    if (type != "verification") return;
+
+    final status = (data["status"] ?? "").toString().toLowerCase().trim();
+    if (status.isNotEmpty) {
+      setState(() {
+        verificationStatus = status;
+      });
+      return;
+    }
+
+    loadVerificationStatus();
   }
 
   Future<void> _refreshProfile() async {
@@ -305,6 +333,7 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
 
   Future<void> loadVerificationStatus() async {
     final status = await VerificationService.getStatus();
+    if (!mounted) return;
     setState(() {
       verificationStatus = status;
     });
@@ -965,4 +994,3 @@ Widget _languageOption(BuildContext context) {
     ),
   );
 }
-

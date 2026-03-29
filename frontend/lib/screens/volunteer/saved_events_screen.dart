@@ -1,5 +1,11 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import '../../config/api_config.dart';
 import '../../services/saved_events_service.dart';
+import '../../services/notification_service.dart';
 import '../../utils/ist_date_time.dart';
 import 'view_event_screen.dart';
 import '../../localization/localization_extensions.dart';
@@ -15,11 +21,91 @@ class _SavedEventsScreenState extends State<SavedEventsScreen> {
   bool loading = true;
   String? errorMessage;
   List<Map<String, dynamic>> savedEvents = [];
+  StreamSubscription<Map<String, dynamic>>? _notificationSub;
 
   @override
   void initState() {
     super.initState();
     _loadSavedEvents();
+    _notificationSub =
+        NotificationService.messageEvents.listen(_handleNotificationEvent);
+  }
+
+  @override
+  void dispose() {
+    _notificationSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _handleNotificationEvent(Map<String, dynamic> data) async {
+    if (!mounted) return;
+
+    final type = (data["type"] ?? "").toString().trim().toLowerCase();
+    if (type != "event_removed" &&
+        type != "event_deleted" &&
+        type != "event_update" &&
+        type != "event_broadcast") {
+      return;
+    }
+
+    final rawEventId = data["eventId"] ?? data["event_id"];
+    final eventId = rawEventId?.toString();
+    if (eventId == null || eventId.trim().isEmpty) return;
+
+    final isSaved =
+        savedEvents.any((event) => event["id"].toString() == eventId);
+    if (!isSaved) return;
+
+    if (type == "event_removed" || type == "event_deleted") {
+      await SavedEventsService.removeEvent(eventId);
+      if (!mounted) return;
+      await _loadSavedEvents();
+      return;
+    }
+
+    await _refreshSavedEvent(eventId);
+  }
+
+  Future<void> _refreshSavedEvent(String eventId) async {
+    http.Response? response;
+    try {
+      response = await http.get(
+        Uri.parse("${ApiConfig.baseUrl}/events/$eventId"),
+      );
+    } catch (_) {
+      response = null;
+    }
+
+    if (!mounted) return;
+
+    if (response == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr("Failed to refresh saved event."))),
+      );
+      return;
+    }
+
+    if (response.statusCode == 404) {
+      await SavedEventsService.removeEvent(eventId);
+      if (!mounted) return;
+      await _loadSavedEvents();
+      return;
+    }
+
+    if (response.statusCode != 200) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr("Failed to refresh saved event."))),
+      );
+      return;
+    }
+
+    final decoded = jsonDecode(response.body);
+    final freshEvent = decoded is Map<String, dynamic>
+        ? decoded
+        : Map<String, dynamic>.from(decoded as Map);
+    await SavedEventsService.saveEvent(freshEvent);
+    if (!mounted) return;
+    await _loadSavedEvents();
   }
 
   Future<void> _loadSavedEvents() async {
@@ -47,6 +133,76 @@ class _SavedEventsScreenState extends State<SavedEventsScreen> {
 
   Future<void> _removeEvent(String eventId) async {
     await SavedEventsService.removeEvent(eventId);
+    await _loadSavedEvents();
+  }
+
+  Future<void> _openSavedEvent(Map<String, dynamic> event) async {
+    final rawId = event["id"];
+    final eventId = int.tryParse(rawId?.toString() ?? "");
+    if (eventId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr("Invalid event details"))),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    http.Response? response;
+    try {
+      response = await http.get(
+        Uri.parse("${ApiConfig.baseUrl}/events/$eventId"),
+      );
+    } catch (_) {
+      response = null;
+    }
+
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop();
+
+    if (response == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr("Failed to load event details"))),
+      );
+      return;
+    }
+
+    if (response.statusCode == 404) {
+      await SavedEventsService.removeEvent(eventId.toString());
+      if (!mounted) return;
+      await _loadSavedEvents();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr("This event is no longer available."))),
+      );
+      return;
+    }
+
+    if (response.statusCode != 200) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr("Failed to load event details"))),
+      );
+      return;
+    }
+
+    final decoded = jsonDecode(response.body);
+    final freshEvent = decoded is Map<String, dynamic>
+        ? decoded
+        : Map<String, dynamic>.from(decoded as Map);
+
+    await SavedEventsService.saveEvent(freshEvent);
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ViewEventScreen(event: freshEvent),
+      ),
+    );
     await _loadSavedEvents();
   }
 
@@ -105,15 +261,7 @@ class _SavedEventsScreenState extends State<SavedEventsScreen> {
                                 _removeEvent(id);
                               },
                             ),
-                            onTap: () async {
-                              await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ViewEventScreen(event: event),
-                                ),
-                              );
-                              await _loadSavedEvents();
-                            },
+                            onTap: () => _openSavedEvent(event),
                           ),
                         );
                       },

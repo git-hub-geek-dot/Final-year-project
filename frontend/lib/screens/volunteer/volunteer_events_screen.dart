@@ -486,15 +486,18 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
           appStatus == "accepted" ||
           appStatus == "completed";
       final isHistoryEligible =
-          isApproved || appStatus == "cancelled" || reviewClosed;
+          isApproved ||
+          appStatus == "cancelled" ||
+          appStatus == "rejected" ||
+          reviewClosed;
 
       final matchesTab = selectedTab == "all"
-          ? !_isPastStatus(eventStatus) && appStatus != "rejected"
+          ? !_isPastStatus(eventStatus)
           : selectedTab == "past"
               ? isPast && isHistoryEligible
               : selectedTab == "ongoing"
-                  ? isOngoing && appStatus != "rejected"
-                  : isUpcoming && appStatus != "rejected";
+                  ? isOngoing
+                  : isUpcoming;
 
       final matchesDate = _matchesDateFilter(dateOnly, today);
 
@@ -677,8 +680,7 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
 
     if (selectedDate == "This Week") {
       final endOfWeek = today.add(const Duration(days: 7));
-      return eventDate.isAfter(today.subtract(const Duration(days: 1))) &&
-          eventDate.isBefore(endOfWeek);
+      return !eventDate.isBefore(today) && !eventDate.isAfter(endOfWeek);
     }
 
     if (selectedDate == "This Month") {
@@ -736,7 +738,7 @@ class _VolunteerEventsScreenState extends State<VolunteerEventsScreen> {
     ]);
     final fallback = applied ?? 0;
     return context.tr(
-      "{filled}/{required} approved",
+      "{filled}/{required} applied",
       args: {
         "filled": fallback.toString(),
         "required": required.toString(),

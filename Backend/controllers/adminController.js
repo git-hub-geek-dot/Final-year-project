@@ -1542,7 +1542,8 @@ const dismissReport = async (req, res) => {
           resolved_at = NOW(),
           updated_at = NOW()
       WHERE id = $3 AND status = 'pending'
-      RETURNING id, reporter_id, target_type, target_id, reason, admin_note
+      RETURNING id, reporter_id, target_type, target_id, reason, admin_note,
+        (SELECT title FROM events WHERE id = reports.target_id) AS event_title
       `,
       [note || null, adminId, reportId]
     );
@@ -1566,6 +1567,7 @@ const dismissReport = async (req, res) => {
           body: buildPaymentIssueUpdateBody({
             actionTaken: "dismissed",
             note: updatedReport.admin_note,
+            eventTitle: updatedReport.event_title,
           }),
           data: {
             type: "payment_issue_update",
@@ -1576,9 +1578,11 @@ const dismissReport = async (req, res) => {
               updatedReport.target_id != null
                 ? String(updatedReport.target_id)
                 : null,
+            eventTitle: updatedReport.event_title,
             message: buildPaymentIssueUpdateBody({
               actionTaken: "dismissed",
               note: updatedReport.admin_note,
+              eventTitle: updatedReport.event_title,
             }),
           },
         });
@@ -1843,6 +1847,7 @@ const resolveReport = async (req, res) => {
             eventId:
               report.target_id != null ? String(report.target_id) : null,
             actionTaken,
+            eventTitle: report.event_title,
             message: buildPaymentIssueUpdateBody({
               actionTaken,
               note,

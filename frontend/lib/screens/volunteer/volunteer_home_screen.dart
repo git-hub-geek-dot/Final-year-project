@@ -433,19 +433,14 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      isOngoing
-                          ? context.tr("My Ongoing Events")
-                          : context.tr("My Upcoming Events"),
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+                Text(
+                  isOngoing
+                      ? context.tr("My Ongoing Events")
+                      : context.tr("My Upcoming Events"),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 10),
                 Container(
@@ -504,17 +499,12 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
           const SizedBox(height: 16),
           Container(
             key: _recommendedHeaderKey,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  context.tr("Recommended for You"),
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+            child: Text(
+              context.tr("Recommended for You"),
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -1013,6 +1003,8 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 6),
                   Row(
@@ -1020,7 +1012,14 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
                       const Icon(Icons.calendar_today,
                           size: 16, color: Colors.black54),
                       const SizedBox(width: 6),
-                      Text(date, style: const TextStyle(color: Colors.black54)),
+                      Expanded(
+                        child: Text(
+                          date,
+                          style: const TextStyle(color: Colors.black54),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 6),
@@ -1044,7 +1043,14 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
                       const Icon(Icons.access_time,
                           size: 16, color: Colors.black54),
                       const SizedBox(width: 6),
-                      Text(time, style: const TextStyle(color: Colors.black54)),
+                      Expanded(
+                        child: Text(
+                          time,
+                          style: const TextStyle(color: Colors.black54),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -1149,65 +1155,81 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
                   Text(
                     event["title"] ?? "",
                     style: const TextStyle(fontWeight: FontWeight.w600),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
                   Text(
                     event["location"] ?? "",
                     style: const TextStyle(color: Colors.black54, fontSize: 12),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
                   Text(
                     date,
                     style: const TextStyle(color: Colors.black54, fontSize: 12),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
                   Text(
                     time,
                     style: const TextStyle(color: Colors.black54, fontSize: 12),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                actionState.isEnabled
-                    ? _gradientButton(
-                        label: actionState.label,
-                        compact: true,
-                        onTap: () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ViewEventScreen(event: event),
+            Flexible(
+              fit: FlexFit.loose,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  actionState.isEnabled
+                      ? _gradientButton(
+                          label: actionState.label,
+                          compact: true,
+                          onTap: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ViewEventScreen(event: event),
+                              ),
+                            );
+                            await _loadSavedEvents();
+                            await fetchMyApplications();
+                          },
+                        )
+                      : _statusPill(actionState.label, actionState.color),
+                  if (progressLabel != null) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.people_outline,
+                            size: 12, color: Colors.black38),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            progressLabel,
+                            style: const TextStyle(
+                              color: Colors.black38,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
                             ),
-                          );
-                          await _loadSavedEvents();
-                          await fetchMyApplications();
-                        },
-                      )
-                    : _statusPill(actionState.label, actionState.color),
-                if (progressLabel != null) ...[
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.people_outline,
-                          size: 12, color: Colors.black38),
-                      const SizedBox(width: 4),
-                      Text(
-                        progressLabel,
-                        style: const TextStyle(
-                          color: Colors.black38,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.right,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ],
         ),
@@ -1331,6 +1353,8 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
           fontWeight: FontWeight.w600,
           fontSize: 12,
         ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }
@@ -1362,6 +1386,8 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
               color: Colors.white,
               fontWeight: FontWeight.w600,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ),
@@ -1472,11 +1498,15 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                label,
-                style: TextStyle(
-                  color: selected ? Colors.white : Colors.black87,
-                  fontWeight: FontWeight.w600,
+              Flexible(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: selected ? Colors.white : Colors.black87,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               const SizedBox(width: 6),

@@ -2019,6 +2019,53 @@ const sendEventNotification = async (req, res) => {
   }
 };
 
+const restoreEvent = async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const requestedStatus = (req.body?.status || "").toString().trim().toLowerCase();
+    const allowedStatuses = new Set(["draft", "open", "closed", "completed"]);
+
+    if (!allowedStatuses.has(requestedStatus)) {
+      return res.status(400).json({
+        error: "Invalid restore status",
+      });
+    }
+
+    const eventRes = await pool.query(
+      "SELECT id, status FROM events WHERE id = $1",
+      [eventId]
+    );
+
+    if (eventRes.rowCount === 0) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    if (eventRes.rows[0].status !== "deleted") {
+      return res.status(400).json({
+        error: "Only hidden events can be restored",
+      });
+    }
+
+    const restored = await pool.query(
+      `
+      UPDATE events
+      SET status = $2
+      WHERE id = $1
+      RETURNING id, status
+      `,
+      [eventId, requestedStatus]
+    );
+
+    res.json({
+      message: "Event restored",
+      event: restored.rows[0],
+    });
+  } catch (err) {
+    console.error("RESTORE EVENT ERROR:", err);
+    res.status(500).json({ error: "Failed to restore event" });
+  }
+};
+
 module.exports = {
   getUsers,
   getEvents,
@@ -2035,6 +2082,7 @@ module.exports = {
   reviewStrikeAppeal,
   deleteEvent,
   hardDeleteEvent,
+  restoreEvent,
   getVolunteerLeaderboard,
   getOrganiserLeaderboard,
   evaluateBadges,

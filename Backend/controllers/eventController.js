@@ -1336,7 +1336,13 @@ exports.submitAttendanceFeedback = async (req, res) => {
           NOW() >= (
             event_date + COALESCE(start_time, TIME '00:00:00')
           )
-        ) AS has_started
+        ) AS has_started,
+        (
+          NOW() <= (
+            COALESCE(end_date, event_date) + COALESCE(end_time, TIME '23:59:59')
+            + INTERVAL '48 hours'
+          )
+        ) AS within_attendance_grace
       FROM events
       WHERE id = $1 AND organiser_id = $2
       `,
@@ -1367,6 +1373,29 @@ exports.submitAttendanceFeedback = async (req, res) => {
       return res.status(400).json({
         error: "Attendance is available after event starts",
       });
+    }
+    if (event.status === "completed" && event.within_attendance_grace !== true) {
+      const reopenAccessRes = await pool.query(
+        `
+        SELECT 1
+        FROM reports
+        WHERE target_type = 'event'
+          AND target_id = $1
+          AND reporter_id = $2
+          AND status = 'resolved'
+          AND action_taken = 'reopen_attendance'
+          AND resolved_at >= NOW() - INTERVAL '24 hours'
+        LIMIT 1
+        `,
+        [eventId, organiserId]
+      );
+
+      if (reopenAccessRes.rowCount === 0) {
+        return res.status(400).json({
+          error:
+            "Attendance grace window has ended (48 hours after event end). Ask admin to reopen attendance.",
+        });
+      }
     }
 
     const approvedVolunteersResult = await pool.query(

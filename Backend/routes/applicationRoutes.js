@@ -73,6 +73,13 @@ router.put(
   applicationController.updateCompensationStatus
 );
 
+// ✅ NEW: Organiser marks compensation as sent
+router.put(
+  "/applications/:id/mark-paid",
+  authenticateToken,
+  applicationController.markCompensationSentByOrganiser
+);
+
 // ✅ NEW: Volunteer cancellation with strike-window policy
 router.put(
   "/applications/:id/cancel",

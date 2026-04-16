@@ -11,6 +11,7 @@ const { initChatSocket } = require("./sockets/chatSocket");
 const { markOverdueEventsCompleted } = require("./services/eventStatusService");
 const {
   notifyOngoingAttendanceUpdates,
+  notifyCompletedAttendanceGraceReminders,
 } = require("./services/eventAttendanceNotificationService");
 
 const app = express();
@@ -66,10 +67,10 @@ initChatSocket(io);
 
 const runEventStatusSync = async () => {
   try {
-    const [updatedCount, attendanceNotifyCount] = await Promise.all([
-      markOverdueEventsCompleted(),
-      notifyOngoingAttendanceUpdates(),
-    ]);
+    const updatedCount = await markOverdueEventsCompleted();
+    const attendanceNotifyCount = await notifyOngoingAttendanceUpdates();
+    const completedGraceNotifyCount =
+      await notifyCompletedAttendanceGraceReminders();
 
     if (updatedCount > 0) {
       console.log(
@@ -80,6 +81,12 @@ const runEventStatusSync = async () => {
     if (attendanceNotifyCount > 0) {
       console.log(
         `[ATTENDANCE NOTIFY] Sent ${attendanceNotifyCount} organiser attendance update notification(s)`
+      );
+    }
+
+    if (completedGraceNotifyCount > 0) {
+      console.log(
+        `[ATTENDANCE GRACE NOTIFY] Sent ${completedGraceNotifyCount} completed-event attendance reminder notification(s)`
       );
     }
   } catch (err) {

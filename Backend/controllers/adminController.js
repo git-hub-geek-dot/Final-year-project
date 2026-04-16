@@ -1612,7 +1612,7 @@ const resolveReport = async (req, res) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    if (!["none", "strike", "suspend", "cancel_event"].includes(action)) {
+    if (!["none", "strike", "suspend", "cancel_event", "reopen_attendance"].includes(action)) {
       return res.status(400).json({ error: "Invalid action" });
     }
 
@@ -1801,6 +1801,48 @@ const resolveReport = async (req, res) => {
               ? `Your event was removed. Reason: ${cancelReason}`
               : "Your event was removed by admin.",
             data: { type: "event_removed", eventId: String(actionEventId) },
+          },
+        };
+      }
+    }
+
+    if (action === "reopen_attendance") {
+      if (report.target_type !== "event") {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ error: "Attendance reopen is only available for event reports" });
+      }
+      if (!actionEventId) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ error: "No event to reopen attendance for" });
+      }
+      if ((report.reason || "").toString().trim().toLowerCase() !== "attendance reopen request") {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          error: "Attendance reopen is only allowed for attendance reopen requests",
+        });
+      }
+      if (!report.organiser_id || report.reporter_id !== report.organiser_id) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          error: "Attendance reopen must be requested by the event organiser",
+        });
+      }
+
+      actionTaken = "reopen_attendance";
+
+      if (actionUserId) {
+        postCommitNotification = {
+          userId: actionUserId,
+          errorLabel: "REPORT ATTENDANCE REOPEN NOTIFY ERROR:",
+          payload: {
+            title: "Attendance reopened",
+            body:
+              "Admin approved your request. You can submit attendance for this completed event for the next 24 hours.",
+            data: {
+              type: "attendance_reopen_update",
+              eventId: String(actionEventId),
+              reportId: String(reportId),
+            },
           },
         };
       }

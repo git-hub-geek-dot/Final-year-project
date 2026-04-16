@@ -841,6 +841,118 @@ exports.updateCompensationStatus = async (req, res) => {
   }
 };
 
+// ================= ORGANISER MARK PAYMENT AS SENT =================
+// Organiser can mark payment as sent for approved/completed paid-event applications.
+exports.markCompensationSentByOrganiser = async (req, res) => {
+  try {
+    const applicationId = parseInt(req.params.id, 10);
+    const organiserId = req.user?.id;
+
+    if (req.user?.role !== "organiser") {
+      return res.status(403).json({
+        error: "Only organisers can mark volunteer payments",
+      });
+    }
+
+    if (!Number.isInteger(applicationId) || applicationId <= 0) {
+      return res.status(400).json({ error: "Invalid application ID" });
+    }
+
+    const existingResult = await pool.query(
+      `
+      SELECT
+        a.id,
+        a.status,
+        COALESCE(a.compensation_status, 'pending') AS compensation_status,
+        a.event_id,
+        a.volunteer_id,
+        e.event_type
+      FROM applications a
+      JOIN events e ON e.id = a.event_id
+      WHERE a.id = $1
+        AND e.organiser_id = $2
+      `,
+      [applicationId, organiserId]
+    );
+
+    if (existingResult.rowCount === 0) {
+      return res.status(404).json({ error: "Application not found" });
+    }
+
+    const existing = existingResult.rows[0];
+    const eventType = (existing.event_type || "").toString().toLowerCase();
+    const applicationStatus = normalizeStoredApplicationStatus(existing.status);
+    const compensationStatus = (existing.compensation_status || "pending")
+      .toString()
+      .toLowerCase();
+
+    if (eventType !== "paid") {
+      return res.status(400).json({
+        error: "Compensation tracking is only available for paid events",
+      });
+    }
+
+    if (!["approved", "completed"].includes(applicationStatus)) {
+      return res.status(400).json({
+        error: "Only approved or completed applications can be marked as paid",
+      });
+    }
+
+    if (compensationStatus === "received") {
+      return res.status(200).json({
+        success: true,
+        message: "Volunteer already confirmed payment received",
+        application: {
+          id: existing.id,
+          compensation_status: "received",
+          event_id: existing.event_id,
+          volunteer_id: existing.volunteer_id,
+        },
+      });
+    }
+
+    if (compensationStatus === "payment_sent") {
+      return res.status(200).json({
+        success: true,
+        message: "Payment was already marked as sent",
+        application: {
+          id: existing.id,
+          compensation_status: "payment_sent",
+          event_id: existing.event_id,
+          volunteer_id: existing.volunteer_id,
+        },
+      });
+    }
+
+    const updateResult = await pool.query(
+      `
+      UPDATE applications a
+      SET compensation_status = 'payment_sent'
+      FROM events e
+      WHERE a.id = $1
+        AND e.id = a.event_id
+        AND e.organiser_id = $2
+        AND e.event_type = 'paid'
+      RETURNING a.id, a.compensation_status, a.event_id, a.volunteer_id
+      `,
+      [applicationId, organiserId]
+    );
+
+    if (updateResult.rowCount === 0) {
+      return res.status(404).json({ error: "Application not found" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Payment marked as sent",
+      application: updateResult.rows[0],
+    });
+  } catch (err) {
+    console.error("MARK COMPENSATION SENT ERROR:", err);
+    return res.status(500).json({ error: "Failed to mark payment as sent" });
+  }
+};
+
 // ================= GET SINGLE APPLICATION (DETAILS) =================
 // For organiser to view one application detail
 exports.getApplicationById = async (req, res) => {
@@ -870,6 +982,11 @@ exports.getApplicationById = async (req, res) => {
           ELSE a.status
         END AS status,
         COALESCE(a.attendance_status, 'unmarked') AS attendance_status,
+        COALESCE(
+          CASE WHEN e.event_type = 'unpaid' THEN 'not_applicable' END,
+          a.compensation_status,
+          'pending'
+        ) AS compensation_status,
         COALESCE(a.is_shortlisted, false) AS is_shortlisted,
         COALESCE(a.availability_status, 'available') AS availability_status,
         a.attendance_marked_at,
@@ -881,6 +998,7 @@ exports.getApplicationById = async (req, res) => {
         e.event_date,
         e.end_date,
         e.end_time,
+        e.event_type,
         e.volunteers_required,
         COALESCE(
           (

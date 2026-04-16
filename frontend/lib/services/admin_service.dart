@@ -54,6 +54,23 @@ class AdminService {
     }
   }
 
+  static Future<void> restoreEvent(int eventId, String status) async {
+    final token = await TokenService.getToken();
+
+    final response = await http.put(
+      Uri.parse("${ApiConfig.baseUrl}/admin/events/$eventId/restore"),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({"status": status}),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception("Failed to restore event");
+    }
+  }
+
   // ================= USERS =================
   static Future<Map<String, dynamic>> getAllUsers(
       {int page = 1, int limit = 20}) async {

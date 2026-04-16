@@ -41,8 +41,7 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    "Choose delete type for \"${event["title"]}\".\n\n"
-                    "Soft delete hides the event. Hard delete removes it permanently.",
+                    "Hide removes the event from normal view. Delete permanently removes it forever.",
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -54,7 +53,7 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
                       ),
                       const Expanded(
                         child: Text(
-                          "I understand hard delete is permanent.",
+                          "I understand delete permanently cannot be undone.",
                         ),
                       ),
                     ],
@@ -68,14 +67,14 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
                 ),
                 TextButton(
                   onPressed: () => Navigator.pop(context, _DeleteAction.soft),
-                  child: const Text("Soft Delete"),
+                  child: const Text("Hide"),
                 ),
                 TextButton(
                   onPressed: confirmHardDelete
                       ? () => Navigator.pop(context, _DeleteAction.hard)
                       : null,
                   style: TextButton.styleFrom(foregroundColor: Colors.red),
-                  child: const Text("Hard Delete"),
+                  child: const Text("Delete Permanently"),
                 ),
               ],
             );
@@ -97,6 +96,92 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Delete failed")),
+      );
+    }
+  }
+
+  Future<void> _restoreEvent(Map event) async {
+    String selectedStatus = "open";
+
+    final restoreStatus = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text("Restore event"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Choose how \"${event["title"]}\" should be restored.",
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedStatus,
+                    decoration: const InputDecoration(
+                      labelText: "Restore as",
+                      border: OutlineInputBorder(),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: "draft",
+                        child: Text("Draft"),
+                      ),
+                      DropdownMenuItem(
+                        value: "open",
+                        child: Text("Open"),
+                      ),
+                      DropdownMenuItem(
+                        value: "closed",
+                        child: Text("Cancelled"),
+                      ),
+                      DropdownMenuItem(
+                        value: "completed",
+                        child: Text("Completed"),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setDialogState(() => selectedStatus = value);
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Cancel"),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context, selectedStatus),
+                  child: const Text("Restore"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (restoreStatus == null) return;
+
+    try {
+      await AdminService.restoreEvent(event["id"], restoreStatus);
+      await _fetchEvents(reset: true);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "Event restored as ${_restoreStatusLabel(restoreStatus)}",
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Restore failed")),
       );
     }
   }
@@ -353,6 +438,31 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
                                                     mainAxisAlignment:
                                                         MainAxisAlignment.end,
                                                     children: [
+                                                      if (isDeleted)
+                                                        TextButton.icon(
+                                                          onPressed: () async {
+                                                            await _restoreEvent(
+                                                                event);
+                                                          },
+                                                          icon: const Icon(
+                                                            Icons.restore,
+                                                            size: 16,
+                                                          ),
+                                                          label: const Text(
+                                                            "Restore",
+                                                          ),
+                                                          style: TextButton
+                                                              .styleFrom(
+                                                            foregroundColor:
+                                                                Colors.green,
+                                                            padding:
+                                                                const EdgeInsets
+                                                                    .symmetric(
+                                                              horizontal: 12,
+                                                              vertical: 8,
+                                                            ),
+                                                          ),
+                                                        ),
                                                       if (!isDeleted)
                                                         TextButton.icon(
                                                           onPressed: () async {
@@ -451,6 +561,20 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
       return "deleted_by_admin";
     }
     return raw.isEmpty ? "open" : raw;
+  }
+
+  String _restoreStatusLabel(String status) {
+    switch (status) {
+      case "draft":
+        return "Draft";
+      case "closed":
+        return "Cancelled";
+      case "completed":
+        return "Completed";
+      case "open":
+      default:
+        return "Open";
+    }
   }
 
   Widget _statusChip(String label, String value) {

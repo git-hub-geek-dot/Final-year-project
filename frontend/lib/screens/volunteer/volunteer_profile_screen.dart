@@ -20,6 +20,7 @@ import 'saved_events_screen.dart';
 import 'payment_history_screen.dart';
 import 'invite_friends_screen.dart';
 import 'get_verified_screen.dart';
+import '../reports/my_reports_screen.dart';
 
 class VolunteerProfileScreen extends StatefulWidget {
   const VolunteerProfileScreen({super.key});
@@ -1163,6 +1164,18 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen>
                                   MaterialPageRoute(
                                     builder: (_) =>
                                         const CompensationStatusScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                            _tile(
+                              Icons.report_gmailerrorred,
+                              context.tr("My Reports"),
+                              () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const MyReportsScreen(),
                                   ),
                                 );
                               },

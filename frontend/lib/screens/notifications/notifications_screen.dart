@@ -18,7 +18,7 @@ import '../organiser/organiser_profile_screen.dart';
 import '../organiser/review_application_screen.dart';
 import '../volunteer/my_applications_screen.dart';
 import '../volunteer/event_announcements_screen.dart';
-import '../volunteer/payment_history_screen.dart';
+import '../reports/my_reports_screen.dart';
 import '../volunteer/view_event_screen.dart';
 import '../volunteer/volunteer_profile_screen.dart';
 
@@ -404,6 +404,27 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       return;
     }
 
+    if (type == "attendance_reopen_update") {
+      final raw = data["eventId"] ?? data["event_id"];
+      final eventId = int.tryParse(raw?.toString() ?? "");
+      if (eventId != null) {
+        final role = (await TokenService.getRole())?.toLowerCase();
+        if (!mounted) return;
+
+        if (role == "organiser") {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => AttendanceFeedbackScreen(eventId: eventId),
+            ),
+          );
+        } else {
+          await _openEventDetails(eventId);
+        }
+      }
+      return;
+    }
+
     if (type == "event_group_chat") {
       final raw = data["eventId"] ?? data["event_id"];
       final eventId = int.tryParse(raw?.toString() ?? "");
@@ -527,7 +548,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       if (!mounted) return;
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const CompensationStatusScreen()),
+        MaterialPageRoute(builder: (_) => const MyReportsScreen()),
       );
       return;
     }

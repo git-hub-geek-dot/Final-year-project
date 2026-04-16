@@ -35,6 +35,7 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
   bool loading = true;
   bool actionLoading = false;
   bool shortlistLoading = false;
+  bool compensationLoading = false;
   String? errorMessage;
   late int approvedCount;
   late int volunteersRequired;
@@ -394,6 +395,75 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
     }
   }
 
+  Future<void> markPaymentSent() async {
+    if (compensationLoading) return;
+    try {
+      setState(() => compensationLoading = true);
+
+      final token = await TokenService.getToken();
+      if (token == null || token.isEmpty) {
+        setState(() => compensationLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.tr("Token not found. Please login again."))),
+        );
+        return;
+      }
+
+      final url = Uri.parse(
+        "${ApiConfig.baseUrl}/applications/${widget.applicationId}/mark-paid",
+      );
+
+      final response = await http.put(
+        url,
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
+      );
+
+      setState(() => compensationLoading = false);
+
+      if (response.statusCode == 200) {
+        final decoded = _decodeMap(response.body);
+        final updated = decoded?["application"];
+        final backendMessage = decoded?["message"]?.toString();
+
+        if (updated is Map) {
+          setState(() {
+            application?["compensation_status"] =
+                updated["compensation_status"];
+          });
+        }
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              backendMessage == null || backendMessage.isEmpty
+                  ? context.tr("Payment marked as sent.")
+                  : backendMessage,
+            ),
+          ),
+        );
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_responseErrorMessage(response.body))),
+        );
+      }
+    } catch (e) {
+      setState(() => compensationLoading = false);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context.tr("Error: {error}", args: {"error": e.toString()}),
+          ),
+        ),
+      );
+    }
+  }
+
   bool _isApproveBlockedByCapacity() {
     final currentStatus = normalizeApplicationStatus(application?["status"]);
     if (_isApprovedStatus(currentStatus)) return false;
@@ -414,6 +484,19 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
       );
     }
     return context.tr("Cannot approve. Slots are full.");
+  }
+
+  String _paymentStatusLabel(String status) {
+    switch (status.toLowerCase()) {
+      case "received":
+        return context.tr("Received");
+      case "payment_sent":
+        return context.tr("Marked as sent");
+      case "not_applicable":
+        return context.tr("Not applicable");
+      default:
+        return context.tr("Pending");
+    }
   }
 
   double _asDouble(dynamic value) {
@@ -929,7 +1012,9 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
     final eventStatus =
         (app?["event_status"] ?? "").toString().toLowerCase();
     final isEventOpen = eventStatus.isEmpty || eventStatus == "open";
-    final reviewClosed = _asBool(app?["review_closed"]) || !isEventOpen;
+    final reviewClosed =
+      _isReviewActionable(normalizedStatus) &&
+        (_asBool(app?["review_closed"]) || !isEventOpen);
     final canReviewApplication =
         _isReviewActionable(normalizedStatus) && !reviewClosed;
     final canShortlistApplication = canReviewApplication;
@@ -942,6 +1027,16 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
     final canRateVolunteer = showRatingAction &&
         _isEventCompleted(app) &&
         attendanceStatus != "absent";
+    final eventType = (app?["event_type"] ?? "unpaid").toString().toLowerCase();
+    final compensationStatus =
+      (app?["compensation_status"] ?? (eventType == "paid" ? "pending" : "not_applicable"))
+        .toString()
+        .toLowerCase();
+    final canManageCompensation = eventType == "paid" &&
+      (normalizedStatus == "approved" || normalizedStatus == "completed");
+    final canMarkPaymentSent = canManageCompensation &&
+      compensationStatus != "received" &&
+      compensationStatus != "payment_sent";
 
     final eventsCount = _asInt(
       app?["events_count"] ?? app?["committed_events"] ?? 1,
@@ -1104,6 +1199,11 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                                 : "Absent",
                             compact: compact,
                           ),
+                        infoRow(
+                          "Payment",
+                          _paymentStatusLabel(compensationStatus),
+                          compact: compact,
+                        ),
                         if (priorExperience.isNotEmpty) ...[
                           SizedBox(height: compact ? 8 : 12),
                           _textSection(
@@ -1222,6 +1322,48 @@ class _ViewApplicationScreenState extends State<ViewApplicationScreen> {
                                   ),
                                 ),
                               ),
+                              if (canManageCompensation) ...[
+                                SizedBox(height: compact ? 8 : 10),
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: actionButtonHeight,
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF2563EB),
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                    ),
+                                    onPressed: compensationLoading || !canMarkPaymentSent
+                                        ? null
+                                        : markPaymentSent,
+                                    icon: compensationLoading
+                                        ? const SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              valueColor: AlwaysStoppedAnimation<Color>(
+                                                Colors.white,
+                                              ),
+                                            ),
+                                          )
+                                        : const Icon(Icons.payments_outlined),
+                                    label: Text(
+                                      compensationLoading
+                                          ? "Please wait..."
+                                          : canMarkPaymentSent
+                                              ? "Mark Payment Sent"
+                                              : compensationStatus == "received"
+                                                  ? "Volunteer Confirmed Received"
+                                                  : "Payment Already Marked",
+                                      style: TextStyle(fontSize: compact ? 16 : 18),
+                                    ),
+                                  ),
+                                ),
+                              ],
                               if (showRatingAction) ...[
                                 SizedBox(height: compact ? 8 : 10),
                                 SizedBox(

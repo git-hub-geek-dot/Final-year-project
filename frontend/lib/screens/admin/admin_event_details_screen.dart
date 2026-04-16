@@ -198,13 +198,6 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Event Details"),
-        backgroundColor: Theme.of(context).primaryColor,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_active),
-            onPressed: _showNotifyEventDialog,
-          ),
-        ],
       ),
       body: AppBackground(
         child: RefreshIndicator(
@@ -419,6 +412,15 @@ class _AdminEventDetailsScreenState extends State<AdminEventDetailsScreen> {
                           event["description"] ?? "No description"),
                       _detailRow(
                           "Location", event["location"] ?? "No location"),
+                        _detailRow(
+                        "Event Type",
+                        ((event["event_type"] ?? "unpaid")
+                              .toString()
+                              .toLowerCase() ==
+                            "paid")
+                          ? "Paid"
+                          : "Unpaid",
+                        ),
                       _detailRow("Event Date", _formatEventDateRange(event)),
                       _detailRow("Start Time", _eventStartTime(event)),
                       _detailRow("End Time", _eventEndTime(event)),

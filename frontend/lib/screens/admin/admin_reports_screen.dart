@@ -107,9 +107,10 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
   String _formatActionTaken(dynamic raw) {
     final action = (raw ?? "").toString().trim().toLowerCase();
     if (action.isEmpty) return "-";
-    if (action == "none") return "Resolved without action";
+    if (action == "none") return "No action needed";
     if (action == "dismissed") return "Dismissed";
     if (action == "cancel_event") return "Event removed";
+    if (action == "reopen_attendance") return "Attendance reopened (24h)";
     if (action.startsWith("strike_")) {
       final suffix = action.substring("strike_".length).replaceAll("_", " ");
       return "Strike: $suffix";
@@ -129,6 +130,9 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
     if (reason.toLowerCase() == "unpaid compensation") {
       return "Unpaid compensation";
     }
+    if (reason.toLowerCase() == "attendance reopen request") {
+      return "Attendance reopen request";
+    }
     return reason;
   }
 
@@ -137,12 +141,20 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
     return reason == "unpaid compensation";
   }
 
+  bool _isAttendanceReopenRequest(Map report) {
+    final reason = (report["reason"] ?? "").toString().trim().toLowerCase();
+    return reason == "attendance reopen request";
+  }
+
   String _targetTitle(Map report) {
     final type = report["target_type"]?.toString() ?? "unknown";
     if (type == "user") {
       return "User: ${report["target_user_name"] ?? "Unknown"}";
     }
     if (type == "event") {
+      if (_isAttendanceReopenRequest(report)) {
+        return "Attendance reopen: ${report["target_event_title"] ?? "Unknown"}";
+      }
       if (_isUnpaidCompensationReport(report)) {
         return "Payment issue: ${report["target_event_title"] ?? "Unknown"}";
       }
@@ -161,6 +173,9 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
     }
     if (type == "event") {
       final organiser = report["organiser_name"]?.toString() ?? "-";
+      if (_isAttendanceReopenRequest(report)) {
+        return "Organiser: $organiser  |  Request to reopen attendance";
+      }
       if (_isUnpaidCompensationReport(report)) {
         return "Organiser: $organiser  |  Volunteer reported unpaid payment";
       }
@@ -256,7 +271,8 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
   Future<Map<String, dynamic>?> _promptSuspend() async {
     final daysController = TextEditingController();
     final reasonController = TextEditingController();
-    String? error;
+    String? daysError;
+    String? reasonError;
 
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -269,9 +285,14 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
               TextField(
                 controller: daysController,
                 keyboardType: TextInputType.number,
+                onChanged: (_) {
+                  if (daysError != null) {
+                    setState(() => daysError = null);
+                  }
+                },
                 decoration: InputDecoration(
                   labelText: "Days",
-                  errorText: error,
+                  errorText: daysError,
                 ),
               ),
               const SizedBox(height: 12),
@@ -279,8 +300,14 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                 controller: reasonController,
                 maxLines: 3,
                 maxLength: 500,
-                decoration: const InputDecoration(
+                onChanged: (_) {
+                  if (reasonError != null) {
+                    setState(() => reasonError = null);
+                  }
+                },
+                decoration: InputDecoration(
                   labelText: "Reason",
+                  errorText: reasonError,
                 ),
               ),
             ],
@@ -294,14 +321,20 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
               onPressed: () {
                 final days = int.tryParse(daysController.text.trim());
                 final reason = reasonController.text.trim();
-                if (days == null || days < 1) {
-                  setState(() => error = "Enter valid days");
+
+                final nextDaysError =
+                    (days == null || days < 1) ? "Enter valid days" : null;
+                final nextReasonError =
+                    reason.isEmpty ? "Reason is required" : null;
+
+                if (nextDaysError != null || nextReasonError != null) {
+                  setState(() {
+                    daysError = nextDaysError;
+                    reasonError = nextReasonError;
+                  });
                   return;
                 }
-                if (reason.isEmpty) {
-                  setState(() => error = "Reason is required");
-                  return;
-                }
+
                 Navigator.pop(ctx, {"days": days, "reason": reason});
               },
               child: const Text("Suspend"),
@@ -385,6 +418,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
   Future<void> _showDetails(Map report) async {
     final status = report["status"]?.toString() ?? "pending";
     final canAct = status == "pending";
+    final isAttendanceReopenRequest = _isAttendanceReopenRequest(report);
     final actionUserId = report["action_user_id"];
     final actionEventId = report["action_event_id"];
     final actionTargetLabel = _actionTargetLabel(report);
@@ -444,7 +478,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                   note: note,
                 );
               },
-              child: const Text("Resolve without action"),
+              child: const Text("No action needed"),
             ),
           if (canAct)
             TextButton(
@@ -454,7 +488,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
               },
               child: const Text("Dismiss"),
             ),
-          if (canAct && actionUserId != null)
+          if (canAct && actionUserId != null && !isAttendanceReopenRequest)
             TextButton(
               onPressed: () async {
                 Navigator.pop(ctx);
@@ -475,7 +509,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
               },
               child: Text(_strikeActionLabel(report)),
             ),
-          if (canAct && actionUserId != null)
+          if (canAct && actionUserId != null && !isAttendanceReopenRequest)
             TextButton(
               onPressed: () async {
                 Navigator.pop(ctx);
@@ -493,7 +527,21 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
               },
               child: Text(_suspendActionLabel(report)),
             ),
-          if (canAct && actionEventId != null)
+          if (canAct && actionEventId != null && isAttendanceReopenRequest)
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final note = await _promptAdminNote("Reopen attendance");
+                if (note == null) return;
+                _resolveReport(
+                  reportId: report["id"],
+                  action: "reopen_attendance",
+                  note: note,
+                );
+              },
+              child: const Text("Reopen attendance (24h)"),
+            ),
+          if (canAct && actionEventId != null && !isAttendanceReopenRequest)
             TextButton(
               onPressed: () async {
                 Navigator.pop(ctx);

@@ -207,6 +207,8 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
     switch (status.toLowerCase()) {
       case "received":
         return Colors.green;
+      case "payment_sent":
+        return Colors.blue;
       case "not_applicable":
         return Colors.grey;
       default:
@@ -222,6 +224,8 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
     switch (status.toLowerCase()) {
       case "received":
         return context.tr("Received");
+      case "payment_sent":
+        return context.tr("Marked as sent");
       case "not_applicable":
         return context.tr("Not applicable");
       default:
@@ -272,7 +276,9 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
     final clearanceDate = IstDateTime.tryParse(clearanceDateRaw);
 
     if (eventType != "paid") return false;
-    if (compensationStatus != "pending") return false;
+    if (compensationStatus != "pending" && compensationStatus != "payment_sent") {
+      return false;
+    }
     if (hasPendingReport) return false;
     if (!["approved", "accepted", "completed"].contains(applicationStatus)) {
       return false;
@@ -308,6 +314,24 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
 
     if (compensationStatus == "received") {
       return context.tr("Payment marked as received.");
+    }
+
+    if (compensationStatus == "payment_sent") {
+      if (clearanceDate == null) {
+        return context.tr("Organiser marked payment as sent. Confirm when received.");
+      }
+
+      final clearanceDay = IstDateTime.startOfDay(clearanceDate);
+      if (clearanceDay.isAfter(today)) {
+        return context.tr(
+          "Organiser marked payment as sent. Report unpaid payment after {date} if needed.",
+          args: {"date": IstDateTime.formatDate(clearanceDate)},
+        );
+      }
+
+      return context.tr(
+        "Organiser marked payment as sent. If still unpaid, report to admin.",
+      );
     }
 
     if (hasPendingReport) {
@@ -364,7 +388,15 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
       return;
     }
 
+    const issueOptions = [
+      "Unpaid after clearance date",
+      "Partial payment",
+      "Payment amount mismatch",
+      "Other payment issue",
+    ];
     final detailsController = TextEditingController();
+    String? selectedIssue;
+    String? issueError;
     String? detailsError;
 
     final bool? shouldSubmit = await showDialog<bool>(
@@ -387,6 +419,30 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
                               .toString(),
                         },
                       ),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedIssue,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        labelText: context.tr("Issue category"),
+                        errorText: issueError,
+                        border: const OutlineInputBorder(),
+                      ),
+                      items: issueOptions
+                          .map(
+                            (option) => DropdownMenuItem<String>(
+                              value: option,
+                              child: Text(option),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        setLocalState(() {
+                          selectedIssue = value;
+                          issueError = null;
+                        });
+                      },
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -417,6 +473,12 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () {
+                    if ((selectedIssue ?? "").isEmpty) {
+                      setLocalState(() {
+                        issueError = context.tr("Please select an issue category.");
+                      });
+                      return;
+                    }
                     if (detailsController.text.trim().isEmpty) {
                       setLocalState(() {
                         detailsError = context.tr(
@@ -451,8 +513,10 @@ class _CompensationStatusScreenState extends State<CompensationStatusScreen> {
           context.tr("Paid event");
       final clearanceText = app["payment_clearance_date"]?.toString();
       final volunteerNote = detailsController.text.trim();
+      final issueLabel = selectedIssue ?? "Unpaid after clearance date";
       final autoDetails = [
         "Payment issue for event: $title",
+        "Issue category: $issueLabel",
         "Expected payment: $paymentText",
         if (clearanceText != null && clearanceText.isNotEmpty)
           "Payment clearance date: ${IstDateTime.formatDate(clearanceText)}",

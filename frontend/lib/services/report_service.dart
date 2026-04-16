@@ -40,4 +40,39 @@ class ReportService {
       throw Exception(error);
     }
   }
+
+  static Future<Map<String, dynamic>> getMyReports({
+    int page = 1,
+    int limit = 20,
+    String status = 'all',
+    String type = 'all',
+  }) async {
+    final token = await TokenService.getToken();
+    if (token == null || token.isEmpty) {
+      throw Exception("Token not found");
+    }
+
+    final query = Uri.parse(
+      "${ApiConfig.baseUrl}/reports/me?page=$page&limit=$limit&status=$status&type=$type",
+    );
+
+    final response = await http.get(
+      query,
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+    );
+
+    if (response.statusCode != 200) {
+      String error = "Failed to load reports";
+      try {
+        final data = jsonDecode(response.body);
+        error = data["error"]?.toString() ?? error;
+      } catch (_) {}
+      throw Exception(error);
+    }
+
+    return jsonDecode(response.body);
+  }
 }

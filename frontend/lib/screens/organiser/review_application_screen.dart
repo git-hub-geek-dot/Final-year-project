@@ -553,9 +553,11 @@ class _ReviewApplicationsScreenState extends State<ReviewApplicationsScreen> {
                                     (a["event_status"] ?? "")
                                         .toString()
                                         .toLowerCase();
-                                final reviewClosed = _asBool(a["review_closed"]) ||
-                                    (eventStatus.isNotEmpty &&
-                                        eventStatus != "open");
+                                final reviewClosed =
+                                  isActionableReviewStatus(status) &&
+                                    (_asBool(a["review_closed"]) ||
+                                      (eventStatus.isNotEmpty &&
+                                        eventStatus != "open"));
 
                                 String? cancellationInfo;
                                 if (status == "cancelled" &&

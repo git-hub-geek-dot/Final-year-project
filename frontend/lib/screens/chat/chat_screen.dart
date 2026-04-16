@@ -595,38 +595,83 @@ class _ChatScreenState extends State<ChatScreen> {
     final messageId = msg["id"] as int?;
     if (messageId == null) return;
 
-    final reasonController = TextEditingController();
+    const reasonOptions = [
+      "Harassment or abuse",
+      "Spam",
+      "Fraud or scam",
+      "Hate speech",
+      "Inappropriate content",
+      "Other",
+    ];
+    final customReasonController = TextEditingController();
     final detailsController = TextEditingController();
-    String? errorText;
+    String? selectedReason;
+    String? reasonErrorText;
+    String? customReasonErrorText;
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
           title: const Text("Report message"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text("Tell us why this message is being reported."),
-              const SizedBox(height: 12),
-              TextField(
-                controller: reasonController,
-                decoration: InputDecoration(
-                  labelText: "Reason",
-                  errorText: errorText,
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text("Tell us why this message is being reported."),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: selectedReason,
+                  decoration: InputDecoration(
+                    labelText: "Reason category",
+                    errorText: reasonErrorText,
+                  ),
+                  isExpanded: true,
+                  items: reasonOptions
+                      .map(
+                        (reason) => DropdownMenuItem<String>(
+                          value: reason,
+                          child: Text(reason),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      selectedReason = value;
+                      reasonErrorText = null;
+                      if (value != "Other") {
+                        customReasonErrorText = null;
+                      }
+                    });
+                  },
                 ),
-                maxLength: 255,
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: detailsController,
-                decoration: const InputDecoration(
-                  labelText: "Details (optional)",
+                if (selectedReason == "Other") ...[
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: customReasonController,
+                    decoration: InputDecoration(
+                      labelText: "Custom reason",
+                      errorText: customReasonErrorText,
+                    ),
+                    maxLength: 255,
+                    onChanged: (_) {
+                      if (customReasonErrorText != null) {
+                        setState(() => customReasonErrorText = null);
+                      }
+                    },
+                  ),
+                ],
+                const SizedBox(height: 8),
+                TextField(
+                  controller: detailsController,
+                  decoration: const InputDecoration(
+                    labelText: "Details (optional)",
+                  ),
+                  maxLines: 3,
+                  maxLength: 1000,
                 ),
-                maxLines: 3,
-                maxLength: 1000,
-              ),
-            ],
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -635,9 +680,18 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             TextButton(
               onPressed: () {
-                final reason = reasonController.text.trim();
-                if (reason.isEmpty) {
-                  setState(() => errorText = "Reason is required");
+                final selected = selectedReason?.trim();
+                final custom = customReasonController.text.trim();
+
+                if (selected == null || selected.isEmpty) {
+                  setState(() => reasonErrorText = "Reason is required");
+                  return;
+                }
+
+                if (selected == "Other" && custom.isEmpty) {
+                  setState(
+                    () => customReasonErrorText = "Custom reason is required",
+                  );
                   return;
                 }
                 Navigator.pop(ctx, true);
@@ -649,10 +703,12 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
 
-    final reason = reasonController.text.trim();
+    final selected = (selectedReason ?? "").trim();
+    final reason =
+        selected == "Other" ? customReasonController.text.trim() : selected;
     final details = detailsController.text.trim();
 
-    reasonController.dispose();
+    customReasonController.dispose();
     detailsController.dispose();
 
     if (confirmed != true) return;

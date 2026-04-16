@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../services/event_service.dart';
 import '../../services/notification_service.dart';
+import '../../services/report_service.dart';
 import '../../utils/application_status.dart';
 import '../../utils/ist_date_time.dart';
 import '../../utils/payment_format.dart';
@@ -26,10 +27,12 @@ class EventDetailsScreen extends StatefulWidget {
 }
 
 class _EventDetailsScreenState extends State<EventDetailsScreen> {
+  static const Duration _attendanceGraceWindow = Duration(hours: 48);
   bool loadingStats = true;
   bool publishingDraft = false;
   bool cancellingEvent = false;
   bool announcingEvent = false;
+  bool attendanceReopenActive = false;
   StreamSubscription<Map<String, dynamic>>? _notificationSub;
 
   int applied = 0;
@@ -41,6 +44,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
   void initState() {
     super.initState();
     loadStats();
+    _loadAttendanceReopenAccess();
     _notificationSub =
         NotificationService.messageEvents.listen(_handleNotificationEvent);
   }
@@ -55,6 +59,25 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     if (!mounted) return;
 
     final type = (data["type"] ?? "").toString().trim().toLowerCase();
+    if (type == "attendance_reopen_update") {
+      final rawEventId = data["eventId"] ?? data["event_id"];
+      final eventId = int.tryParse(rawEventId?.toString() ?? "");
+      final currentId = int.tryParse("${widget.event["id"]}");
+      if (eventId != null && currentId != null && eventId == currentId) {
+        setState(() => attendanceReopenActive = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              context.tr(
+                "Attendance was reopened by admin. You can submit it now.",
+              ),
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
     if (type != "event_removed" && type != "event_deleted") {
       return;
     }
@@ -107,6 +130,47 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     }
   }
 
+  Future<void> _loadAttendanceReopenAccess() async {
+    final eventId = int.tryParse("${widget.event["id"]}");
+    if (eventId == null) return;
+
+    try {
+      final data = await ReportService.getMyReports(
+        page: 1,
+        limit: 50,
+        status: "resolved",
+        type: "event",
+      );
+      final items = (data["items"] as List?) ?? [];
+      final now = IstDateTime.now();
+
+      bool hasAccess = false;
+      for (final raw in items) {
+        if (raw is! Map) continue;
+        final report = Map<String, dynamic>.from(raw);
+        final targetId = int.tryParse("${report["target_id"] ?? ""}");
+        final reason = (report["reason"] ?? "").toString().trim().toLowerCase();
+        final actionTaken =
+            (report["action_taken"] ?? "").toString().trim().toLowerCase();
+        final resolvedAt = IstDateTime.tryParse(report["resolved_at"]);
+
+        if (targetId != eventId) continue;
+        if (reason != "attendance reopen request") continue;
+        if (actionTaken != "reopen_attendance") continue;
+        if (resolvedAt == null) continue;
+        if (!now.isAfter(resolvedAt.add(const Duration(hours: 24)))) {
+          hasAccess = true;
+          break;
+        }
+      }
+
+      if (!mounted) return;
+      setState(() => attendanceReopenActive = hasAccess);
+    } catch (_) {
+      // Keep default false when report fetch fails.
+    }
+  }
+
   bool _isDraft(Map event) {
     final text = _normalizedStatus(event);
     return text == "draft";
@@ -122,6 +186,147 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
 
   bool _isCompleted(Map event) {
     return _normalizedStatus(event) == "completed";
+  }
+
+  DateTime? _eventEndDateTime(Map event) {
+    final rawDate = (event["end_date"] ?? event["event_date"])?.toString();
+    final datePart = IstDateTime.tryParse(rawDate);
+    if (datePart == null) return null;
+
+    final rawTime = (event["end_time"] ?? "").toString().trim();
+    final parsedTime = _parseTimeValue(rawTime);
+    final hour = parsedTime?.hour ?? 23;
+    final minute = parsedTime?.minute ?? 59;
+    final second = parsedTime?.second ?? 59;
+
+    return DateTime(
+      datePart.year,
+      datePart.month,
+      datePart.day,
+      hour,
+      minute,
+      second,
+    );
+  }
+
+  DateTime? _parseTimeValue(String value) {
+    if (value.isEmpty) return null;
+    if (value.contains("T")) return IstDateTime.tryParse(value);
+    final normalized = value.length == 5 ? "$value:00" : value;
+    return DateTime.tryParse("2000-01-01T$normalized");
+  }
+
+  bool _isAttendanceGraceWindowOpen(Map event) {
+    if (!_isCompleted(event)) return false;
+    final endAt = _eventEndDateTime(event);
+    if (endAt == null) return false;
+
+    final deadline = endAt.add(_attendanceGraceWindow);
+    return !IstDateTime.now().isAfter(deadline);
+  }
+
+  Future<void> _requestAttendanceReopen(Map event) async {
+    final eventId = int.tryParse("${event["id"]}");
+    if (eventId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr("Invalid event id"))),
+      );
+      return;
+    }
+
+    final detailsController = TextEditingController();
+    String? detailsError;
+
+    final shouldSubmit = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setLocalState) => AlertDialog(
+          title: Text(context.tr("Request attendance reopen")),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  context.tr(
+                    "This sends an admin report to reopen attendance for this completed event.",
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: detailsController,
+                  minLines: 3,
+                  maxLines: 5,
+                  onChanged: (_) {
+                    if (detailsError != null) {
+                      setLocalState(() => detailsError = null);
+                    }
+                  },
+                  decoration: InputDecoration(
+                    labelText: context.tr("Reason details"),
+                    hintText: context.tr(
+                      "Add why attendance could not be marked within 48 hours.",
+                    ),
+                    errorText: detailsError,
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(context.tr("Cancel")),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (detailsController.text.trim().isEmpty) {
+                  setLocalState(() {
+                    detailsError = context.tr(
+                      "Please add a short reason for admin review.",
+                    );
+                  });
+                  return;
+                }
+                Navigator.pop(dialogContext, true);
+              },
+              child: Text(context.tr("Submit report")),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (shouldSubmit != true) {
+      detailsController.dispose();
+      return;
+    }
+
+    try {
+      await ReportService.submitReport(
+        targetType: "event",
+        targetId: eventId,
+        reason: "Attendance reopen request",
+        details: detailsController.text.trim(),
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context.tr("Attendance reopen request submitted for admin review."),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst("Exception: ", ""))),
+      );
+    } finally {
+      detailsController.dispose();
+    }
   }
 
   String _normalizedStatus(Map event) {
@@ -765,6 +970,13 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
         final isCompletedEvent = _isCompleted(event);
         final isOngoingEvent = _normalizedStatus(event) == "ongoing";
         final isRemovedEvent = _normalizedStatus(event) == "deleted_by_admin";
+        final isWithinAttendanceGrace = _isAttendanceGraceWindowOpen(event);
+        final canMarkAttendance =
+            isOngoingEvent || isWithinAttendanceGrace || attendanceReopenActive;
+        final canRequestAttendanceReopen =
+            isCompletedEvent &&
+            !isWithinAttendanceGrace &&
+            !attendanceReopenActive;
 
         final viewVolunteersButton = ElevatedButton(
           onPressed: () async {
@@ -830,7 +1042,23 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
             side: BorderSide(color: Colors.deepPurple.shade300),
           ),
           icon: const Icon(Icons.fact_check_outlined),
-          label: Text(context.tr("Mark Attendance")),
+          label: Text(
+            isCompletedEvent && attendanceReopenActive
+                ? context.tr("Mark Attendance (admin reopened)")
+                : isCompletedEvent && isWithinAttendanceGrace
+                ? context.tr("Mark Attendance (48h grace)")
+                : context.tr("Mark Attendance"),
+          ),
+        );
+
+        final requestAttendanceReopenButton = OutlinedButton.icon(
+          onPressed: () => _requestAttendanceReopen(event),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.orange.shade700,
+            side: BorderSide(color: Colors.orange.shade300),
+          ),
+          icon: const Icon(Icons.lock_reset),
+          label: Text(context.tr("Request attendance reopen")),
         );
 
         final announceButton = OutlinedButton.icon(
@@ -923,8 +1151,14 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                 viewVolunteersButton,
                 const SizedBox(height: 10),
               ],
-              if (!isDraftEvent && !isCancelledEvent && isOngoingEvent) ...[
+              if (!isDraftEvent && !isCancelledEvent && canMarkAttendance) ...[
                 markAttendanceButton,
+                const SizedBox(height: 10),
+              ],
+              if (!isDraftEvent &&
+                  !isCancelledEvent &&
+                  canRequestAttendanceReopen) ...[
+                requestAttendanceReopenButton,
                 const SizedBox(height: 10),
               ],
               if (!isDraftEvent && !isCancelledEvent) ...[
@@ -950,8 +1184,14 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
               Expanded(child: viewVolunteersButton),
               const SizedBox(width: 10),
             ],
-            if (!isDraftEvent && !isCancelledEvent && isOngoingEvent) ...[
+            if (!isDraftEvent && !isCancelledEvent && canMarkAttendance) ...[
               markAttendanceButton,
+              const SizedBox(width: 10),
+            ],
+            if (!isDraftEvent &&
+                !isCancelledEvent &&
+                canRequestAttendanceReopen) ...[
+              requestAttendanceReopenButton,
               const SizedBox(width: 10),
             ],
             if (!isDraftEvent && !isCancelledEvent) ...[

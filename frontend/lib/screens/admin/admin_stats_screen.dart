@@ -99,46 +99,58 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
                 children: [
                   Text("Last updated: $updatedText"),
                   const SizedBox(height: 12),
-                  const Text(
-                    "Activity",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      _rangeChip("7D", 7),
-                      _rangeChip("30D", 30),
-                      _rangeChip("90D", 90),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 220,
-                    child: FutureBuilder<List<dynamic>>(
-                      future: timeseriesFuture,
-                      builder: (context, seriesSnapshot) {
-                        if (seriesSnapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
-                        }
+                  Card(
+                    child: ExpansionTile(
+                      title: const Text(
+                        "Activity",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      initiallyExpanded: false,
+                      childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                      children: [
+                        Wrap(
+                          spacing: 8,
+                          children: [
+                            _rangeChip("7D", 7),
+                            _rangeChip("30D", 30),
+                            _rangeChip("90D", 90),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          height: 220,
+                          child: FutureBuilder<List<dynamic>>(
+                            future: timeseriesFuture,
+                            builder: (context, seriesSnapshot) {
+                              if (seriesSnapshot.connectionState ==
+                                  ConnectionState.waiting) {
+                                return const Center(
+                                  child: CircularProgressIndicator(),
+                                );
+                              }
 
-                        if (seriesSnapshot.hasError ||
-                            !seriesSnapshot.hasData) {
-                          return const Center(
-                            child: Text("Failed to load activity"),
-                          );
-                        }
+                              if (seriesSnapshot.hasError ||
+                                  !seriesSnapshot.hasData) {
+                                return const Center(
+                                  child: Text("Failed to load activity"),
+                                );
+                              }
 
-                        final series = _mapSeries(seriesSnapshot.data!);
-                        if (series.isEmpty) {
-                          return const Center(child: Text("No activity data"));
-                        }
+                              final series = _mapSeries(seriesSnapshot.data!);
+                              if (series.isEmpty) {
+                                return const Center(
+                                  child: Text("No activity data"),
+                                );
+                              }
 
-                        return _buildChart(series);
-                      },
+                              return _buildChart(series);
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 8),

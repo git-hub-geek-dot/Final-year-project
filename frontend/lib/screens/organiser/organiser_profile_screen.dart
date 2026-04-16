@@ -20,6 +20,7 @@ import 'organiser_activity_screen.dart';
 import 'my_events_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../volunteer/my_badges_screen.dart';
+import '../reports/my_reports_screen.dart';
 
 class OrganiserProfileScreen extends StatefulWidget {
   const OrganiserProfileScreen({super.key});
@@ -809,6 +810,19 @@ class _OrganiserProfileScreenState extends State<OrganiserProfileScreen> {
                                   context,
                                   MaterialPageRoute(
                                     builder: (_) => const OrganiserActivityScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                            _profileOption(
+                              context: context,
+                              icon: Icons.report_gmailerrorred,
+                              text: context.tr("My Reports"),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const MyReportsScreen(),
                                   ),
                                 );
                               },

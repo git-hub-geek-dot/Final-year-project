@@ -148,9 +148,17 @@ exports.createReport = async (req, res) => {
 
     const insertRes = await pool.query(
       `
-      INSERT INTO reports (reporter_id, target_type, target_id, reason, details)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING id, reporter_id, target_type, target_id, reason, details, status, created_at
+      INSERT INTO reports (
+        reporter_id,
+        target_type,
+        target_id,
+        reason,
+        details,
+        created_at,
+        updated_at
+      )
+      VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+      RETURNING id, reporter_id, target_type, target_id, reason, details, status, created_at, updated_at
       `,
       [reporterId, targetType, targetId, reason, details || null]
     );

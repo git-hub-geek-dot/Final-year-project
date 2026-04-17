@@ -244,6 +244,13 @@ exports.register = async (req, res) => {
       });
     }
 
+    if (finalRole === "volunteer" && !city?.toString().trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "City is required for volunteer",
+      });
+    }
+
     const normalizedEmail = normalizeIdentifier(email);
 
     const emailVerified = await isVerified(normalizedEmail, "email");

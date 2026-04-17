@@ -3,7 +3,7 @@ const router = express.Router();
 
 const authController = require("../controllers/authController");
 const authMiddleware = require("../middleware/auth");
-const { isConfigured } = require("../config/email");
+const { getConfigurationStatus } = require("../config/email");
 
 router.post("/register", authController.register);
 router.post("/login", authController.login);
@@ -12,9 +12,24 @@ router.post("/auth/verify-otp", authController.verifyOtp);
 
 // Check email service configuration
 router.get("/email-status", (req, res) => {
+  const status = getConfigurationStatus();
+
+  let message = "Email service is configured";
+  if (!status.configured) {
+    if (!status.hasApiKey && !status.hasFromAddress) {
+      message = "Missing SENDGRID_API_KEY and SENDGRID_FROM configuration";
+    } else if (!status.hasApiKey) {
+      message = "Missing SENDGRID_API_KEY configuration";
+    } else if (!status.hasFromAddress) {
+      message = "Missing SENDGRID_FROM configuration";
+    } else {
+      message = "Email service not configured";
+    }
+  }
+
   res.json({
-    configured: isConfigured(),
-    message: isConfigured() ? "Email service is configured" : "Email service not configured"
+    ...status,
+    message,
   });
 });
 router.post("/auth/verify-phone", authController.verifyPhoneToken);

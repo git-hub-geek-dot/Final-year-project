@@ -8,6 +8,18 @@ const OTP_TTL_MINUTES = 10;
 
 const normalizeIdentifier = (identifier) => identifier.trim().toLowerCase();
 
+const getEmailErrorMessage = (err, fallback) => {
+  const message = err?.message || "";
+  if (
+    message.includes("Email service not configured") ||
+    message.startsWith("SendGrid error:")
+  ) {
+    return message;
+  }
+
+  return fallback;
+};
+
 const generateOtp = () =>
   Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -100,7 +112,7 @@ exports.requestOtp = async (req, res) => {
     console.error("REQUEST OTP ERROR:", err);
     return res.status(500).json({
       success: false,
-      message: "Failed to send OTP",
+      message: getEmailErrorMessage(err, "Failed to send OTP"),
     });
   }
 };
@@ -580,7 +592,7 @@ exports.forgotPassword = async (req, res) => {
     console.error("FORGOT PASSWORD ERROR:", err);
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message: getEmailErrorMessage(err, "Internal server error"),
     });
   }
 };

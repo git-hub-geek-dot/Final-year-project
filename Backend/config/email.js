@@ -1,36 +1,75 @@
 let sgMail = null;
 
 const sendgridApiKey = process.env.SENDGRID_API_KEY;
-const sendgridFrom = process.env.SENDGRID_FROM || process.env.SENDGRID_FROM_EMAIL || "noreply@volunteerx.com";
+const sendgridFrom =
+  process.env.SENDGRID_FROM || process.env.SENDGRID_FROM_EMAIL || "";
 
-console.log('SendGrid API Key loaded:', sendgridApiKey ? 'Yes (' + sendgridApiKey.substring(0, 10) + '...)' : 'No');
+if (!sendgridApiKey) {
+  console.warn("SENDGRID_API_KEY not set. Email service is disabled.");
+}
+
+if (!sendgridFrom) {
+  console.warn(
+    "SENDGRID_FROM (or SENDGRID_FROM_EMAIL) not set. Email service is disabled."
+  );
+}
 
 if (sendgridApiKey) {
   try {
     sgMail = require("@sendgrid/mail");
     sgMail.setApiKey(sendgridApiKey);
-    console.log('SendGrid initialized successfully');
+    console.log("SendGrid initialized successfully");
   } catch (err) {
-    console.warn("@sendgrid/mail not installed or failed to initialize", err.message || err);
+    console.warn(
+      "@sendgrid/mail not installed or failed to initialize",
+      err.message || err
+    );
     sgMail = null;
   }
 }
 
-const isConfigured = () => !!sgMail;
+const isConfigured = () => !!sgMail && !!sendgridFrom;
+
+const getConfigurationStatus = () => ({
+  configured: isConfigured(),
+  hasApiKey: !!sendgridApiKey,
+  hasFromAddress: !!sendgridFrom,
+});
+
+const extractSendgridError = (err) => {
+  const errors = err?.response?.body?.errors;
+  if (Array.isArray(errors) && errors.length > 0) {
+    return errors
+      .map((entry) => entry?.message)
+      .filter(Boolean)
+      .join("; ");
+  }
+
+  return err?.message || "Unknown email provider error";
+};
 
 const sendEmail = async ({ to, subject, text, html, from: overrideFrom }) => {
-  if (!sgMail) {
-    throw new Error("Email service not configured");
+  if (!isConfigured()) {
+    throw new Error(
+      "Email service not configured. Set SENDGRID_API_KEY and SENDGRID_FROM."
+    );
   }
+
+  const from = overrideFrom || sendgridFrom;
 
   const msg = {
     to,
-    from: overrideFrom || sendgridFrom,
+    from,
     subject,
     text,
     html,
   };
-  return sgMail.send(msg);
+
+  try {
+    return await sgMail.send(msg);
+  } catch (err) {
+    throw new Error(`SendGrid error: ${extractSendgridError(err)}`);
+  }
 };
 
-module.exports = { sendEmail, isConfigured };
+module.exports = { sendEmail, isConfigured, getConfigurationStatus };

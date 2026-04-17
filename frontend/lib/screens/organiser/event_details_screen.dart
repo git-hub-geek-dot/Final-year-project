@@ -738,6 +738,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     final status = _statusText(event);
     final eventDateText = _fmtDate(event["event_date"]);
     final eventDateRangeText = _formatEventDateRange(event);
+    final dailyScheduleRows = _buildDailyScheduleRows(event);
     final deadlineText = _fmtDate(event["application_deadline"]);
     final startTimeText = _fmtTime(event["start_time"]);
     final endTimeText = _fmtTime(event["end_time"]);
@@ -909,6 +910,18 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                             "end": endTimeText,
                           },
                         )),
+                    if (dailyScheduleRows.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        context.tr("Daily Schedules"),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ...dailyScheduleRows,
+                    ],
                     _infoRow(
                         Icons.timer,
                         context.tr(
@@ -1423,6 +1436,35 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
 
     // Show date range for multi-day events
     return "$startDate ${context.tr("to")} $endDate";
+  }
+
+  List<Widget> _buildDailyScheduleRows(Map event) {
+    final rawSchedules = event["daily_schedules"];
+    if (rawSchedules is! List || rawSchedules.isEmpty) {
+      return const [];
+    }
+
+    if (rawSchedules.length <= 1) {
+      return const [];
+    }
+
+    int dayNumber = 1;
+    return rawSchedules.whereType<Map>().map((raw) {
+      final schedule = Map<String, dynamic>.from(raw);
+      final date = _fmtDate(schedule["date"]);
+      final start = _fmtTime(schedule["start_time"]);
+      final end = _fmtTime(schedule["end_time"]);
+      final label = context.tr(
+        "Day {number}: {date} | {time}",
+        args: {
+          "number": dayNumber.toString(),
+          "date": date,
+          "time": "$start - $end",
+        },
+      );
+      dayNumber++;
+      return _infoRow(Icons.schedule, label);
+    }).toList();
   }
 
   static String _fmtDate(dynamic value) {

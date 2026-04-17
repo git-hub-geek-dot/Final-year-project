@@ -101,6 +101,11 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
       return;
     }
 
+    if (widget.role == "volunteer" && cityController.text.trim().isEmpty) {
+      showError("City is required for volunteer");
+      return;
+    }
+
     if (!emailVerified) {
       showError("Please verify your email");
       return;
@@ -127,9 +132,7 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
           "contact_number": contactController.text.trim().isEmpty
               ? null
               : contactController.text.trim(),
-          "city": cityController.text.trim().isEmpty
-              ? null
-              : cityController.text.trim(),
+          "city": cityController.text.trim(),
         });
       }
 
@@ -511,7 +514,7 @@ class _RegisterBaseScreenState extends State<RegisterBaseScreen> {
                     _phoneOtpSection(),
                     inputField(
                       icon: Icons.location_city,
-                      hint: "City (optional)",
+                      hint: "City",
                       controller: cityController,
                     ),
                   ],

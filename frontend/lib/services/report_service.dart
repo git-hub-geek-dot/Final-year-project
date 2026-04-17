@@ -35,8 +35,21 @@ class ReportService {
       String error = "Failed to submit report";
       try {
         final data = jsonDecode(response.body);
-        error = data["error"]?.toString() ?? error;
+        error =
+            data["error"]?.toString() ??
+            data["message"]?.toString() ??
+            error;
       } catch (_) {}
+
+      if (error == "Failed to submit report") {
+        final rawBody = response.body.trim();
+        if (rawBody.isNotEmpty) {
+          error = "Failed to submit report (${response.statusCode}): $rawBody";
+        } else {
+          error = "Failed to submit report (${response.statusCode})";
+        }
+      }
+
       throw Exception(error);
     }
   }

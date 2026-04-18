@@ -2108,6 +2108,36 @@ const restoreEvent = async (req, res) => {
   }
 };
 
+// ================= PENDING APPLICATIONS AUTO-PROCESSING =================
+const processPendingApplications = async (req, res) => {
+  try {
+    const {
+      processPendingApplications,
+    } = require("../services/pendingApplicationService");
+
+    const result = await processPendingApplications();
+
+    if (!result.success) {
+      return res.status(500).json({
+        error: "Failed to process pending applications",
+        details: result.error,
+      });
+    }
+
+    res.json({
+      message: "Pending applications processed successfully",
+      summary: {
+        rejectedByDeadline: result.rejectedByDeadline,
+        rejectedByCompletion: result.rejectedByCompletion,
+        totalProcessed: result.total,
+      },
+    });
+  } catch (err) {
+    console.error("PROCESS PENDING APPLICATIONS ERROR:", err);
+    res.status(500).json({ error: "Failed to process pending applications" });
+  }
+};
+
 module.exports = {
   getUsers,
   getEvents,
@@ -2141,4 +2171,5 @@ module.exports = {
   resolveReport,
   sendTargetedNotification,
   sendEventNotification,
+  processPendingApplications,
 };

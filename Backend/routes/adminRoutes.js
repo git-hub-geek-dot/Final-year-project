@@ -259,4 +259,12 @@ router.post(
   adminController.dismissReport
 );
 
+// ================= PENDING APPLICATIONS AUTO-PROCESSING =================
+router.post(
+  "/applications/process-pending",
+  authenticateToken,
+  adminOnly,
+  adminController.processPendingApplications
+);
+
 module.exports = router;

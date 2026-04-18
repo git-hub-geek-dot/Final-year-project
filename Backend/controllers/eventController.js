@@ -607,9 +607,6 @@ exports.getEventById = async (req, res) => {
 // =======================================================
 exports.getVolunteerLeaderboard = async (req, res) => {
   try {
-    const period = req.query.period === "weekly" ? "weekly" : "monthly";
-    const days = period === "weekly" ? 7 : 30;
-
     const result = await pool.query(
       `
       SELECT
@@ -629,11 +626,9 @@ exports.getVolunteerLeaderboard = async (req, res) => {
             COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')
           )
         )
-        AND COALESCE(e.end_date, e.event_date) >= CURRENT_DATE - ($1::int - 1)
       GROUP BY u.id, u.name
       ORDER BY completed_events DESC, u.name ASC
-      `,
-      [days]
+      `
     );
 
     res.json(result.rows);
@@ -645,9 +640,6 @@ exports.getVolunteerLeaderboard = async (req, res) => {
 
 exports.getOrganiserLeaderboard = async (req, res) => {
   try {
-    const period = req.query.period === "weekly" ? "weekly" : "monthly";
-    const days = period === "weekly" ? 7 : 30;
-
     const result = await pool.query(
       `
       SELECT
@@ -664,11 +656,9 @@ exports.getOrganiserLeaderboard = async (req, res) => {
             COALESCE(e.end_date, e.event_date) + COALESCE(e.end_time, TIME '23:59:59')
           )
         )
-        AND COALESCE(e.end_date, e.event_date) >= CURRENT_DATE - ($1::int - 1)
       GROUP BY u.id, u.name
       ORDER BY completed_events DESC, u.name ASC
-      `,
-      [days]
+      `
     );
 
     res.json(result.rows);

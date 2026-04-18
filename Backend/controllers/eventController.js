@@ -9,6 +9,9 @@ const {
 const {
   applyAttendanceCompletionEffects,
 } = require("../services/eventStatusService");
+const {
+  autoRejectPendingForCompletedEvents,
+} = require("../services/pendingApplicationService");
 
 const VALID_PAYMENT_RATE_TYPES = new Set(["per_day", "per_hour", "fixed"]);
 const VALID_ATTENDANCE_STATUSES = new Set(["unmarked", "present", "absent"]);
@@ -1563,6 +1566,18 @@ exports.submitAttendanceFeedback = async (req, res) => {
     }
 
     await client.query("COMMIT");
+
+    // Auto-reject pending applications for completed events
+    if (event.status === "completed") {
+      try {
+        await autoRejectPendingForCompletedEvents();
+      } catch (autoRejectErr) {
+        console.error(
+          "AUTO-REJECT PENDING APPLICATIONS ERROR:",
+          autoRejectErr
+        );
+      }
+    }
 
     for (const item of attendanceNotifications) {
       if (event.status === "completed" && item.status === "absent") {

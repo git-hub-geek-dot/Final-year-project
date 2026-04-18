@@ -852,6 +852,16 @@ const deleteEvent = async (req, res) => {
       eventId,
     ]);
 
+    // Auto-cancel all applications for this deleted event
+    await pool.query(
+      `UPDATE applications 
+       SET status = 'cancelled', 
+           admin_cancel_reason = 'Event was removed by admin.'
+       WHERE event_id = $1 
+         AND status IN ('pending', 'approved', 'accepted', 'waitlisted', 'completed')`,
+      [eventId]
+    );
+
     res.json({ message: "Event deleted" });
 
     try {

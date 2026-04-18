@@ -12,6 +12,9 @@ const {
 const {
   autoRejectPendingForCompletedEvents,
 } = require("../services/pendingApplicationService");
+const {
+  evaluateAndAwardBadges,
+} = require("../services/badgeEvaluationService");
 
 const VALID_PAYMENT_RATE_TYPES = new Set(["per_day", "per_hour", "fixed"]);
 const VALID_ATTENDANCE_STATUSES = new Set(["unmarked", "present", "absent"]);
@@ -1576,6 +1579,13 @@ exports.submitAttendanceFeedback = async (req, res) => {
           "AUTO-REJECT PENDING APPLICATIONS ERROR:",
           autoRejectErr
         );
+      }
+
+      // Auto-evaluate and award badges
+      try {
+        await evaluateAndAwardBadges();
+      } catch (badgeEvalErr) {
+        console.error("AUTO-EVALUATE BADGES ERROR:", badgeEvalErr);
       }
     }
 
